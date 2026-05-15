@@ -1,0 +1,15 @@
+export { default as authRoutes } from './auth/auth.routes';
+export { default as restaurantRoutes } from './restaurant/restaurant.routes';
+export { default as menuRoutes } from './menu/menu.routes';
+export { default as publicRoutes } from './menu/public.routes';
+export { default as qrRoutes } from './qrcodes/qrcodes.routes';
+export { default as orderRoutes } from './orders/orders.routes';
+export { default as paymentRoutes } from './payments/payments.routes';
+export { default as aiRoutes } from './ai/ai.routes';
+export { default as marketingRoutes } from './marketing/marketing.routes';
+export { default as cameraRoutes } from './surveillance/surveillance.routes';
+export { default as analyticsRoutes } from './analytics/analytics.routes';
+export { default as adminRoutes } from './admin/admin.routes';
+export { default as ussdRoutes } from './ussd/ussd.routes';
+export { default as smsRoutes } from './sms/sms.routes';
+export { default as notificationRoutes } from './notifications/notifications.routes';

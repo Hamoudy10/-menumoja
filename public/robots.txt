@@ -1,0 +1,3 @@
+User-agent: *
+Allow: /
+Sitemap: https://menumoja.co.ke/sitemap.xml
