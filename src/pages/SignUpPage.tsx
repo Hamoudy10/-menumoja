@@ -108,7 +108,7 @@ export default function SignUpPage() {
     otpRefs.current[focusIndex]?.focus()
   }
 
-  const handleSignUp = async (data: {
+  const handleSignUp = async (formData: {
     restaurantName: string
     ownerName: string
     phone: string
@@ -117,7 +117,13 @@ export default function SignUpPage() {
   }) => {
     setLoading(true)
     try {
-      const res = await storeRegister(data)
+      const res = await storeRegister({
+        name: formData.ownerName,
+        email: formData.email,
+        phone: formData.phone,
+        password: formData.password,
+        restaurantName: formData.restaurantName,
+      })
       setUserId(res.user?.id || res.userId)
       setStep('otp')
     } catch {
