@@ -87,6 +87,8 @@ export function errorHandler(
     return;
   }
 
+  console.error(`[${requestId}] UNHANDLED ERROR:`, err.stack || err.message);
+
   logger.error(`[${requestId}] Unhandled error: ${err.message}`, {
     stack: err.stack,
     method: req.method,
