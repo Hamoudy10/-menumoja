@@ -54,12 +54,18 @@ if (config.redisUrl && !config.redisUrl.includes('localhost')) {
     const origSetex = client.setex.bind(client);
     const origDel = client.del.bind(client);
     const origTtl = client.ttl.bind(client);
+    const origIncr = client.incr.bind(client);
+    const origExpire = client.expire.bind(client);
+    const origExists = client.exists.bind(client);
 
     client.get = async (key: string) => { try { return await origGet(key); } catch { return null; } };
     client.set = async (key: string, value: any, ...args: any[]) => { try { return await origSet(key, value, ...args); } catch { return; } };
     client.setex = async (key: string, seconds: number, value: any) => { try { return await origSetex(key, seconds, value); } catch { return; } };
     client.del = async (...keys: string[]) => { try { return await origDel(...keys); } catch { return 0; } };
     client.ttl = async (key: string) => { try { return await origTtl(key); } catch { return -2; } };
+    client.incr = async (key: string) => { try { return await origIncr(key); } catch { return 1; } };
+    client.expire = async (key: string, seconds: number) => { try { return await origExpire(key, seconds); } catch { return 0; } };
+    client.exists = async (...keys: string[]) => { try { return await origExists(...keys); } catch { return 0; } };
 
     redis = client;
   } catch {
