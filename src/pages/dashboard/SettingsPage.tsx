@@ -34,7 +34,7 @@ export default function SettingsPage() {
   const { darkMode, toggleDarkMode, restaurant, updateRestaurant, staff, addStaff, removeStaff, fetchStaff, language, setLanguage } = useStore()
   const [section, setSection] = useState('profile')
   const [showAddStaff, setShowAddStaff] = useState(false)
-  const [newStaff, setNewStaff] = useState({ name: '', phone: '', role: 'waiter' as const, pin: '' })
+  const [newStaff, setNewStaff] = useState<{ name: string; phone: string; role: 'waiter' | 'cashier' | 'kitchen' | 'manager'; pin: string }>({ name: '', phone: '', role: 'waiter', pin: '' })
   const [saving, setSaving] = useState(false)
   const [profile, setProfile] = useState({
     name: '', ownerName: '', email: '', phone: '', cuisine: '', location: '', description: '',

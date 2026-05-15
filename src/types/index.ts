@@ -136,6 +136,9 @@ export interface Camera {
   id: string
   name: string
   ip: string
+  port?: number
+  username?: string
+  location?: string
   active: boolean
   feedUrl: string
   alerts: Alert[]
