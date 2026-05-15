@@ -1,0 +1,12 @@
+{
+  "build": {
+    "builder": "DOCKERFILE",
+    "dockerfilePath": "backend/Dockerfile",
+    "watchPatterns": ["backend/**"]
+  },
+  "deploy": {
+    "startCommand": "cd backend && node dist/index.js",
+    "healthcheckPath": "/api/v1/health",
+    "restartPolicyType": "ON_FAILURE"
+  }
+}
