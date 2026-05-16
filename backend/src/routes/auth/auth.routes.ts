@@ -182,17 +182,23 @@ router.post(
       owner = await prisma.owner.create({
         data: { fullName: name || email.split('@')[0], email, phone: '', passwordHash, isVerified: true, onboardingCompleted: false },
       });
+    }
 
-      // Create default restaurant
-      const plan = await prisma.subscriptionPlan.findFirst({ where: { isActive: true }, orderBy: { priceMonthlyKes: 'asc' } });
-      const slug = generateSlug(name || email.split('@')[0]);
-      const restaurant = await prisma.restaurant.create({
-        data: { ownerId: owner.id, name: name || 'My Restaurant', slug, address: '', phone: '', planId: plan?.id || '', subscriptionStatus: 'TRIAL', trialEndsAt: new Date(Date.now() + 14 * 86400000) },
+    // Find or create restaurant
+    let restaurant = await prisma.restaurant.findFirst({ where: { ownerId: owner.id } });
+    if (!restaurant) {
+      let plan = await prisma.subscriptionPlan.findFirst({ where: { isActive: true }, orderBy: { priceMonthlyKes: 'asc' } });
+      if (!plan) {
+        plan = await prisma.subscriptionPlan.create({
+          data: { name: 'Free Trial', priceMonthlyKes: 0, priceYearlyKes: 0, hasOrdering: true, hasAnalytics: true, maxMenuItems: 50, maxTables: 20, isActive: true },
+        });
+      }
+      const slug = generateSlug(name || email.split('@')[0]) + '-' + Date.now().toString(36);
+      restaurant = await prisma.restaurant.create({
+        data: { ownerId: owner.id, name: name || 'My Restaurant', slug, address: '', phone: '', planId: plan.id, subscriptionStatus: 'TRIAL', trialEndsAt: new Date(Date.now() + 14 * 86400000), description: '' },
       });
       await prisma.restaurantSettings.create({ data: { restaurantId: restaurant.id } });
     }
-
-    const restaurant = await prisma.restaurant.findFirst({ where: { ownerId: owner.id } });
     if (!restaurant) throw new AppError(500, 'RESTAURANT_NOT_FOUND', 'No restaurant found', 'Hakuna mgahawa uliopatikana');
 
     const tokens = generateTokens(owner.id, 'owner', restaurant.id);
