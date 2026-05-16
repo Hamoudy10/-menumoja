@@ -321,15 +321,68 @@ export default function MenuManager() {
                 <Input label="Price (KES)" type="number" value={editingItem.price || ''} onChange={(e) => updateItem(currentCat.id, editingItem.id, { price: parseInt(e.target.value) || 0 })} />
 
                 <div>
-                  <label className="mb-2 block font-accent text-sm font-medium text-text-primary dark:text-white/90">Photo URL</label>
-                  <div className="flex gap-2">
-                    <Input value={editingItem.photo || ''} onChange={(e) => updateItem(currentCat.id, editingItem.id, { photo: e.target.value })} placeholder="https://example.com/food.jpg" className="flex-1" />
+                  <label className="mb-2 block font-accent text-sm font-medium text-text-primary dark:text-white/90">Photo</label>
+                  <div
+                    onDragOver={(e) => e.preventDefault()}
+                    onDrop={(e) => {
+                      e.preventDefault()
+                      const file = e.dataTransfer.files[0]
+                      if (file && file.type.startsWith('image/')) {
+                        const reader = new FileReader()
+                        reader.onload = (ev) => updateItem(currentCat.id, editingItem.id, { photo: ev.target?.result as string })
+                        reader.readAsDataURL(file)
+                      }
+                    }}
+                    className="relative rounded-xl border-2 border-dashed border-white/20 p-4 text-center hover:border-secondary/50 transition-colors cursor-pointer"
+                    onClick={() => {
+                      const input = document.createElement('input')
+                      input.type = 'file'
+                      input.accept = 'image/*'
+                      input.onchange = () => {
+                        const file = input.files?.[0]
+                        if (file) {
+                          const reader = new FileReader()
+                          reader.onload = (ev) => updateItem(currentCat.id, editingItem.id, { photo: ev.target?.result as string })
+                          reader.readAsDataURL(file)
+                        }
+                      }
+                      input.click()
+                    }}
+                  >
+                    {editingItem.photo ? (
+                      <div className="relative">
+                        <img src={editingItem.photo} alt="" className="mx-auto h-32 w-32 rounded-xl object-cover" onError={(e) => { (e.target as HTMLImageElement).src = '' }} />
+                        <p className="mt-2 text-xs text-text-secondary dark:text-white/50">Drop new image or click to change</p>
+                      </div>
+                    ) : (
+                      <div className="py-4">
+                        <Image className="mx-auto h-8 w-8 text-text-secondary/40" />
+                        <p className="mt-2 text-sm font-accent text-text-secondary dark:text-white/60">Drop an image here or click to browse</p>
+                        <p className="mt-1 text-xs text-text-secondary/40">You can also paste a URL below</p>
+                      </div>
+                    )}
                   </div>
-                  {editingItem.photo && (
-                    <div className="mt-2 h-24 w-24 rounded-xl overflow-hidden bg-black/5 dark:bg-white/10">
-                      <img src={editingItem.photo} alt="" className="h-full w-full object-cover" onError={(e) => { (e.target as HTMLImageElement).style.display = 'none' }} />
-                    </div>
-                  )}
+                  <div className="mt-2 flex gap-2">
+                    <Input value={editingItem.photo || ''} onChange={(e) => updateItem(currentCat.id, editingItem.id, { photo: e.target.value })} placeholder="Or paste image URL..." className="flex-1" />
+                    <button
+                      onClick={async () => {
+                        try {
+                          const { generateImage } = await import('@/api/ai')
+                          const prompt = editingItem.description || editingItem.name || 'a delicious Kenyan dish'
+                          const data = await generateImage(`Professional food photography of ${editingItem.name || 'dish'}, ${prompt}, Kenyan cuisine`, editingItem.name || 'dish')
+                          const url = data.imageUrl || data.url || ''
+                          if (url) updateItem(currentCat.id, editingItem.id, { photo: url })
+                          showSuccessToast('AI image generated!')
+                        } catch {
+                          showSuccessToast('AI image generation needs OpenAI API key configured')
+                        }
+                      }}
+                      className="shrink-0 rounded-xl bg-gradient-to-br from-secondary to-accent px-3 py-2 text-xs font-accent font-medium text-white hover:opacity-90 transition-opacity"
+                      title="Generate image with AI"
+                    >
+                      ✨ AI
+                    </button>
+                  </div>
                 </div>
 
                 <div>
