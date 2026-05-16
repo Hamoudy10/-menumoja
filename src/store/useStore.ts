@@ -45,7 +45,7 @@ interface AppState {
   addCategory: (data: any) => Promise<void>
   updateCategory: (id: string, data: any) => Promise<void>
   removeCategory: (id: string) => Promise<void>
-  addItem: (categoryId: string, data: any) => Promise<void>
+  addItem: (categoryId: string, data: any) => Promise<any>
   updateItem: (categoryId: string, itemId: string, data: any) => Promise<void>
   removeItem: (categoryId: string, itemId: string) => Promise<void>
   toggleItemAvailability: (itemId: string) => Promise<void>
@@ -373,6 +373,7 @@ export const useStore = create<AppState>((set) => ({
         ),
       }))
       toast.success('Item added')
+      return newItem
     } catch (err: any) {
       toast.error(err?.response?.data?.message || 'Failed to add item')
       throw err

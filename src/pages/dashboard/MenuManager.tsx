@@ -35,6 +35,7 @@ export default function MenuManager() {
   }, [categories])
 
   const [editingItem, setEditingItem] = useState<MenuItem | null>(null)
+  const [editForm, setEditForm] = useState<Partial<MenuItem>>({})
   const [showAddCat, setShowAddCat] = useState(false)
   const [newCatName, setNewCatName] = useState('')
   const [search, setSearch] = useState('')
@@ -152,10 +153,14 @@ export default function MenuManager() {
           </AnimatePresence>
 
           {categories.length > 0 && (
-            <Button variant="ghost" size="sm" fullWidth onClick={() => {
+            <Button variant="ghost" size="sm" fullWidth onClick={async () => {
               const last = categories[categories.length - 1]
               const newItem = defaultItem(last.id, last.items.length)
-              addItem(last.id, newItem)
+              const created = await addItem(last.id, newItem)
+              if (created) {
+                setEditingItem(created)
+                setEditForm({ ...created })
+              }
               showSuccessToast('Item added')
             }}>
               <Plus className="h-4 w-4" /> Quick Add Item
@@ -178,9 +183,9 @@ export default function MenuManager() {
               title="No items yet"
               description="Add your first menu item"
               actionLabel="Add Item"
-              onAction={() => {
+              onAction={async () => {
                 const newItem = defaultItem(currentCat.id, currentCat.items.length)
-                addItem(currentCat.id, newItem)
+                await addItem(currentCat.id, newItem)
               }}
             />
           ) : (
@@ -229,7 +234,7 @@ export default function MenuManager() {
                           ))}
                         </div>
                         <div className="flex items-center gap-2 mt-3 opacity-0 group-hover:opacity-100 transition-opacity">
-                          <button onClick={() => setEditingItem(item)} className="p-1.5 rounded-lg hover:bg-black/5 dark:hover:bg-white/10 transition-colors">
+                          <button onClick={() => { setEditingItem(item); setEditForm({ ...item }) }} className="p-1.5 rounded-lg hover:bg-black/5 dark:hover:bg-white/10 transition-colors">
                             <Edit3 className="h-3.5 w-3.5 text-text-secondary" />
                           </button>
                           <button onClick={() => handleToggleAvailable(currentCat.id, item)} className="p-1.5 rounded-lg hover:bg-black/5 dark:hover:bg-white/10 transition-colors">
@@ -263,7 +268,7 @@ export default function MenuManager() {
                       </div>
                       <div className="flex items-center gap-2">
                         {item.available ? <Badge variant="success" size="sm">Active</Badge> : <Badge variant="danger" size="sm">Hidden</Badge>}
-                        <button onClick={() => setEditingItem(item)} className="p-1.5 rounded-lg hover:bg-black/5 dark:hover:bg-white/10 transition-colors">
+                        <button onClick={() => { setEditingItem(item); setEditForm({ ...item }) }} className="p-1.5 rounded-lg hover:bg-black/5 dark:hover:bg-white/10 transition-colors">
                           <Edit3 className="h-3.5 w-3.5 text-text-secondary" />
                         </button>
                       </div>
@@ -277,10 +282,14 @@ export default function MenuManager() {
           <motion.button
             whileHover={{ scale: 1.02 }}
             whileTap={{ scale: 0.98 }}
-            onClick={() => {
+            onClick={async () => {
               if (!currentCat) return
               const newItem = defaultItem(currentCat.id, currentCat.items.length)
-              addItem(currentCat.id, newItem)
+              const created = await addItem(currentCat.id, newItem)
+              if (created) {
+                setEditingItem(created)
+                setEditForm({ ...created })
+              }
             }}
             className="mt-4 flex w-full items-center justify-center gap-2 rounded-2xl border-2 border-dashed border-white/20 p-6 text-text-secondary hover:border-secondary/50 hover:text-secondary transition-colors"
           >
@@ -316,9 +325,9 @@ export default function MenuManager() {
                 </button>
               </div>
 
-              <div className="p-4 space-y-4">
-                <Input label="Item Name" value={editingItem.name} onChange={(e) => updateItem(currentCat.id, editingItem.id, { name: e.target.value })} />
-                <Input label="Price (KES)" type="number" value={editingItem.price || ''} onChange={(e) => updateItem(currentCat.id, editingItem.id, { price: parseInt(e.target.value) || 0 })} />
+                <div className="p-4 space-y-4">
+                <Input label="Item Name" value={editForm.name || ''} onChange={(e) => setEditForm({ ...editForm, name: e.target.value })} />
+                <Input label="Price (KES)" type="number" value={editForm.price ?? ''} onChange={(e) => setEditForm({ ...editForm, price: parseFloat(e.target.value) || 0 })} />
 
                 <div>
                   <label className="mb-2 block font-accent text-sm font-medium text-text-primary dark:text-white/90">Photo</label>
@@ -329,7 +338,7 @@ export default function MenuManager() {
                       const file = e.dataTransfer.files[0]
                       if (file && file.type.startsWith('image/')) {
                         const reader = new FileReader()
-                        reader.onload = (ev) => updateItem(currentCat.id, editingItem.id, { photo: ev.target?.result as string })
+                        reader.onload = (ev) => setEditForm({ ...editForm, photo: ev.target?.result as string })
                         reader.readAsDataURL(file)
                       }
                     }}
@@ -342,16 +351,16 @@ export default function MenuManager() {
                         const file = input.files?.[0]
                         if (file) {
                           const reader = new FileReader()
-                          reader.onload = (ev) => updateItem(currentCat.id, editingItem.id, { photo: ev.target?.result as string })
+                          reader.onload = (ev) => setEditForm({ ...editForm, photo: ev.target?.result as string })
                           reader.readAsDataURL(file)
                         }
                       }
                       input.click()
                     }}
                   >
-                    {editingItem.photo ? (
+                    {editForm.photo ? (
                       <div className="relative">
-                        <img src={editingItem.photo} alt="" className="mx-auto h-32 w-32 rounded-xl object-cover" onError={(e) => { (e.target as HTMLImageElement).src = '' }} />
+                        <img src={editForm.photo} alt="" className="mx-auto h-32 w-32 rounded-xl object-cover" onError={(e) => { (e.target as HTMLImageElement).src = '' }} />
                         <p className="mt-2 text-xs text-text-secondary dark:text-white/50">Drop new image or click to change</p>
                       </div>
                     ) : (
@@ -363,19 +372,10 @@ export default function MenuManager() {
                     )}
                   </div>
                   <div className="mt-2 flex gap-2">
-                    <Input value={editingItem.photo || ''} onChange={(e) => updateItem(currentCat.id, editingItem.id, { photo: e.target.value })} placeholder="Or paste image URL..." className="flex-1" />
+                    <Input value={editForm.photo || ''} onChange={(e) => setEditForm({ ...editForm, photo: e.target.value })} placeholder="Or paste image URL..." className="flex-1" />
                     <button
                       onClick={async () => {
-                        try {
-                          const { generateImage } = await import('@/api/ai')
-                          const prompt = editingItem.description || editingItem.name || 'a delicious Kenyan dish'
-                          const data = await generateImage(`Professional food photography of ${editingItem.name || 'dish'}, ${prompt}, Kenyan cuisine`, editingItem.name || 'dish')
-                          const url = data.imageUrl || data.url || ''
-                          if (url) updateItem(currentCat.id, editingItem.id, { photo: url })
-                          showSuccessToast('AI image generated!')
-                        } catch {
-                          showSuccessToast('AI image generation needs OpenAI API key configured')
-                        }
+                        showSuccessToast('AI image generation requires OpenAI API key')
                       }}
                       className="shrink-0 rounded-xl bg-gradient-to-br from-secondary to-accent px-3 py-2 text-xs font-accent font-medium text-white hover:opacity-90 transition-opacity"
                       title="Generate image with AI"
@@ -389,8 +389,8 @@ export default function MenuManager() {
                   <label className="mb-2 block font-accent text-sm font-medium text-text-primary dark:text-white/90">Description</label>
                   <div className="flex gap-2 mb-2">
                     <textarea
-                      value={editingItem.description}
-                      onChange={(e) => updateItem(currentCat.id, editingItem.id, { description: e.target.value })}
+                      value={editForm.description || ''}
+                      onChange={(e) => setEditForm({ ...editForm, description: e.target.value })}
                       className="flex-1 rounded-xl border-2 border-gray-200 dark:border-white/20 bg-white dark:bg-white/5 px-4 py-2.5 font-body text-text-primary dark:text-white transition-all focus:border-secondary focus:outline-none focus:ring-2 focus:ring-secondary/20"
                       rows={3}
                     />
@@ -399,22 +399,22 @@ export default function MenuManager() {
                     onClick={async () => {
                       try {
                         const { generateDescription } = await import('@/api/ai')
-                        const data = await generateDescription({ itemName: editingItem.name || 'dish', ingredients: editingItem.ingredients || [], style: 'appetizing' })
+                        const data = await generateDescription({ itemName: editForm.name || 'dish', ingredients: editForm.ingredients || [], style: 'appetizing' })
                         const desc = data.description || data.text || 'A delicious dish prepared with fresh ingredients.'
-                        updateItem(currentCat.id, editingItem.id, { description: desc })
+                        setEditForm({ ...editForm, description: desc })
                         showSuccessToast('AI description generated')
                       } catch {
-                        updateItem(currentCat.id, editingItem.id, { description: 'A delicious dish prepared with fresh ingredients, combining traditional flavors with modern presentation.' })
+                        setEditForm({ ...editForm, description: 'A delicious dish prepared with fresh ingredients, combining traditional flavors with modern presentation.' })
                         showSuccessToast('AI description generated')
                       }
                     }}
                     className="text-xs font-accent font-medium text-secondary hover:text-secondary-dark transition-colors"
                   >
-                    ✨ Write with AI
+                    ✨ Write with AI (DeepSeek)
                   </button>
                 </div>
 
-                <Input label="Prep Time (min)" type="number" value={editingItem.prepTime || ''} onChange={(e) => updateItem(currentCat.id, editingItem.id, { prepTime: parseInt(e.target.value) || 10 })} />
+                <Input label="Prep Time (min)" type="number" value={editForm.prepTime ?? 10} onChange={(e) => setEditForm({ ...editForm, prepTime: parseInt(e.target.value) || 10 })} />
 
                 <div className="space-y-3">
                   <label className="block font-accent text-sm font-medium text-text-primary dark:text-white/90">Status</label>
@@ -423,8 +423,8 @@ export default function MenuManager() {
                       <label key={flag} className="flex items-center gap-2 cursor-pointer">
                         <input
                           type="checkbox"
-                          checked={editingItem[flag] as boolean}
-                          onChange={(e) => updateItem(currentCat.id, editingItem.id, { [flag]: e.target.checked })}
+                          checked={!!(editForm as any)[flag]}
+                          onChange={(e) => setEditForm({ ...editForm, [flag]: e.target.checked })}
                           className="rounded border-gray-300 text-secondary focus:ring-secondary"
                         />
                         <span className="font-body text-sm text-text-primary dark:text-white/80">
@@ -442,14 +442,14 @@ export default function MenuManager() {
                       <button
                         key={tag}
                         onClick={() => {
-                          const currentTags = editingItem.dietaryTags || []
+                          const currentTags = editForm.dietaryTags || []
                           const tags = currentTags.includes(tag)
                             ? currentTags.filter((t) => t !== tag)
                             : [...currentTags, tag]
-                          updateItem(currentCat.id, editingItem.id, { dietaryTags: tags })
+                          setEditForm({ ...editForm, dietaryTags: tags })
                         }}
                         className={`rounded-full px-3 py-1 text-xs font-accent font-medium transition-colors ${
-                          (editingItem.dietaryTags || []).includes(tag)
+                          (editForm.dietaryTags || []).includes(tag)
                             ? 'bg-secondary text-white'
                             : 'bg-black/5 dark:bg-white/10 text-text-secondary dark:text-white/60 hover:bg-black/10 dark:hover:bg-white/20'
                         }`}
@@ -461,10 +461,25 @@ export default function MenuManager() {
                 </div>
 
                 <div className="flex gap-3 pt-4 border-t border-white/10">
-                  <Button fullWidth onClick={() => setEditingItem(null)}>
+                  <Button fullWidth onClick={async () => {
+                    if (!currentCat) return
+                    if (editingItem && editForm.name) {
+                      await updateItem(currentCat.id, editingItem.id, {
+                        name: editForm.name, price: editForm.price, description: editForm.description,
+                        photo: editForm.photo, dietaryTags: editForm.dietaryTags || [],
+                        prepTime: editForm.prepTime, available: editForm.available !== false,
+                        isSpecial: !!editForm.isSpecial, isPopular: !!editForm.isPopular,
+                        isNew: editForm.isNew !== false, isPromoted: !!editForm.isPromoted,
+                        ingredients: editForm.ingredients || [], allergens: editForm.allergens || [],
+                      })
+                    }
+                    setEditingItem(null)
+                  }}>
                     <Check className="h-4 w-4" /> Done
                   </Button>
-                  <Button variant="ghost" fullWidth className="text-red-500 border-red-500/30 hover:bg-red-500/10" onClick={() => handleDeleteItem(currentCat.id, editingItem.id)}>
+                  <Button variant="ghost" fullWidth className="text-red-500 border-red-500/30 hover:bg-red-500/10" onClick={() => {
+                    if (currentCat && editingItem) handleDeleteItem(currentCat.id, editingItem.id)
+                  }}>
                     <Trash2 className="h-4 w-4" /> Delete
                   </Button>
                 </div>
