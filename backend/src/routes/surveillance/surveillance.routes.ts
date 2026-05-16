@@ -118,6 +118,53 @@ router.post('/', validate(addCameraSchema), asyncHandler(async (req: Authenticat
   });
 }));
 
+router.get('/alert', asyncHandler(async (req: AuthenticatedRequest, res: Response) => {
+  const restaurantId = (req as any).restaurantId;
+  const { page, perPage } = parsePagination(req.query as any);
+  const isReviewed = req.query.isReviewed as string | undefined;
+
+  const where: any = { restaurantId };
+  if (isReviewed === 'true') where.isReviewed = true;
+  else if (isReviewed === 'false') where.isReviewed = false;
+
+  const [alerts, total] = await Promise.all([
+    prisma.cameraAlert.findMany({
+      where,
+      include: { camera: { select: { name: true } } },
+      orderBy: { occurredAt: 'desc' },
+      skip: (page - 1) * perPage,
+      take: perPage,
+    }),
+    prisma.cameraAlert.count({ where }),
+  ]);
+
+  res.json({
+    success: true,
+    data: alerts.map((a) => ({ ...a, cameraName: a.camera.name })),
+    meta: buildPaginationMeta(total, page, perPage),
+  });
+}));
+
+router.put('/alert/:alertId/review', asyncHandler(async (req: AuthenticatedRequest, res: Response) => {
+  const restaurantId = (req as any).restaurantId;
+  const alertId = req.params.alertId;
+
+  const alert = await prisma.cameraAlert.findFirst({
+    where: { id: alertId, restaurantId },
+  });
+
+  if (!alert) {
+    throw new NotFoundError('Alert not found', 'Tahadhari haikupatikana');
+  }
+
+  const updated = await prisma.cameraAlert.update({
+    where: { id: alertId },
+    data: { isReviewed: true, reviewedAt: new Date() },
+  });
+
+  res.json({ success: true, data: updated });
+}));
+
 router.get('/:id', asyncHandler(async (req: AuthenticatedRequest, res: Response) => {
   const restaurantId = (req as any).restaurantId;
   const cameraId = req.params.id;
@@ -137,23 +184,11 @@ router.get('/:id', asyncHandler(async (req: AuthenticatedRequest, res: Response)
     throw new NotFoundError('Camera not found', 'Kamera haikupatikana');
   }
 
-  let decryptedPassword: string | null = null;
-  if (camera.passwordEncrypted) {
-    try {
-      decryptedPassword = decrypt(camera.passwordEncrypted);
-    } catch {
-      decryptedPassword = null;
-    }
-  }
-
-  const streamUrlForClient = `rtsp://${camera.username ? `${encodeURIComponent(camera.username)}:${decryptedPassword ? encodeURIComponent(decryptedPassword) : ''}@` : ''}${camera.ipAddress}:${camera.port}/live`;
-
   res.json({
     success: true,
     data: {
       ...camera,
-      streamUrl: streamUrlForClient,
-      passwordEncrypted: null,
+      passwordEncrypted: camera.passwordEncrypted ? '[ENCRYPTED]' : null,
     },
   });
 }));
@@ -304,35 +339,6 @@ router.post('/:id/stream-token', asyncHandler(async (req: AuthenticatedRequest, 
   });
 }));
 
-// ==================== ALERTS ====================
-
-router.get('/alert', asyncHandler(async (req: AuthenticatedRequest, res: Response) => {
-  const restaurantId = (req as any).restaurantId;
-  const { page, perPage } = parsePagination(req.query as any);
-  const isReviewed = req.query.isReviewed as string | undefined;
-
-  const where: any = { restaurantId };
-  if (isReviewed === 'true') where.isReviewed = true;
-  else if (isReviewed === 'false') where.isReviewed = false;
-
-  const [alerts, total] = await Promise.all([
-    prisma.cameraAlert.findMany({
-      where,
-      include: { camera: { select: { name: true } } },
-      orderBy: { occurredAt: 'desc' },
-      skip: (page - 1) * perPage,
-      take: perPage,
-    }),
-    prisma.cameraAlert.count({ where }),
-  ]);
-
-  res.json({
-    success: true,
-    data: alerts.map((a) => ({ ...a, cameraName: a.camera.name })),
-    meta: buildPaginationMeta(total, page, perPage),
-  });
-}));
-
 router.get('/:id/alerts', asyncHandler(async (req: AuthenticatedRequest, res: Response) => {
   const restaurantId = (req as any).restaurantId;
   const cameraId = req.params.id;
@@ -362,26 +368,6 @@ router.get('/:id/alerts', asyncHandler(async (req: AuthenticatedRequest, res: Re
     data: alerts.map((a) => ({ ...a, cameraName: camera.name })),
     meta: buildPaginationMeta(total, page, perPage),
   });
-}));
-
-router.put('/alert/:alertId/review', asyncHandler(async (req: AuthenticatedRequest, res: Response) => {
-  const restaurantId = (req as any).restaurantId;
-  const alertId = req.params.alertId;
-
-  const alert = await prisma.cameraAlert.findFirst({
-    where: { id: alertId, restaurantId },
-  });
-
-  if (!alert) {
-    throw new NotFoundError('Alert not found', 'Tahadhari haikupatikana');
-  }
-
-  const updated = await prisma.cameraAlert.update({
-    where: { id: alertId },
-    data: { isReviewed: true, reviewedAt: new Date() },
-  });
-
-  res.json({ success: true, data: updated });
 }));
 
 export default router;
