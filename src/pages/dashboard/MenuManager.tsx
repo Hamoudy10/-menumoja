@@ -63,7 +63,7 @@ export default function MenuManager() {
   }
 
   const currentCat = categories.find((c) => c.id === selectedCat)
-  const filteredItems = currentCat?.items.filter((i) =>
+  const filteredItems = (currentCat?.items || []).filter((i) =>
     i.name.toLowerCase().includes(search.toLowerCase())
   ) || []
 
@@ -115,7 +115,7 @@ export default function MenuManager() {
                     <GripVertical className="h-3.5 w-3.5 shrink-0 opacity-40" />
                     <Tag className="h-3.5 w-3.5 shrink-0" />
                     <span className="truncate flex-1 text-left">{cat.name}</span>
-                    <Badge size="sm" variant="default">{cat.items.length}</Badge>
+                    <Badge size="sm" variant="default">{(cat.items || []).length}</Badge>
                   </motion.button>
                 </Reorder.Item>
               ))}

@@ -267,7 +267,8 @@ export const useStore = create<AppState>((set) => ({
     set({ loadingCategories: true })
     try {
       const data = await menuApi.fetchCategories()
-      set({ categories: data.categories || data })
+      const cats = (data.categories || data || []).map((c: any) => ({ ...c, items: c.items || [] }))
+      set({ categories: cats })
     } catch (err: any) {
       const msg = err?.response?.data?.message || 'Failed to load menu'
       toast.error(msg)
