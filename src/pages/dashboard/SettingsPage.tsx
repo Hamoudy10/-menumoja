@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import {
   User, Palette, QrCode, Users, Bell, CreditCard, Globe, Crown, Trash2,
-  Plus, X, Shield, Coffee, Moon, Sun, Save, Loader2, CheckCircle2,
+  Plus, X, Shield, Moon, Sun, Save, Loader2, CheckCircle2, Download,
 } from 'lucide-react'
 import { useStore } from '@/store/useStore'
 import { Button } from '@/components/ui/Button'
@@ -31,7 +31,7 @@ const languages = [
 ]
 
 export default function SettingsPage() {
-  const { darkMode, toggleDarkMode, restaurant, updateRestaurant, staff, addStaff, removeStaff, fetchStaff, language, setLanguage } = useStore()
+  const { darkMode, toggleDarkMode, restaurant, updateRestaurant, staff, addStaff, removeStaff, fetchStaff, language, setLanguage, qrCodes, fetchQrCodes, generateQrCode, generateBatchQrCodes, deleteQrCode } = useStore()
   const [section, setSection] = useState('profile')
   const [showAddStaff, setShowAddStaff] = useState(false)
   const [newStaff, setNewStaff] = useState<{ name: string; phone: string; role: 'waiter' | 'cashier' | 'kitchen' | 'manager'; pin: string }>({ name: '', phone: '', role: 'waiter', pin: '' })
@@ -47,6 +47,7 @@ export default function SettingsPage() {
 
   useEffect(() => {
     fetchStaff()
+    fetchQrCodes()
     if (restaurant) {
       setProfile({
         name: restaurant.name || '', ownerName: restaurant.ownerName || '', email: restaurant.email || '',
@@ -171,25 +172,59 @@ export default function SettingsPage() {
         return (
           <div className="space-y-4">
             <p className="font-body text-sm text-text-secondary dark:text-white/70">
-              Your QR codes are active. Customers can scan to view your menu. Choose a design style for your printed QR cards.
+              Generate QR codes for your restaurant. Customers scan to view your digital menu.
             </p>
-            <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-              {[
-                { style: 1, desc: 'Classic dark frame with coral accent' },
-                { style: 2, desc: 'Modern minimal with gradient' },
-                { style: 3, desc: 'Premium gold border with logo' },
-              ].map(({ style, desc }) => (
-                <div key={style} className={`rounded-xl border-2 p-4 text-center transition-colors cursor-pointer ${style === 1 ? 'border-secondary' : 'border-white/10 hover:border-secondary/50'}`}>
-                  <div className="mx-auto mb-2 h-24 w-24 rounded-xl bg-gradient-to-br from-secondary/20 to-accent/20 flex items-center justify-center">
-                    <QrCode className="h-12 w-12 text-secondary" />
-                  </div>
-                  <p className="font-accent text-sm font-medium text-text-primary dark:text-white">Style {style}</p>
-                  <p className="font-accent text-[10px] text-text-secondary dark:text-white/50 mt-1">{desc}</p>
-                  <Badge variant={style === 1 ? 'success' : 'default'} size="sm" className="mt-2">{style === 1 ? 'Active' : 'Preview'}</Badge>
-                </div>
-              ))}
+
+            <div className="flex items-center gap-3">
+              <Button size="sm" onClick={async () => {
+                const qr = await generateQrCode({ label: `${restaurant?.name || 'Menu'} QR`, type: 'GENERAL' })
+                if (qr) showSuccessToast('QR code generated!')
+              }}><Plus className="h-3.5 w-3.5" /> Generate Main QR</Button>
+              <Button size="sm" variant="ghost" onClick={async () => {
+                const n = prompt('Number of tables:', '10')
+                if (n && !isNaN(parseInt(n))) {
+                  await generateBatchQrCodes({ numberOfTables: parseInt(n), template: 1 })
+                }
+              }}><Plus className="h-3.5 w-3.5" /> Generate Table QRs</Button>
             </div>
-            <Button><Save className="h-4 w-4" /> Update QR Code</Button>
+
+            <div className="space-y-2 max-h-80 overflow-y-auto">
+              {qrCodes.length === 0 ? (
+                <p className="text-center font-body text-sm text-text-secondary dark:text-white/40 py-8">
+                  No QR codes yet. Generate one above.
+                </p>
+              ) : (
+                qrCodes.map((qr: any) => (
+                  <div key={qr.id} className="flex items-center gap-4 rounded-xl border border-white/10 p-3 hover:bg-black/5 dark:hover:bg-white/5 transition-colors">
+                    <div className="h-14 w-14 rounded-lg bg-gradient-to-br from-secondary/20 to-accent/20 flex items-center justify-center">
+                      <QrCode className="h-7 w-7 text-secondary" />
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <p className="font-accent text-sm font-medium text-text-primary dark:text-white truncate">{qr.label}</p>
+                      <p className="font-accent text-xs text-text-secondary dark:text-white/50">
+                        {qr.tableNumber ? `Table ${qr.tableNumber} · ` : ''}{qr.totalScans || qr.scanCount || 0} scans
+                      </p>
+                    </div>
+                    <a
+                      href={qr.qrImageUrl || qr.targetUrl || '#'}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="flex h-8 w-8 items-center justify-center rounded-lg bg-black/5 dark:bg-white/10 hover:bg-black/10 dark:hover:bg-white/20 transition-colors"
+                      title="Download QR"
+                    >
+                      <Download className="h-4 w-4 text-text-secondary" />
+                    </a>
+                    <button
+                      onClick={() => deleteQrCode(qr.id)}
+                      className="flex h-8 w-8 items-center justify-center rounded-lg hover:bg-red-100 dark:hover:bg-red-900/30 text-text-secondary hover:text-red-500 transition-colors"
+                      title="Delete"
+                    >
+                      <Trash2 className="h-3.5 w-3.5" />
+                    </button>
+                  </div>
+                ))
+              )}
+            </div>
           </div>
         )
 

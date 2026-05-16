@@ -10,6 +10,7 @@ import * as staffApi from '@/api/staff'
 import * as marketingApi from '@/api/marketing'
 import * as surveillanceApi from '@/api/surveillance'
 import * as notificationsApi from '@/api/notifications'
+import * as qrcodesApi from '@/api/qrcodes'
 import type {
   MenuCategory, Order, Staff, TableInfo,
   Transaction, Post, Camera, Customer, OnboardingData, CartItem,
@@ -94,6 +95,12 @@ interface AppState {
   fetchNotifications: () => Promise<void>
 
   updateRestaurant: (data: Partial<Restaurant>) => Promise<void>
+
+  qrCodes: any[]
+  fetchQrCodes: () => Promise<void>
+  generateQrCode: (data: any) => Promise<any>
+  generateBatchQrCodes: (data: any) => Promise<any>
+  deleteQrCode: (id: string) => Promise<void>
 
   customer: Customer | null
   setCustomer: (customer: Customer) => void
@@ -710,6 +717,50 @@ export const useStore = create<AppState>((set) => ({
       throw err
     }
   },
+
+  qrCodes: [],
+  fetchQrCodes: async () => {
+    try {
+      const data = await qrcodesApi.fetchQrCodes()
+      set({ qrCodes: data || [] })
+    } catch (err: any) {
+      toast.error(err?.response?.data?.message || 'Failed to load QR codes')
+    }
+  },
+  generateQrCode: async (data) => {
+    try {
+      const res = await qrcodesApi.generateQrCode(data)
+      const qr = res.qrCode || res
+      set((s) => ({ qrCodes: [...s.qrCodes, qr] }))
+      toast.success('QR code generated!')
+      return qr
+    } catch (err: any) {
+      toast.error(err?.response?.data?.message || 'Failed to generate QR code')
+      throw err
+    }
+  },
+  generateBatchQrCodes: async (data) => {
+    try {
+      const res = await qrcodesApi.generateBatchQrCodes(data)
+      const codes = res.qrCodes || res || []
+      set((s) => ({ qrCodes: [...s.qrCodes, ...codes] }))
+      toast.success(`${codes.length} QR codes generated!`)
+      return codes
+    } catch (err: any) {
+      toast.error(err?.response?.data?.message || 'Failed to generate QR codes')
+      throw err
+    }
+  },
+  deleteQrCode: async (id) => {
+    try {
+      await qrcodesApi.deleteQrCode(id)
+      set((s) => ({ qrCodes: s.qrCodes.filter((q: any) => q.id !== id) }))
+      toast.success('QR code deleted')
+    } catch (err: any) {
+      toast.error(err?.response?.data?.message || 'Failed to delete QR code')
+    }
+  },
+
   setCustomer: (customer) => set({ customer }),
   cart: [],
   addToCart: (item) => set((s) => {
