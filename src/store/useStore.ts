@@ -321,7 +321,25 @@ export const useStore = create<AppState>((set) => ({
         allergens: data.allergens || [],
       }
       const res = await menuApi.addItem(payload)
-      const newItem = res.item || res
+      const raw = res.item || res
+      const newItem = {
+        id: raw.id,
+        name: raw.name || '',
+        price: raw.price || 0,
+        description: raw.description || '',
+        photo: raw.image || raw.photoUrl || '',
+        categoryId: raw.categoryId || categoryId,
+        dietaryTags: raw.dietaryTags || [],
+        prepTime: raw.preparationTime || raw.prepTime || 10,
+        available: raw.isAvailable !== false,
+        isSpecial: raw.isSpecial || false,
+        isPopular: raw.isPopular || false,
+        isNew: raw.isNew ?? true,
+        isPromoted: raw.isPromoted || false,
+        order: raw.order ?? 0,
+        ingredients: raw.ingredients || [],
+        allergens: raw.allergens || [],
+      }
       set((s) => ({
         categories: s.categories.map((c) =>
           c.id === categoryId ? { ...c, items: [...c.items, newItem] } : c,
@@ -346,10 +364,29 @@ export const useStore = create<AppState>((set) => ({
       if (data.allergens !== undefined) mapped.allergens = data.allergens
       if (data.photo !== undefined) mapped.image = data.photo
       const res = await menuApi.updateItem(itemId, mapped)
+      const raw = res.item || res
+      const normalized = {
+        id: raw.id || itemId,
+        name: raw.name,
+        price: raw.price,
+        description: raw.description,
+        photo: raw.image || raw.photoUrl,
+        categoryId: raw.categoryId,
+        dietaryTags: raw.dietaryTags || raw.dietaryTags,
+        prepTime: raw.preparationTime !== undefined ? raw.preparationTime : raw.prepTime,
+        available: raw.isAvailable !== undefined ? raw.isAvailable : raw.available,
+        isSpecial: raw.isSpecial,
+        isPopular: raw.isPopular,
+        isNew: raw.isNew,
+        isPromoted: raw.isPromoted,
+        order: raw.order,
+        ingredients: raw.ingredients,
+        allergens: raw.allergens,
+      }
       set((s) => ({
         categories: s.categories.map((c) =>
           c.id === categoryId
-            ? { ...c, items: c.items.map((i) => (i.id === itemId ? { ...i, ...(res.item || res), ...data } : i)) }
+            ? { ...c, items: c.items.map((i) => (i.id === itemId ? { ...i, ...normalized, ...data } : i)) }
             : c,
         ),
       }))
