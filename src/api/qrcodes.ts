@@ -21,7 +21,7 @@ export const deleteQrCode = (id: string) =>
   api.delete(`/qr/${id}`).then(unwrap)
 
 export const downloadQrPng = (id: string) =>
-  api.get(`/qr/${id}/download`, { responseType: 'blob' }).then(unwrap)
+  api.get(`/qr/${id}/download`, { responseType: 'blob' })
 
 export const downloadQrPdf = (id: string) =>
-  api.get(`/qr/${id}/pdf`, { responseType: 'blob' }).then(unwrap)
+  api.get(`/qr/${id}/pdf`, { responseType: 'blob' })

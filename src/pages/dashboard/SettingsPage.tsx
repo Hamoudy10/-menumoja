@@ -205,15 +205,44 @@ export default function SettingsPage() {
                         {qr.tableNumber ? `Table ${qr.tableNumber} · ` : ''}{qr.totalScans || qr.scanCount || 0} scans
                       </p>
                     </div>
-                    <a
-                      href={qr.qrImageUrl || qr.targetUrl || '#'}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="flex h-8 w-8 items-center justify-center rounded-lg bg-black/5 dark:bg-white/10 hover:bg-black/10 dark:hover:bg-white/20 transition-colors"
-                      title="Download QR"
-                    >
-                      <Download className="h-4 w-4 text-text-secondary" />
-                    </a>
+                    <div className="flex gap-1">
+                      <button
+                        onClick={() => {
+                          const url = qr.qrImageUrl || qr.targetUrl
+                          if (url) window.open(url, '_blank')
+                        }}
+                        className="flex h-8 w-8 items-center justify-center rounded-lg bg-black/5 dark:bg-white/10 hover:bg-black/10 dark:hover:bg-white/20 transition-colors"
+                        title="View QR"
+                      >
+                        <Download className="h-3.5 w-3.5 text-text-secondary" />
+                      </button>
+                      <button
+                        onClick={async () => {
+                          try {
+                            const token = localStorage.getItem('accessToken')
+                            const res = await fetch(`https://menumoja-production.up.railway.app/api/v1/qr/${qr.id}/pdf`, {
+                              headers: { 'Authorization': `Bearer ${token}` }
+                            })
+                            if (!res.ok) throw new Error('Download failed')
+                            const blob = await res.blob()
+                            const url = URL.createObjectURL(blob)
+                            const a = document.createElement('a')
+                            a.href = url
+                            a.download = `${qr.label || 'qr-code'}.pdf`
+                            a.click()
+                            URL.revokeObjectURL(url)
+                          } catch {
+                            showSuccessToast('Opening QR image instead')
+                            const viewUrl = qr.qrImageUrl || qr.targetUrl
+                            if (viewUrl) window.open(viewUrl, '_blank')
+                          }
+                        }}
+                        className="flex h-8 w-8 items-center justify-center rounded-lg bg-black/5 dark:bg-white/10 hover:bg-black/10 dark:hover:bg-white/20 transition-colors"
+                        title="Download PDF"
+                      >
+                        <span className="text-[10px] font-bold text-text-secondary">PDF</span>
+                      </button>
+                    </div>
                     <button
                       onClick={() => deleteQrCode(qr.id)}
                       className="flex h-8 w-8 items-center justify-center rounded-lg hover:bg-red-100 dark:hover:bg-red-900/30 text-text-secondary hover:text-red-500 transition-colors"
