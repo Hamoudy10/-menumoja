@@ -29,6 +29,11 @@ export default function MenuManager() {
       setSelectedCat(categories[0].id)
     }
   }, [categories, selectedCat])
+
+  useEffect(() => {
+    setCategoriesOrder(categories)
+  }, [categories])
+
   const [editingItem, setEditingItem] = useState<MenuItem | null>(null)
   const [showAddCat, setShowAddCat] = useState(false)
   const [newCatName, setNewCatName] = useState('')
@@ -219,7 +224,7 @@ export default function MenuManager() {
                         </div>
                         <p className="font-accent text-sm font-bold text-secondary">KES {item.price.toLocaleString()}</p>
                         <div className="flex items-center gap-1 mt-2">
-                          {item.dietaryTags.slice(0, 2).map((tag) => (
+                          {(item.dietaryTags || []).slice(0, 2).map((tag) => (
                             <Badge key={tag} size="sm" variant="info">{tag}</Badge>
                           ))}
                         </div>
@@ -351,13 +356,14 @@ export default function MenuManager() {
                       <button
                         key={tag}
                         onClick={() => {
-                          const tags = editingItem.dietaryTags.includes(tag)
-                            ? editingItem.dietaryTags.filter((t) => t !== tag)
-                            : [...editingItem.dietaryTags, tag]
+                          const currentTags = editingItem.dietaryTags || []
+                          const tags = currentTags.includes(tag)
+                            ? currentTags.filter((t) => t !== tag)
+                            : [...currentTags, tag]
                           updateItem(currentCat.id, editingItem.id, { dietaryTags: tags })
                         }}
                         className={`rounded-full px-3 py-1 text-xs font-accent font-medium transition-colors ${
-                          editingItem.dietaryTags.includes(tag)
+                          (editingItem.dietaryTags || []).includes(tag)
                             ? 'bg-secondary text-white'
                             : 'bg-black/5 dark:bg-white/10 text-text-secondary dark:text-white/60 hover:bg-black/10 dark:hover:bg-white/20'
                         }`}
