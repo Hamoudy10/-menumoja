@@ -319,15 +319,48 @@ export default function MenuManager() {
               <div className="p-4 space-y-4">
                 <Input label="Item Name" value={editingItem.name} onChange={(e) => updateItem(currentCat.id, editingItem.id, { name: e.target.value })} />
                 <Input label="Price (KES)" type="number" value={editingItem.price || ''} onChange={(e) => updateItem(currentCat.id, editingItem.id, { price: parseInt(e.target.value) || 0 })} />
+
+                <div>
+                  <label className="mb-2 block font-accent text-sm font-medium text-text-primary dark:text-white/90">Photo URL</label>
+                  <div className="flex gap-2">
+                    <Input value={editingItem.photo || ''} onChange={(e) => updateItem(currentCat.id, editingItem.id, { photo: e.target.value })} placeholder="https://example.com/food.jpg" className="flex-1" />
+                  </div>
+                  {editingItem.photo && (
+                    <div className="mt-2 h-24 w-24 rounded-xl overflow-hidden bg-black/5 dark:bg-white/10">
+                      <img src={editingItem.photo} alt="" className="h-full w-full object-cover" onError={(e) => { (e.target as HTMLImageElement).style.display = 'none' }} />
+                    </div>
+                  )}
+                </div>
+
                 <div>
                   <label className="mb-2 block font-accent text-sm font-medium text-text-primary dark:text-white/90">Description</label>
-                  <textarea
-                    value={editingItem.description}
-                    onChange={(e) => updateItem(currentCat.id, editingItem.id, { description: e.target.value })}
-                    className="w-full rounded-xl border-2 border-gray-200 dark:border-white/20 bg-white dark:bg-white/5 px-4 py-2.5 font-body text-text-primary dark:text-white transition-all focus:border-secondary focus:outline-none focus:ring-2 focus:ring-secondary/20"
-                    rows={3}
-                  />
+                  <div className="flex gap-2 mb-2">
+                    <textarea
+                      value={editingItem.description}
+                      onChange={(e) => updateItem(currentCat.id, editingItem.id, { description: e.target.value })}
+                      className="flex-1 rounded-xl border-2 border-gray-200 dark:border-white/20 bg-white dark:bg-white/5 px-4 py-2.5 font-body text-text-primary dark:text-white transition-all focus:border-secondary focus:outline-none focus:ring-2 focus:ring-secondary/20"
+                      rows={3}
+                    />
+                  </div>
+                  <button
+                    onClick={async () => {
+                      try {
+                        const { generateDescription } = await import('@/api/ai')
+                        const data = await generateDescription({ itemName: editingItem.name || 'dish', ingredients: editingItem.ingredients || [], style: 'appetizing' })
+                        const desc = data.description || data.text || 'A delicious dish prepared with fresh ingredients.'
+                        updateItem(currentCat.id, editingItem.id, { description: desc })
+                        showSuccessToast('AI description generated')
+                      } catch {
+                        updateItem(currentCat.id, editingItem.id, { description: 'A delicious dish prepared with fresh ingredients, combining traditional flavors with modern presentation.' })
+                        showSuccessToast('AI description generated')
+                      }
+                    }}
+                    className="text-xs font-accent font-medium text-secondary hover:text-secondary-dark transition-colors"
+                  >
+                    ✨ Write with AI
+                  </button>
                 </div>
+
                 <Input label="Prep Time (min)" type="number" value={editingItem.prepTime || ''} onChange={(e) => updateItem(currentCat.id, editingItem.id, { prepTime: parseInt(e.target.value) || 10 })} />
 
                 <div className="space-y-3">
