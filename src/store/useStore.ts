@@ -309,11 +309,22 @@ export const useStore = create<AppState>((set) => ({
   },
   addItem: async (categoryId, data) => {
     try {
-      const payload = { ...data, categoryId }
+      const payload = {
+        name: data.name || 'New Item',
+        price: data.price || 0,
+        description: data.description || '',
+        categoryId,
+        isAvailable: data.available !== false,
+        isPopular: !!data.isPopular,
+        preparationTime: data.prepTime || 10,
+        ingredients: data.ingredients || [],
+        allergens: data.allergens || [],
+      }
       const res = await menuApi.addItem(payload)
+      const newItem = res.item || res
       set((s) => ({
         categories: s.categories.map((c) =>
-          c.id === categoryId ? { ...c, items: [...c.items, res.item || res] } : c,
+          c.id === categoryId ? { ...c, items: [...c.items, newItem] } : c,
         ),
       }))
       toast.success('Item added')
@@ -324,11 +335,21 @@ export const useStore = create<AppState>((set) => ({
   },
   updateItem: async (categoryId, itemId, data) => {
     try {
-      const res = await menuApi.updateItem(itemId, data)
+      const mapped: any = {}
+      if (data.name !== undefined) mapped.name = data.name
+      if (data.price !== undefined) mapped.price = data.price
+      if (data.description !== undefined) mapped.description = data.description
+      if (data.available !== undefined) mapped.isAvailable = data.available
+      if (data.isPopular !== undefined) mapped.isPopular = data.isPopular
+      if (data.prepTime !== undefined) mapped.preparationTime = data.prepTime
+      if (data.ingredients !== undefined) mapped.ingredients = data.ingredients
+      if (data.allergens !== undefined) mapped.allergens = data.allergens
+      if (data.photo !== undefined) mapped.image = data.photo
+      const res = await menuApi.updateItem(itemId, mapped)
       set((s) => ({
         categories: s.categories.map((c) =>
           c.id === categoryId
-            ? { ...c, items: c.items.map((i) => (i.id === itemId ? { ...i, ...(res.item || res) } : i)) }
+            ? { ...c, items: c.items.map((i) => (i.id === itemId ? { ...i, ...(res.item || res), ...data } : i)) }
             : c,
         ),
       }))
