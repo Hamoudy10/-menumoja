@@ -279,7 +279,8 @@ export const useStore = create<AppState>((set) => ({
   addCategory: async (data) => {
     try {
       const res = await menuApi.addCategory(data)
-      set((s) => ({ categories: [...s.categories, res.category || res] }))
+      const newCat = { items: [], ...(res.category || res) }
+      set((s) => ({ categories: [...s.categories, newCat] }))
       toast.success('Category added')
     } catch (err: any) {
       toast.error(err?.response?.data?.message || 'Failed to add category')
@@ -289,7 +290,7 @@ export const useStore = create<AppState>((set) => ({
   updateCategory: async (id, data) => {
     try {
       const res = await menuApi.updateCategory(id, data)
-      set((s) => ({ categories: s.categories.map((c) => c.id === id ? { ...c, ...(res.category || res) } : c) }))
+      set((s) => ({ categories: s.categories.map((c) => c.id === id ? { items: c.items || [], ...c, ...(res.category || res) } : c) }))
       toast.success('Category updated')
     } catch (err: any) {
       toast.error(err?.response?.data?.message || 'Failed to update category')
