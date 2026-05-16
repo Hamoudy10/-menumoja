@@ -267,7 +267,27 @@ export const useStore = create<AppState>((set) => ({
     set({ loadingCategories: true })
     try {
       const data = await menuApi.fetchCategories()
-      const cats = (data.categories || data || []).map((c: any) => ({ ...c, items: c.items || [] }))
+      const cats = (data.categories || data || []).map((c: any) => ({
+        ...c,
+        items: (c.items || []).map((raw: any) => ({
+          id: raw.id,
+          name: raw.name || '',
+          price: raw.price || 0,
+          description: raw.description || '',
+          photo: raw.image || raw.photoUrl || raw.photo || '',
+          categoryId: raw.categoryId || c.id,
+          dietaryTags: raw.dietaryTags || [],
+          prepTime: raw.preparationTime || raw.prepTime || 10,
+          available: raw.isAvailable !== false,
+          isSpecial: raw.isSpecial || false,
+          isPopular: raw.isPopular || false,
+          isNew: raw.isNew ?? true,
+          isPromoted: raw.isPromoted || false,
+          order: raw.order ?? 0,
+          ingredients: raw.ingredients || [],
+          allergens: raw.allergens || [],
+        })),
+      }))
       set({ categories: cats })
     } catch (err: any) {
       const msg = err?.response?.data?.message || 'Failed to load menu'
