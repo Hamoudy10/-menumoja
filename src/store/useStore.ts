@@ -290,7 +290,7 @@ export const useStore = create<AppState>((set) => ({
   updateCategory: async (id, data) => {
     try {
       const res = await menuApi.updateCategory(id, data)
-      set((s) => ({ categories: s.categories.map((c) => c.id === id ? { items: c.items || [], ...c, ...(res.category || res) } : c) }))
+      set((s) => ({ categories: s.categories.map((c) => c.id === id ? { ...c, ...(res.category || res), items: (res.category || res)?.items || c.items || [] } : c) }))
       toast.success('Category updated')
     } catch (err: any) {
       toast.error(err?.response?.data?.message || 'Failed to update category')
