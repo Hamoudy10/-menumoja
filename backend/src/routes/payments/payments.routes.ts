@@ -356,13 +356,15 @@ router.get('/',
       if (dateTo) where.createdAt.lte = new Date(dateTo);
     }
 
+    const safePage = Math.max(1, Number(page) || 1);
+    const safePerPage = Math.min(100, Math.max(1, Number(perPage) || 20));
     const [total, payments] = await Promise.all([
       prisma.payment.count({ where }),
       prisma.payment.findMany({
         where,
         orderBy: { createdAt: 'desc' },
-        skip: (page - 1) * perPage,
-        take: perPage,
+        skip: (safePage - 1) * safePerPage,
+        take: safePerPage,
         select: {
           id: true,
           paymentMethod: true,

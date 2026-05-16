@@ -318,13 +318,15 @@ router.get('/',
       if (dateTo) where.createdAt.lte = new Date(dateTo);
     }
 
+    const safePage = Math.max(1, Number(page) || 1);
+    const safePerPage = Math.min(100, Math.max(1, Number(perPage) || 20));
     const [total, orders] = await Promise.all([
       prisma.order.count({ where }),
       prisma.order.findMany({
         where,
         orderBy: { createdAt: 'desc' },
-        skip: (page - 1) * perPage,
-        take: perPage,
+        skip: (safePage - 1) * safePerPage,
+        take: safePerPage,
         select: {
           id: true,
           orderNumber: true,
@@ -751,13 +753,15 @@ router.get('/history',
       ].filter(Boolean);
     }
 
+    const hSafePage = Math.max(1, Number(page) || 1);
+    const hSafePerPage = Math.min(100, Math.max(1, Number(perPage) || 20));
     const [total, orders] = await Promise.all([
       prisma.order.count({ where }),
       prisma.order.findMany({
         where,
         orderBy: { createdAt: 'desc' },
-        skip: (page - 1) * perPage,
-        take: perPage,
+        skip: (hSafePage - 1) * hSafePerPage,
+        take: hSafePerPage,
         select: {
           id: true,
           orderNumber: true,
