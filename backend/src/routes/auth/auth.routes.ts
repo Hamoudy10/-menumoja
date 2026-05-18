@@ -1,7 +1,7 @@
 import { Router } from 'express';
 import crypto from 'crypto';
-import axios from 'axios';
-import jwt, { JwtPayload } from 'jsonwebtoken';
+import { OAuth2Client } from 'google-auth-library';
+import jwt from 'jsonwebtoken';
 import { v4 as uuidv4 } from 'uuid';
 import { asyncHandler, AppError, NotFoundError, hashPassword, generateSlug, comparePassword } from '@/utils';
 import { authenticate, authLimiter, validate } from '@/middleware';
@@ -165,26 +165,19 @@ router.post(
       throw new AppError(400, 'GOOGLE_CREDENTIAL_REQUIRED', 'Google credential is required', 'Kitambulisho cha Google kinahitajika');
     }
 
-    // Verify Google credential (JWT) with Google's public keys
-    let payload: JwtPayload | null = null;
+    // Verify Google credential (idToken) using Google's official library
+    let payload: any = null;
     try {
-      const gCertsUrl = 'https://www.googleapis.com/oauth2/v3/certs';
-      const certsResponse = await axios.get(gCertsUrl);
-      const keys = certsResponse.data?.keys || [];
-      const header = jwt.decode(credential, { complete: true }) as any;
-      if (!header || !header.header?.kid) {
-        throw new Error('No key ID in token header');
+      const googleClientId = process.env.GOOGLE_CLIENT_ID || process.env.VITE_GOOGLE_CLIENT_ID;
+      if (!googleClientId) {
+        throw new Error('GOOGLE_CLIENT_ID not configured');
       }
-      const key = keys.find((k: any) => k.kid === header.header.kid);
-      if (!key) {
-        throw new Error('No matching public key found');
-      }
-      const publicKey = `-----BEGIN CERTIFICATE-----\n${key.n}\n-----END CERTIFICATE-----`;
-      payload = jwt.verify(credential, publicKey, {
-        algorithms: ['RS256'],
-        audience: process.env.GOOGLE_CLIENT_ID || process.env.VITE_GOOGLE_CLIENT_ID,
-        issuer: ['accounts.google.com', 'https://accounts.google.com'],
-      }) as JwtPayload;
+      const authClient = new OAuth2Client(googleClientId);
+      const ticket = await authClient.verifyIdToken({
+        idToken: credential,
+        audience: googleClientId,
+      });
+      payload = ticket.getPayload();
     } catch (err: any) {
       logger.warn('Google credential verification failed', { error: err.message });
       throw new AppError(400, 'INVALID_GOOGLE_CREDENTIAL', 'Invalid Google credential', 'Kitambulisho batili cha Google');
