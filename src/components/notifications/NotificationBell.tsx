@@ -94,9 +94,11 @@ export default function NotificationBell() {
                       <p className="font-body text-xs font-medium text-text-primary dark:text-white/90 truncate">
                         {n.title || n.message}
                       </p>
-                      <p className="font-accent text-[10px] text-text-secondary dark:text-white/40 mt-0.5">
-                        {n.message}
-                      </p>
+                      {n.title && n.message && n.title !== n.message && (
+                        <p className="font-accent text-[10px] text-text-secondary dark:text-white/40 mt-0.5">
+                          {n.message}
+                        </p>
+                      )}
                       <p className="font-accent text-[10px] text-text-secondary/50 mt-0.5 flex items-center gap-1">
                         <Clock className="h-2.5 w-2.5" />
                         {n.createdAt ? format(new Date(n.createdAt), 'MMM d, HH:mm') : ''}

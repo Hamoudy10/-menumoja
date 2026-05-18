@@ -105,7 +105,7 @@ interface AppState {
   customer: Customer | null
   setCustomer: (customer: Customer) => void
   cart: CartItem[]
-  addToCart: (item: any) => void
+  addToCart: (item: any, specialInstructions?: string) => void
   removeFromCart: (itemId: string) => void
   updateCartQuantity: (itemId: string, quantity: number) => void
   clearCart: () => void
@@ -244,7 +244,6 @@ export const useStore = create<AppState>((set) => ({
         customer: null,
         cart: [],
       })
-      window.location.href = '/login'
     }
   },
 

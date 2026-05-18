@@ -490,7 +490,7 @@ export default function SettingsPage() {
                       <button
                         onClick={() => {
                           const url = qr.qrImageUrl || qr.targetUrl || qr.imageUrl
-                          if (url) window.open(url, '_blank')
+                          if (url) window.open(url, '_blank', 'noopener,noreferrer')
                         }}
                         className="flex h-8 w-8 items-center justify-center rounded-lg bg-black/5 dark:bg-white/10 hover:bg-black/10 dark:hover:bg-white/20 transition-colors"
                         title={t('qr.viewQR')}
@@ -516,7 +516,7 @@ export default function SettingsPage() {
                             URL.revokeObjectURL(url)
                           } catch {
                             const viewUrl = qr.qrImageUrl || qr.targetUrl || qr.imageUrl
-                            if (viewUrl) window.open(viewUrl, '_blank')
+                            if (viewUrl) window.open(viewUrl, '_blank', 'noopener,noreferrer')
                           }
                         }}
                         className="flex h-8 w-8 items-center justify-center rounded-lg bg-black/5 dark:bg-white/10 hover:bg-black/10 dark:hover:bg-white/20 transition-colors"

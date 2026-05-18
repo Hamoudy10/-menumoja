@@ -1,6 +1,7 @@
 import { Router } from 'express';
 import crypto from 'crypto';
-import jwt from 'jsonwebtoken';
+import axios from 'axios';
+import jwt, { JwtPayload } from 'jsonwebtoken';
 import { v4 as uuidv4 } from 'uuid';
 import { asyncHandler, AppError, NotFoundError, hashPassword, generateSlug, comparePassword } from '@/utils';
 import { authenticate, authLimiter, validate } from '@/middleware';
@@ -164,15 +165,32 @@ router.post(
       throw new AppError(400, 'GOOGLE_CREDENTIAL_REQUIRED', 'Google credential is required', 'Kitambulisho cha Google kinahitajika');
     }
 
-    // Decode Google credential (JWT) to get user info
-    let payload: any;
+    // Verify Google credential (JWT) with Google's public keys
+    let payload: JwtPayload | null = null;
     try {
-      payload = jwt.decode(credential);
-    } catch {
+      const gCertsUrl = 'https://www.googleapis.com/oauth2/v3/certs';
+      const certsResponse = await axios.get(gCertsUrl);
+      const keys = certsResponse.data?.keys || [];
+      const header = jwt.decode(credential, { complete: true }) as any;
+      if (!header || !header.header?.kid) {
+        throw new Error('No key ID in token header');
+      }
+      const key = keys.find((k: any) => k.kid === header.header.kid);
+      if (!key) {
+        throw new Error('No matching public key found');
+      }
+      const publicKey = `-----BEGIN CERTIFICATE-----\n${key.n}\n-----END CERTIFICATE-----`;
+      payload = jwt.verify(credential, publicKey, {
+        algorithms: ['RS256'],
+        audience: process.env.GOOGLE_CLIENT_ID || process.env.VITE_GOOGLE_CLIENT_ID,
+        issuer: ['accounts.google.com', 'https://accounts.google.com'],
+      }) as JwtPayload;
+    } catch (err: any) {
+      logger.warn('Google credential verification failed', { error: err.message });
       throw new AppError(400, 'INVALID_GOOGLE_CREDENTIAL', 'Invalid Google credential', 'Kitambulisho batili cha Google');
     }
 
-    const { email, name, sub: googleId } = payload;
+    const { email, name } = payload;
     if (!email) throw new AppError(400, 'EMAIL_REQUIRED', 'Email is required from Google', 'Barua pepe inahitajika kutoka Google');
 
     // Find or create owner

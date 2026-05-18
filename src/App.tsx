@@ -13,6 +13,7 @@ const NotFound = lazy(() => import('@/components/layout/NotFound'))
 const LandingPage = lazy(() => import('@/pages/LandingPage'))
 const LoginPage = lazy(() => import('@/pages/LoginPage'))
 const SignUpPage = lazy(() => import('@/pages/SignUpPage'))
+const ForgotPasswordPage = lazy(() => import('@/pages/ForgotPasswordPage'))
 const DemoPage = lazy(() => import('@/pages/DemoPage'))
 
 const MenuView = lazy(() => import('@/pages/menu/MenuView'))
@@ -73,6 +74,7 @@ function AppRoutes() {
           <Route path="/" element={<PageTransition><LandingPage /></PageTransition>} />
           <Route path="/login" element={<PageTransition><LoginPage /></PageTransition>} />
           <Route path="/signup" element={<PageTransition><SignUpPage /></PageTransition>} />
+          <Route path="/forgot-password" element={<PageTransition><ForgotPasswordPage /></PageTransition>} />
           <Route path="/demo" element={<PageTransition><DemoPage /></PageTransition>} />
 
           <Route path="/menu/:restaurantSlug" element={<PageTransition><MenuView /></PageTransition>} />

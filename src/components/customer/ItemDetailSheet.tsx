@@ -56,15 +56,15 @@ export function ItemDetailSheet({ item, open, onClose }: ItemDetailSheetProps) {
   if (!item) return null
 
   const handleAddToOrder = () => {
-    updateCartQuantity(item.id, quantity)
-    if (!cart.find((c) => c.item.id === item.id)) {
-      addToCart(item)
+    const existing = cart.find((c) => c.item.id === item.id)
+    if (existing) {
       updateCartQuantity(item.id, quantity)
+    } else {
+      addToCart(item, specialInstructions)
+      if (quantity > 1) updateCartQuantity(item.id, quantity)
     }
     setAdded(true)
-    setTimeout(() => {
-      onClose()
-    }, 800)
+    setTimeout(() => onClose(), 800)
   }
 
   const t = (key: string): string => {

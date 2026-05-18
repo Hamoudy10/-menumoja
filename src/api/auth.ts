@@ -22,3 +22,6 @@ export const logout = (refreshToken?: string) =>
 
 export const refreshToken = (token: string) =>
   api.post('/auth/refresh-token', { refreshToken: token }).then(unwrap)
+
+export const forgotPassword = (phone: string) =>
+  api.post('/auth/forgot-password', { phone }).then(unwrap)

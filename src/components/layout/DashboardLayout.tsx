@@ -130,8 +130,8 @@ export default function DashboardLayout() {
               </div>
 
               <button
-                onClick={() => {
-                  logout()
+                onClick={async () => {
+                  await logout()
                   navigate('/login')
                 }}
                 className="flex h-9 w-9 items-center justify-center rounded-xl bg-black/5 dark:bg-white/10 hover:bg-red-100 dark:hover:bg-red-900/30 hover:text-red-500 transition-colors"
