@@ -252,28 +252,31 @@ export async function ownerSetupChat(
 export async function generateDescription(
   itemName: string,
   ingredients: string[],
-  style?: string
+  style?: string,
+  userContext?: string,
+  seed?: number
 ): Promise<{ english: string; swahili: string }> {
   return withRetry(async () => {
     const client = getClient();
     const styleHint = style ? `Write in a ${style} style.` : '';
+    const contextHint = userContext ? `Additional context from user: "${userContext}". Incorporate this naturally.` : '';
+    const varietyHint = 'Make the description unique and varied - do NOT use generic phrases. Be creative with each generation.';
+
+    const systemPrompt = `Generate a short appetizing menu item description in English and Swahili. ${styleHint} ${contextHint} ${varietyHint}
+Return as JSON: { "english": "...", "swahili": "..." }
+Keep each under 50 words. Be specific about the ingredients. Make it sound authentic and enticing.`;
+
+    const temperature = style === 'fun' ? 0.9 : style === 'classic' ? 0.5 : 0.75;
 
     const response = await client.chat.completions.create({
       model: AI_MODEL,
       messages: [
-        {
-          role: 'system',
-          content: `Generate a short appetizing menu item description in English and Swahili. ${styleHint}
-Return as JSON: { "english": "...", "swahili": "..." }
-Keep each under 50 words. Be specific about the ingredients.`,
-        },
-        {
-          role: 'user',
-          content: `Item: ${itemName}\nIngredients: ${ingredients.join(', ')}`,
-        },
+        { role: 'system', content: systemPrompt },
+        { role: 'user', content: `Item: ${itemName}\nIngredients: ${ingredients.join(', ')}` },
       ],
       max_tokens: MAX_TOKENS_DESCRIPTION,
-      temperature: 0.7,
+      temperature,
+      seed: seed || Math.floor(Math.random() * 1000000),
       response_format: { type: 'json_object' },
     });
 
@@ -288,6 +291,31 @@ Keep each under 50 words. Be specific about the ingredients.`,
     english: `Delicious ${itemName} made with fresh ingredients.`,
     swahili: `${itemName} tamu iliyotengenezwa kwa viungo safi.`,
   });
+}
+
+export async function generateMultipleDescriptions(
+  itemName: string,
+  ingredients: string[],
+  count: number = 3,
+  style?: string,
+  userContext?: string
+): Promise<Array<{ english: string; swahili: string }>> {
+  const descriptions: Array<{ english: string; swahili: string }> = [];
+  const baseSeed = Math.floor(Math.random() * 1000000);
+
+  const batchSize = Math.min(count, 5);
+  const promises = Array.from({ length: batchSize }, (_, i) =>
+    generateDescription(itemName, ingredients, style, userContext, baseSeed + i * 100)
+      .catch(() => ({
+        english: `Delicious ${itemName} made with fresh ingredients.`,
+        swahili: `${itemName} tamu iliyotengenezwa kwa viungo safi.`,
+      }))
+  );
+
+  const results = await Promise.all(promises);
+  descriptions.push(...results);
+
+  return descriptions.slice(0, count);
 }
 
 export async function generateRestaurantDescription(
@@ -410,24 +438,30 @@ export async function generateSocialPost(
   restaurantInfo: Record<string, any>,
   postType: string,
   platform: string,
-  language: string
+  language: string,
+  userContext?: string,
+  seed?: number
 ): Promise<{ caption: string; imageUrl: string; hashtags: string }> {
   return withRetry(async () => {
     const client = getClient();
     const infoStr = JSON.stringify(restaurantInfo, null, 2);
+    const userContextHint = userContext ? `\n\nUser's specific request/context: "${userContext}". Make sure to address this.` : '';
+    const varietyHint = 'Make this post unique and creative. Use different angles, tones, and approaches each time. Vary the emojis, structure, and call-to-action.';
     const systemPrompt = buildSocialPostPrompt(postType, platform);
+    const temperature = 0.85 + (Math.random() * 0.15);
 
     const response = await client.chat.completions.create({
       model: AI_MODEL,
       messages: [
-        { role: 'system', content: systemPrompt },
+        { role: 'system', content: `${systemPrompt}\n\n${varietyHint}` },
         {
           role: 'user',
-          content: `Restaurant Info: ${infoStr}\n\nPost Type: ${postType}\nPlatform: ${platform}\nLanguage: ${language === 'sw' ? 'Swahili' : 'English'}\n\nGenerate a social post with caption and hashtags. Return as JSON: { "caption": "...", "hashtags": "#tag1 #tag2 #tag3" }`,
+          content: `Restaurant Info: ${infoStr}\n\nPost Type: ${postType}\nPlatform: ${platform}\nLanguage: ${language === 'sw' ? 'Swahili' : 'English'}${userContextHint}\n\nGenerate a social post with caption and hashtags. Return as JSON: { "caption": "...", "hashtags": "#tag1 #tag2 #tag3" }`,
         },
       ],
       max_tokens: 400,
-      temperature: 0.8,
+      temperature,
+      seed: seed || Math.floor(Math.random() * 1000000),
       response_format: { type: 'json_object' },
     });
 
@@ -437,17 +471,33 @@ export async function generateSocialPost(
     const caption = parsed.caption || `Check out ${restaurantInfo.name || 'our restaurant'}!`;
     const hashtags = parsed.hashtags || '#MenuMoja #FoodKenya';
 
-    const imageResponse = await client.images.generate({
-      model: 'dall-e-3',
-      prompt: `Social media post for restaurant: ${caption.substring(0, 300)}`,
-      n: 1,
-      size: '1024x1024',
-      quality: 'standard',
-    });
+    let imageUrl = '';
+    try {
+      const imageResponse = await client.images.generate({
+        model: 'dall-e-3',
+        prompt: `Social media post for restaurant: ${caption.substring(0, 300)}`,
+        n: 1,
+        size: '1024x1024',
+        quality: 'standard',
+      });
+      imageUrl = imageResponse.data?.[0]?.url || '';
+    } catch {
+      try {
+        const { generateImage } = await import('./huggingface');
+        const hfResult = await generateImage(
+          `Food restaurant social media post: ${caption.substring(0, 200)}`,
+          restaurantInfo.name || 'Food',
+          'black-forest-labs/FLUX.1-dev'
+        );
+        imageUrl = hfResult.imageUrl;
+      } catch {
+        logger.warn('Both DALL-E and HF image generation failed for social post');
+      }
+    }
 
     return {
       caption,
-      imageUrl: imageResponse.data?.[0]?.url || '',
+      imageUrl,
       hashtags,
     };
   }, {
@@ -455,6 +505,30 @@ export async function generateSocialPost(
     imageUrl: '',
     hashtags: '#MenuMoja #FoodKenya',
   });
+}
+
+export async function generateMultipleSocialPosts(
+  restaurantInfo: Record<string, any>,
+  postType: string,
+  platform: string,
+  language: string,
+  count: number = 3,
+  userContext?: string
+): Promise<Array<{ caption: string; imageUrl: string; hashtags: string }>> {
+  const baseSeed = Math.floor(Math.random() * 1000000);
+  const batchSize = Math.min(count, 5);
+
+  const promises = Array.from({ length: batchSize }, (_, i) =>
+    generateSocialPost(restaurantInfo, postType, platform, language, userContext, baseSeed + i * 100)
+      .catch(() => ({
+        caption: `Check out ${restaurantInfo.name || 'our restaurant'} for amazing food! Option ${i + 1}`,
+        imageUrl: '',
+        hashtags: '#MenuMoja #FoodKenya',
+      }))
+  );
+
+  const results = await Promise.all(promises);
+  return results.slice(0, count);
 }
 
 export async function generateFAQSuggestions(

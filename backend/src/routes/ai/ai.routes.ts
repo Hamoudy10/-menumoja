@@ -45,9 +45,12 @@ const generateFaqSchema = z.object({
 const generateSocialPostSchema = z.object({
   restaurantId: z.string().uuid('Invalid restaurant ID'),
   postType: z.string().min(1, 'Post type is required'),
-  platform: z.enum(['instagram', 'facebook', 'twitter', 'whatsapp']),
+  platform: z.enum(['instagram', 'facebook', 'twitter', 'whatsapp', 'tiktok']),
   menuItemId: z.string().uuid('Invalid menu item ID').optional(),
   language: z.enum(['en', 'sw']).default('en'),
+  userContext: z.string().max(500, 'Context too long').optional(),
+  generateOptions: z.boolean().optional().default(false),
+  optionCount: z.number().int().min(1).max(5).optional().default(3),
 }).strict();
 
 // ── Customer Chat Routes ──
@@ -142,11 +145,39 @@ router.post('/generate/description',
   validate(generateDescriptionSchema),
   asyncHandler(async (req, res) => {
     const restaurantId = (req as any).restaurantId;
-    const { itemName, keywords, tone, maxLength } = req.body;
+    const { itemName, keywords, tone, userContext, generateOptions, optionCount } = req.body;
 
     const ingredients = keywords || [];
 
-    const result = await openai.generateDescription(itemName, ingredients, tone);
+    if (generateOptions) {
+      const options = await openai.generateMultipleDescriptions(
+        itemName, ingredients, optionCount || 3, tone, userContext
+      );
+
+      await prisma.aiGeneratedContent.create({
+        data: {
+          restaurantId,
+          contentType: 'MENU_DESCRIPTION',
+          promptUsed: `Generate ${optionCount || 3} descriptions for: ${itemName} (style: ${tone})`,
+          generatedContent: JSON.stringify(options),
+        },
+      });
+
+      logger.info('Menu item descriptions generated (multiple)', { itemName, restaurantId, count: options.length });
+
+      return res.status(201).json({
+        success: true,
+        data: {
+          options: options.map((opt, i) => ({
+            id: `option-${i + 1}`,
+            description: opt.english,
+            descriptionSw: opt.swahili,
+          })),
+        },
+      });
+    }
+
+    const result = await openai.generateDescription(itemName, ingredients, tone, userContext);
 
     const data = await prisma.aiGeneratedContent.create({
       data: {
@@ -247,6 +278,63 @@ router.post('/generate/image',
   })
 );
 
+router.post('/generate/free-image',
+  authenticate,
+  enforceRestaurantScope,
+  validate(generateImageSchema),
+  asyncHandler(async (req, res) => {
+    const restaurantId = (req as any).restaurantId;
+    const { prompt, style } = req.body;
+
+    const enhancedPrompt = `Professional food photography of ${prompt}. ${style ? `${style} style.` : ''} High resolution, appetizing presentation.`;
+
+    let result: { imageUrl: string; thumbnailUrl: string };
+
+    try {
+      const { generateImageWithMultipleModels } = await import('@/integrations/huggingface');
+      result = await generateImageWithMultipleModels(enhancedPrompt, prompt);
+    } catch (hfError) {
+      logger.warn('HF image generation failed, falling back to DALL-E', { error: (hfError as any)?.message });
+      try {
+        const openaiResult = await openai.generateImage(enhancedPrompt, prompt);
+        result = { imageUrl: openaiResult.imageUrl, thumbnailUrl: openaiResult.thumbnailUrl };
+      } catch (dalleError) {
+        throw new AppError(502, 'ALL_IMAGE_MODELS_FAILED', 'All image generation models failed');
+      }
+    }
+
+    if (!result.imageUrl) {
+      throw new AppError(502, 'IMAGE_GEN_FAILED', 'Failed to generate image');
+    }
+
+    const uploaded = await cloudinary.uploadImage(
+      result.imageUrl,
+      `restaurants/${restaurantId}/ai-generated-free`
+    );
+
+    const data = await prisma.aiGeneratedContent.create({
+      data: {
+        restaurantId,
+        contentType: 'IMAGE',
+        promptUsed: enhancedPrompt.substring(0, 500),
+        generatedContent: prompt,
+        imageUrl: uploaded.url,
+      },
+    });
+
+    logger.info('Free AI image generated via HF', { restaurantId, contentId: data.id });
+
+    res.status(201).json({
+      success: true,
+      data: {
+        imageUrl: uploaded.url,
+        thumbnailUrl: uploaded.thumbnailUrl,
+        provider: 'huggingface',
+      },
+    });
+  })
+);
+
 router.post('/enhance/image',
   authenticate,
   enforceRestaurantScope,
@@ -305,7 +393,7 @@ router.post('/generate/social-post',
   validate(generateSocialPostSchema),
   asyncHandler(async (req, res) => {
     const restaurantId = (req as any).restaurantId;
-    const { postType, platform, menuItemId, language } = req.body;
+    const { postType, platform, menuItemId, language, userContext, generateOptions, optionCount } = req.body;
 
     const restaurant = await prisma.restaurant.findUnique({
       where: { id: restaurantId },
@@ -348,7 +436,44 @@ router.post('/generate/social-post',
       }
     }
 
-    const result = await openai.generateSocialPost(restaurantInfo, postType, platform, language);
+    if (generateOptions) {
+      const options = await openai.generateMultipleSocialPosts(
+        restaurantInfo, postType, platform, language, optionCount || 3, userContext
+      );
+
+      const firstOption = options[0];
+      const hashtagsStr = Array.isArray(firstOption.hashtags)
+        ? firstOption.hashtags.join(' ')
+        : typeof firstOption.hashtags === 'string'
+          ? firstOption.hashtags
+          : '';
+
+      await prisma.aiGeneratedContent.create({
+        data: {
+          restaurantId,
+          contentType: 'SOCIAL_POST',
+          promptUsed: `Generate ${platform} ${postType} post (${optionCount} options) for: ${restaurant.name}`,
+          generatedContent: JSON.stringify(options),
+          imageUrl: firstOption.imageUrl,
+        },
+      });
+
+      logger.info('Social post options generated', { restaurantId, platform, postType, optionCount });
+
+      return res.status(201).json({
+        success: true,
+        data: {
+          options: options.map((opt, i) => ({
+            id: `option-${i + 1}`,
+            caption: opt.caption,
+            imageUrl: opt.imageUrl,
+            hashtags: Array.isArray(opt.hashtags) ? opt.hashtags.join(' ') : opt.hashtags,
+          })),
+        },
+      });
+    }
+
+    const result = await openai.generateSocialPost(restaurantInfo, postType, platform, language, userContext);
 
     const hashtagsStr = Array.isArray(result.hashtags)
       ? result.hashtags.join(' ')

@@ -1,88 +1,53 @@
-import { useEffect, useState } from 'react'
 import { motion } from 'framer-motion'
-import type { ReactNode } from 'react'
+import { TrendingUp, TrendingDown } from 'lucide-react'
 
 interface StatCardProps {
-  icon: ReactNode
+  icon: React.ReactNode
   label: string
   value: number
   prefix?: string
-  suffix?: string
-  trend: number
-  trendLabel: string
-  decimals?: number
-  color?: 'secondary' | 'accent' | 'success' | 'primary'
+  trend?: number
+  trendLabel?: string
+  color?: 'primary' | 'secondary' | 'success' | 'accent'
 }
 
-function AnimatedCounter({ value, decimals = 0, prefix = '', suffix = '' }: { value: number; decimals?: number; prefix?: string; suffix?: string }) {
-  const [display, setDisplay] = useState(0)
-
-  useEffect(() => {
-    const duration = 1500
-    const start = performance.now()
-    const animate = (now: number) => {
-      const elapsed = now - start
-      const progress = Math.min(elapsed / duration, 1)
-      const eased = 1 - Math.pow(1 - progress, 3)
-      setDisplay(Math.round(value * eased * 100) / 100)
-      if (progress < 1) requestAnimationFrame(animate)
-    }
-    requestAnimationFrame(animate)
-  }, [value])
-
-  return (
-    <span>
-      {prefix}{display.toLocaleString('en-KE', { minimumFractionDigits: decimals, maximumFractionDigits: decimals })}{suffix}
-    </span>
-  )
+const colorMap: Record<string, string> = {
+  primary: 'from-blue-500 to-purple-500',
+  secondary: 'from-secondary to-accent',
+  success: 'from-success to-emerald-400',
+  accent: 'from-pink-500 to-rose-400',
 }
 
-const colorMap = {
-  secondary: { bg: 'bg-secondary/10', icon: 'text-secondary', gradient: 'from-secondary to-accent' },
-  accent: { bg: 'bg-accent/10', icon: 'text-accent', gradient: 'from-accent to-yellow-400' },
-  success: { bg: 'bg-success/10', icon: 'text-success', gradient: 'from-success to-green-400' },
-  primary: { bg: 'bg-primary/10', icon: 'text-primary', gradient: 'from-primary to-blue-600' },
-}
-
-export function StatCard({ icon, label, value, prefix = '', suffix = '', trend, trendLabel, decimals = 0, color = 'secondary' }: StatCardProps) {
-  const c = colorMap[color]
-  const isUp = trend >= 0
+export function StatCard({ icon, label, value, prefix = '', trend, trendLabel, color = 'primary' }: StatCardProps) {
+  const isPositive = trend !== undefined && trend >= 0
 
   return (
     <motion.div
       initial={{ opacity: 0, y: 20 }}
       animate={{ opacity: 1, y: 0 }}
-      whileHover={{ y: -6, scale: 1.02 }}
-      transition={{ type: 'spring', stiffness: 300, damping: 20 }}
-      className="group relative overflow-hidden rounded-2xl bg-white dark:bg-primary-light border border-white/10 p-5"
+      className="rounded-2xl bg-white dark:bg-primary-light border border-gray-100 dark:border-white/5 p-4"
     >
-      <div className={`absolute inset-0 opacity-0 group-hover:opacity-100 transition-opacity duration-500 bg-gradient-to-br ${c.gradient} opacity-[0.03]`} />
-      <div className="relative z-10 flex items-start justify-between">
-        <div className={`flex h-12 w-12 items-center justify-center rounded-xl ${c.bg} ${c.icon}`}>
-          {icon}
+      <div className="flex items-center justify-between mb-3">
+        <div className={`flex h-9 w-9 items-center justify-center rounded-xl bg-gradient-to-br ${colorMap[color] || colorMap.primary}`}>
+          <div className="text-white [&>svg]:h-4.5 [&>svg]:w-4.5">
+            {icon}
+          </div>
         </div>
-      </div>
-      <div className="relative z-10 mt-4">
-        <p className="font-body text-sm text-text-secondary dark:text-white/60">{label}</p>
-        <p className="mt-1 font-heading text-2xl font-bold text-text-primary dark:text-white tabular-nums">
-          <AnimatedCounter value={value} decimals={decimals} prefix={prefix} suffix={suffix} />
-        </p>
-        <div className="mt-2 flex items-center gap-2">
-          <motion.span
-            initial={{ opacity: 0, x: -10 }}
-            animate={{ opacity: 1, x: 0 }}
-            transition={{ delay: 1 }}
-            className={`inline-flex items-center gap-0.5 rounded-full px-2 py-0.5 text-xs font-accent font-semibold ${
-              isUp ? 'bg-success/10 text-success' : 'bg-red-100 text-red-600 dark:bg-red-900/30 dark:text-red-400'
-            }`}
-          >
-            <svg className={`h-3 w-3 ${isUp ? '' : 'rotate-180'}`} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-              <path d="M18 15l-6-6-6 6" />
-            </svg>
+        {trend !== undefined && (
+          <span className={`flex items-center gap-0.5 text-xs font-medium ${isPositive ? 'text-success' : 'text-red-500'}`}>
+            {isPositive ? <TrendingUp className="h-3 w-3" /> : <TrendingDown className="h-3 w-3" />}
             {Math.abs(trend)}%
-          </motion.span>
-          <span className="font-accent text-[11px] text-text-secondary dark:text-white/40">{trendLabel}</span>
-        </div>
+          </span>
+        )}
+      </div>
+      <p className="font-heading text-xl font-bold text-text-primary dark:text-white">
+        {prefix}{value.toLocaleString()}
+      </p>
+      <div className="flex items-center justify-between mt-0.5">
+        <p className="font-accent text-xs text-text-secondary dark:text-white/50">{label}</p>
+        {trendLabel && (
+          <span className="font-accent text-[10px] text-text-secondary/50">{trendLabel}</span>
+        )}
       </div>
     </motion.div>
   )

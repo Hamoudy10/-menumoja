@@ -350,6 +350,7 @@ router.post(
 // POST /refresh-token - Refresh access token
 router.post(
   '/refresh-token',
+  authLimiter,
   asyncHandler(async (req, res) => {
     const { refreshToken } = req.body;
     if (!refreshToken) {
@@ -426,6 +427,7 @@ router.post(
 // POST /reset-password - Reset password with OTP
 router.post(
   '/reset-password',
+  authLimiter,
   asyncHandler(async (req, res) => {
     const { phone, otp, newPassword } = req.body;
     if (!phone || !otp || !newPassword) {

@@ -1,167 +1,152 @@
-import { useState, useEffect, useRef } from 'react'
-import { Outlet } from 'react-router-dom'
-import { Menu, X, ChefHat, Send } from 'lucide-react'
+import { useState, useEffect } from 'react'
+import { Outlet, useNavigate } from 'react-router-dom'
 import { motion, AnimatePresence } from 'framer-motion'
-import DashboardSidebar from './DashboardSidebar'
+import { Menu, LogOut, User, ChevronDown, ShoppingCart, CreditCard, ChefHat } from 'lucide-react'
 import { useStore } from '@/store/useStore'
-import * as aiApi from '@/api/ai'
+import { useTranslation } from 'react-i18next'
+import toast from 'react-hot-toast'
+import DashboardSidebar from './DashboardSidebar'
+import NotificationBell from '@/components/notifications/NotificationBell'
+import ThemeProvider from '@/components/theme/ThemeProvider'
+import * as notificationsApi from '@/api/notifications'
 
 export default function DashboardLayout() {
-  const [mobileMenuOpen, setMobileMenuOpen] = useState(false)
-  const { darkMode, fetchCategories, fetchOrders, fetchLiveOrders, fetchPayments, fetchTodaySummary, fetchTables, fetchStaff, fetchCameras, fetchNotifications } = useStore()
+  const { t, i18n } = useTranslation()
+  const [sidebarOpen, setSidebarOpen] = useState(false)
+  const { restaurant, logout, language, isAuthenticated, fetchNotifications, notifications, unreadCount } = useStore()
+  const navigate = useNavigate()
 
   useEffect(() => {
-    fetchCategories()
-    fetchOrders()
-    fetchLiveOrders()
-    fetchPayments()
-    fetchTodaySummary()
-    fetchTables()
-    fetchStaff()
-    fetchCameras()
-    fetchNotifications()
-  }, [])
-
-  return (
-    <div className={`min-h-screen ${darkMode ? 'bg-background-dark' : 'bg-background-light'} flex`}>
-      <div className="hidden lg:flex">
-        <DashboardSidebar />
-      </div>
-
-      <AnimatePresence>
-        {mobileMenuOpen && (
-          <motion.div
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            exit={{ opacity: 0 }}
-            className="fixed inset-0 z-40 lg:hidden"
-          >
-            <div
-              className="absolute inset-0 bg-black/50 backdrop-blur-sm"
-              onClick={() => setMobileMenuOpen(false)}
-            />
-            <motion.div
-              initial={{ x: -300 }}
-              animate={{ x: 0 }}
-              exit={{ x: -300 }}
-              transition={{ type: 'spring', damping: 25, stiffness: 200 }}
-              className="absolute left-0 top-0 h-full"
-            >
-              <DashboardSidebar onClose={() => setMobileMenuOpen(false)} />
-            </motion.div>
-          </motion.div>
-        )}
-      </AnimatePresence>
-
-      <div className="flex-1 flex flex-col min-h-screen">
-        <header className="h-16 border-b border-gray-100 dark:border-white/5 flex items-center justify-between px-4 lg:px-6 bg-white dark:bg-primary">
-          <div className="flex items-center gap-3">
-            <button
-              onClick={() => setMobileMenuOpen(true)}
-              className="lg:hidden w-9 h-9 rounded-xl bg-gray-100 dark:bg-white/5 flex items-center justify-center text-text-secondary dark:text-white/60"
-            >
-              <Menu className="w-5 h-5" />
-            </button>
-            <span className="font-heading font-bold text-primary dark:text-white text-lg">Dashboard</span>
-          </div>
-        </header>
-
-        <main className="flex-1 p-4 lg:p-6 overflow-auto">
-          <Outlet />
-        </main>
-      </div>
-
-      <ChefAIAssistant />
-    </div>
-  )
-}
-
-function ChefAIAssistant() {
-  const [open, setOpen] = useState(false)
-  const [messages, setMessages] = useState<{ id: string; role: string; text: string }[]>([
-    { id: '1', role: 'ai', text: 'Habari! I\'m Chef AI. How can I help you run your restaurant today? 👨‍🍳' },
-  ])
-  const [input, setInput] = useState('')
-  const [typing, setTyping] = useState(false)
-
-  const handleSend = async () => {
-    if (!input.trim()) return
-    const userMsg = { id: Date.now().toString(), role: 'user', text: input.trim() }
-    setMessages((prev) => [...prev, userMsg])
-    setInput('')
-    setTyping(true)
-    try {
-      const { restaurant } = useStore.getState()
-      const data = await aiApi.customerChat(restaurant?.id || '', 'dashboard', input.trim(), 'en')
-      setMessages((prev) => [...prev, { id: (Date.now() + 1).toString(), role: 'ai', text: data.reply || data.response || 'I\'m here to help!' }])
-    } catch {
-      setMessages((prev) => [...prev, { id: (Date.now() + 1).toString(), role: 'ai', text: 'I can help you manage your menu, check orders, or answer questions about your restaurant!' }])
-    } finally {
-      setTyping(false)
+    if (language === 'ar') {
+      document.documentElement.dir = 'rtl'
+    } else {
+      document.documentElement.dir = 'ltr'
     }
-  }
+  }, [language])
 
-  return (
-    <>
-      <motion.button
-        whileTap={{ scale: 0.9 }}
-        onClick={() => setOpen(true)}
-        className="fixed bottom-6 right-6 z-50 flex h-14 w-14 items-center justify-center rounded-full bg-secondary shadow-warm text-white"
-        animate={{ boxShadow: ['0 0 20px rgba(255,107,53,0.4)', '0 0 40px rgba(255,107,53,0.7)', '0 0 20px rgba(255,107,53,0.4)'] }}
-        transition={{ duration: 2, repeat: Infinity }}
-      >
-        <ChefHat className="h-6 w-6" />
-      </motion.button>
+  useEffect(() => {
+    if (!isAuthenticated) return
 
-      <AnimatePresence>
-        {open && (
-          <>
-            <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="fixed inset-0 z-50 bg-black/40 backdrop-blur-sm" onClick={() => setOpen(false)} />
-            <motion.div
-              initial={{ opacity: 0, y: 20, scale: 0.95 }}
-              animate={{ opacity: 1, y: 0, scale: 1 }}
-              exit={{ opacity: 0, y: 20, scale: 0.95 }}
-              className="fixed bottom-24 right-6 z-50 w-80 sm:w-96 rounded-2xl bg-white dark:bg-primary-light border border-white/10 shadow-soft overflow-hidden"
-            >
-              <div className="flex items-center justify-between bg-secondary px-4 py-3 text-white">
-                <div className="flex items-center gap-2">
-                  <ChefHat className="h-5 w-5" />
-                  <span className="font-heading text-sm font-bold">Chef AI</span>
-                </div>
-                <motion.button whileTap={{ scale: 0.9 }} onClick={() => setOpen(false)}><X className="h-5 w-5" /></motion.button>
-              </div>
-              <div className="h-80 overflow-y-auto bg-[#e8ddd4] px-4 py-4">
-                <div className="space-y-3">
-                  {messages.map((msg) => (
-                    <div key={msg.id} className={`flex ${msg.role === 'user' ? 'justify-end' : 'justify-start'}`}>
-                      <div className={`max-w-[85%] rounded-2xl px-4 py-2.5 ${msg.role === 'user' ? 'bg-secondary text-white rounded-br-md' : 'bg-white text-text-primary rounded-bl-md shadow-sm'}`}>
-                        <p className="font-body text-sm leading-relaxed">{msg.text}</p>
-                      </div>
-                    </div>
-                  ))}
-                  {typing && (
-                    <div className="flex justify-start">
-                      <div className="rounded-2xl rounded-bl-md bg-white px-4 py-3 shadow-sm">
-                        <div className="flex gap-1">
-                          {[0, 1, 2].map((i) => (<motion.div key={i} animate={{ y: [0, -4, 0] }} transition={{ duration: 0.6, repeat: Infinity, delay: i * 0.15 }} className="h-2 w-2 rounded-full bg-gray-400" />))}
-                        </div>
-                      </div>
-                    </div>
+    const lastCount = localStorage.getItem('last_notif_count') || '0'
+
+    const poll = setInterval(async () => {
+      try {
+        const data = await notificationsApi.fetchNotifications()
+        const newNotifications = (data.notifications || data || [])
+        const currentCount = data.unreadCount ?? 0
+
+        const prevCount = parseInt(localStorage.getItem('last_notif_count') || '0')
+
+        if (currentCount > prevCount && newNotifications.length > 0) {
+          const latest = newNotifications[0]
+          const iconMap: Record<string, string> = {
+            new_order: '🆕',
+            payment: '💰',
+            order_ready: '👨‍🍳',
+            review: '⭐',
+            alert: '⚠️',
+          }
+          toast(
+            (t) => (
+              <div className="flex items-center gap-3">
+                <span className="text-lg">{iconMap[latest.type] || '🔔'}</span>
+                <div className="min-w-0">
+                  <p className="font-accent text-sm font-medium text-text-primary dark:text-white truncate">
+                    {latest.title || latest.message}
+                  </p>
+                  {latest.message && latest.title && (
+                    <p className="font-accent text-xs text-text-secondary dark:text-white/50 truncate">{latest.message}</p>
                   )}
                 </div>
               </div>
-              <div className="border-t border-gray-100 bg-white dark:bg-primary-light px-4 py-3">
-                <form onSubmit={(e) => { e.preventDefault(); handleSend() }} className="flex items-center gap-2">
-                  <input type="text" value={input} onChange={(e) => setInput(e.target.value)} placeholder="Ask Chef AI..." className="flex-1 rounded-2xl bg-gray-100 dark:bg-white/10 px-4 py-2.5 font-body text-sm text-text-primary dark:text-white outline-none placeholder:text-text-secondary/50" />
-                  <motion.button whileTap={{ scale: 0.9 }} type="submit" disabled={!input.trim()} className="flex h-9 w-9 items-center justify-center rounded-full bg-secondary text-white disabled:opacity-50"><Send className="h-4 w-4" /></motion.button>
-                </form>
+            ),
+            { duration: 5000, position: 'top-right' }
+          )
+        }
+
+        localStorage.setItem('last_notif_count', currentCount.toString())
+      } catch {}
+    }, 15000)
+
+    return () => clearInterval(poll)
+  }, [isAuthenticated])
+
+  return (
+    <ThemeProvider>
+      <div className="flex min-h-screen bg-background-light dark:bg-background-dark" dir={language === 'ar' ? 'rtl' : 'ltr'}>
+        <div className="hidden lg:block">
+          <DashboardSidebar />
+        </div>
+
+        <AnimatePresence>
+          {sidebarOpen && (
+            <>
+              <motion.div
+                initial={{ opacity: 0 }}
+                animate={{ opacity: 1 }}
+                exit={{ opacity: 0 }}
+                className="fixed inset-0 z-40 bg-black/40 backdrop-blur-sm lg:hidden"
+                onClick={() => setSidebarOpen(false)}
+              />
+              <motion.div
+                initial={{ x: '-100%' }}
+                animate={{ x: 0 }}
+                exit={{ x: '-100%' }}
+                transition={{ type: 'spring', damping: 30, stiffness: 300 }}
+                className="fixed left-0 top-0 z-50 h-full lg:hidden"
+              >
+                <DashboardSidebar onClose={() => setSidebarOpen(false)} />
+              </motion.div>
+            </>
+          )}
+        </AnimatePresence>
+
+        <div className="flex-1 flex flex-col min-h-screen">
+          <header className="sticky top-0 z-30 flex h-16 items-center justify-between border-b border-white/10 bg-white/80 dark:bg-primary/80 backdrop-blur-xl px-4 lg:px-6">
+            <button
+              onClick={() => setSidebarOpen(true)}
+              className="flex h-9 w-9 items-center justify-center rounded-xl bg-black/5 dark:bg-white/10 hover:bg-black/10 dark:hover:bg-white/20 transition-colors lg:hidden"
+            >
+              <Menu className="h-4 w-4 text-text-secondary" />
+            </button>
+
+            <div className="flex-1" />
+
+            <div className="flex items-center gap-3">
+              <NotificationBell />
+
+              <div className="flex items-center gap-2 rounded-xl bg-black/5 dark:bg-white/10 px-3 py-1.5">
+                <div className="flex h-7 w-7 items-center justify-center rounded-lg bg-secondary text-[10px] font-bold text-white">
+                  {restaurant?.name?.charAt(0) || 'M'}
+                </div>
+                <div className="hidden sm:block">
+                  <p className="font-accent text-xs font-medium text-text-primary dark:text-white leading-tight">
+                    {restaurant?.name || 'MenuMoja'}
+                  </p>
+                  <p className="font-accent text-[10px] text-text-secondary leading-tight">
+                    {restaurant?.plan ? `${restaurant.plan.charAt(0).toUpperCase() + restaurant.plan.slice(1)} Plan` : ''}
+                  </p>
+                </div>
               </div>
-            </motion.div>
-          </>
-        )}
-      </AnimatePresence>
-    </>
+
+              <button
+                onClick={() => {
+                  logout()
+                  navigate('/login')
+                }}
+                className="flex h-9 w-9 items-center justify-center rounded-xl bg-black/5 dark:bg-white/10 hover:bg-red-100 dark:hover:bg-red-900/30 hover:text-red-500 transition-colors"
+                title={t('auth.logout')}
+              >
+                <LogOut className="h-4 w-4" />
+              </button>
+            </div>
+          </header>
+
+          <main className="flex-1 p-4 lg:p-6 overflow-y-auto">
+            <Outlet />
+          </main>
+        </div>
+      </div>
+    </ThemeProvider>
   )
 }
-
-

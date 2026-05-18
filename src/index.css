@@ -23,13 +23,37 @@
   html { scroll-behavior: smooth; }
   body {
     @apply font-body text-text-primary bg-background-light antialiased;
+    font-family: var(--font-body);
   }
-  h1, h2, h3, h4, h5, h6 { @apply font-heading; }
+  h1, h2, h3, h4, h5, h6 {
+    font-family: var(--font-heading);
+  }
+}
+
+:root {
+  --color-primary: #0A1628;
+  --color-primary-light: #1A2A4A;
+  --color-secondary: #FF6B35;
+  --color-accent: #FFD700;
+  --color-success: #2ECC71;
+  --color-warning: #F39C12;
+  --color-danger: #E74C3C;
+  --color-info: #3498DB;
+  --color-background-light: #FAFAF7;
+  --color-background-dark: #060D1A;
+  --color-text-primary: #1A1A2E;
+  --color-text-secondary: #6B7280;
+  --color-glass: rgba(255, 255, 255, 0.1);
+  --font-heading: 'Playfair Display', Georgia, serif;
+  --font-body: 'Inter', system-ui, sans-serif;
+  --font-accent: 'Space Grotesk', monospace;
+  --gradient-primary: linear-gradient(135deg, #FF6B35, #FFD700);
+  --gradient-secondary: linear-gradient(135deg, #FFD700, #FF6B35);
 }
 
 @layer utilities {
   .glass { 
-    background: rgba(255, 255, 255, 0.08);
+    background: var(--color-glass);
     backdrop-filter: blur(16px);
     -webkit-backdrop-filter: blur(16px);
     border: 1px solid rgba(255, 255, 255, 0.1);
@@ -41,13 +65,7 @@
     border: 1px solid rgba(255, 255, 255, 0.06);
   }
   .text-gradient {
-    background: linear-gradient(135deg, #FF6B35, #FFD700);
-    -webkit-background-clip: text;
-    -webkit-text-fill-color: transparent;
-    background-clip: text;
-  }
-  .text-gradient-ocean {
-    background: linear-gradient(135deg, #0A1628, #FF6B35);
+    background: var(--gradient-primary);
     -webkit-background-clip: text;
     -webkit-text-fill-color: transparent;
     background-clip: text;
@@ -70,23 +88,63 @@
   .animate-slide-up {
     animation: slideUp 0.6s ease-out forwards;
   }
-  .gradient-border {
-    position: relative;
-    border-radius: 16px;
-    background-clip: padding-box;
-    border: 1px solid transparent;
+
+  .bg-background-light {
+    background-color: var(--color-background-light);
   }
-  .gradient-border::before {
-    content: '';
-    position: absolute;
-    inset: 0;
-    border-radius: 16px;
-    padding: 1px;
-    background: linear-gradient(135deg, #FF6B35, #FFD700, #FF6B35);
-    -webkit-mask: linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0);
-    -webkit-mask-composite: xor;
-    mask-composite: exclude;
-    pointer-events: none;
+  .dark .bg-background-dark {
+    background-color: var(--color-background-dark);
+  }
+  .dark .bg-primary-dark-theme {
+    background-color: var(--color-background-dark);
+  }
+  .text-text-primary {
+    color: var(--color-text-primary);
+  }
+  .text-text-secondary {
+    color: var(--color-text-secondary);
+  }
+  .bg-primary {
+    background-color: var(--color-primary);
+  }
+  .dark .bg-primary-dark {
+    background-color: var(--color-background-dark);
+  }
+  .bg-primary-light {
+    background-color: var(--color-primary-light);
+  }
+  .text-secondary {
+    color: var(--color-secondary);
+  }
+  .bg-secondary {
+    background-color: var(--color-secondary);
+  }
+  .border-secondary {
+    border-color: var(--color-secondary);
+  }
+  .ring-secondary {
+    --tw-ring-color: var(--color-secondary);
+  }
+  .text-accent {
+    color: var(--color-accent);
+  }
+  .bg-accent {
+    background-color: var(--color-accent);
+  }
+  .text-success {
+    color: var(--color-success);
+  }
+  .bg-success {
+    background-color: var(--color-success);
+  }
+  .font-heading {
+    font-family: var(--font-heading);
+  }
+  .font-body {
+    font-family: var(--font-body);
+  }
+  .font-accent {
+    font-family: var(--font-accent);
   }
 }
 
@@ -112,11 +170,17 @@
   to { opacity: 1; transform: translateY(0); }
 }
 
-@keyframes draw {
-  to { stroke-dashoffset: 0; }
-}
-
 ::-webkit-scrollbar { width: 6px; }
 ::-webkit-scrollbar-track { background: transparent; }
 ::-webkit-scrollbar-thumb { background: #6B7280; border-radius: 3px; }
 ::-webkit-scrollbar-thumb:hover { background: #FF6B35; }
+
+[dir="rtl"] {
+  direction: rtl;
+  text-align: right;
+}
+
+[dir="rtl"] .lg\:border-r {
+  border-right-width: 0;
+  border-left-width: 1px;
+}

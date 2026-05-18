@@ -142,10 +142,12 @@ export default function Step6QRGeneration({ onNext, onPrev }: Props) {
     const printWindow = window.open('', '_blank')
     if (!printWindow) return
     const style = qrStyles[onboarding.qrStyle || 0]
-    printWindow.document.write(`
+    const qrHtml = document.getElementById('menu-moja-qr')?.outerHTML || ''
+    const escapedName = (onboarding.restaurantName || 'MenuMoja').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c] || c))
+    const printContent = `
       <html>
         <head>
-          <title>${onboarding.restaurantName || 'Menu'} QR Code</title>
+          <title>Menu QR Code</title>
           <style>
             body { display: flex; justify-content: center; align-items: center; min-height: 100vh; margin: 0; font-family: Inter, sans-serif; background: ${style.bgColor}; }
             .container { text-align: center; padding: 40px; }
@@ -155,15 +157,19 @@ export default function Step6QRGeneration({ onNext, onPrev }: Props) {
         </head>
         <body>
           <div class="container">
-            <h1>${onboarding.restaurantName || 'MenuMoja'}</h1>
+            <h1>${escapedName}</h1>
             <p>Scan to view menu</p>
-            <div id="qr">${document.getElementById('menu-moja-qr')?.outerHTML || ''}</div>
+            <div id="qr">${qrHtml}</div>
           </div>
           <script>window.onload = function() { window.print(); }</script>
         </body>
       </html>
-    `)
-    printWindow.document.close()
+    `
+    const iframe = printWindow.document.createElement('iframe')
+    iframe.style.display = 'none'
+    printWindow.document.body.appendChild(iframe)
+    iframe.srcdoc = printContent
+    setTimeout(() => { if (printWindow) printWindow.print() }, 500)
   }
 
   const handleShare = async () => {

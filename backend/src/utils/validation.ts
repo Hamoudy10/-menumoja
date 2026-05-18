@@ -289,8 +289,11 @@ export const generateDescriptionSchema = z
   .object({
     itemName: z.string().min(1, 'Item name is required').max(200),
     keywords: z.array(z.string()).max(20).optional(),
-    tone: z.enum(['professional', 'casual', 'elegant', 'playful']).default('professional'),
+    tone: z.enum(['professional', 'casual', 'elegant', 'playful', 'fun', 'classic']).default('professional'),
     maxLength: z.number().int().min(50).max(500).default(150),
+    userContext: z.string().max(500, 'Context too long').optional(),
+    generateOptions: z.boolean().optional().default(false),
+    optionCount: z.number().int().min(1).max(5).optional().default(3),
   })
   .strict();
 

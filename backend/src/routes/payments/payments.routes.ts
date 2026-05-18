@@ -1,3 +1,4 @@
+import crypto from 'crypto';
 import { Router } from 'express';
 import { z } from 'zod';
 import { prisma } from '@/config/database';
@@ -9,6 +10,47 @@ import { mpesaService } from '@/services';
 import * as mpesa from '@/integrations/mpesa';
 import { io } from '@/hooks/socket';
 import logger from '@/utils/logger';
+
+const SAFARICOM_IPS = [
+  '196.201.214.200', '196.201.214.206', '196.201.213.200', '196.201.213.206',
+  '196.201.214.208', '196.201.213.208', '196.201.214.207', '196.201.213.207',
+  '196.202.0.0/15',
+];
+
+const isProductionCallback = process.env.NODE_ENV === 'production';
+
+function verifyMpesaCallback(req: any, _res: any, next: any) {
+  if (isProductionCallback) {
+    const clientIp = req.ip || req.connection?.remoteAddress;
+    const isAllowed = SAFARICOM_IPS.some((cidr) => {
+      if (cidr.includes('/')) {
+        const [range, bits] = cidr.split('/');
+        const mask = ~(2 ** (32 - parseInt(bits)) - 1);
+        const clientNum = ipToInt(clientIp);
+        const rangeNum = ipToInt(range);
+        return (clientNum & mask) === (rangeNum & mask);
+      }
+      return clientIp === cidr;
+    });
+
+    if (!isAllowed) {
+      logger.warn('M-Pesa callback rejected: IP not whitelisted', { clientIp });
+      return _res.status(403).json({ ResultCode: 1, ResultDesc: 'Forbidden' });
+    }
+  }
+
+  const callbackBody = req.body;
+  if (!callbackBody?.Body?.stkCallback) {
+    logger.warn('Invalid M-Pesa callback body structure');
+    return _res.status(200).json({ ResultCode: 1, ResultDesc: 'Invalid request' });
+  }
+
+  next();
+}
+
+function ipToInt(ip: string): number {
+  return ip.split('.').reduce((acc, oct) => (acc << 8) + parseInt(oct, 10), 0) >>> 0;
+}
 
 const router = Router();
 
@@ -127,20 +169,15 @@ router.post('/mpesa/initiate',
 );
 
 router.post('/mpesa/callback',
+  verifyMpesaCallback,
   asyncHandler(async (req, res) => {
     const callbackBody = req.body;
+    const checkoutRequestId = callbackBody.Body.stkCallback.CheckoutRequestID;
 
     logger.info('M-Pesa callback received', {
-      checkoutRequestId: callbackBody?.Body?.stkCallback?.CheckoutRequestID,
-      resultCode: callbackBody?.Body?.stkCallback?.ResultCode,
+      checkoutRequestId,
+      resultCode: callbackBody.Body.stkCallback.ResultCode,
     });
-
-    if (!callbackBody?.Body?.stkCallback) {
-      logger.warn('Invalid M-Pesa callback body structure');
-      return res.status(200).json({ ResultCode: 1, ResultDesc: 'Rejected' });
-    }
-
-    const checkoutRequestId = callbackBody.Body.stkCallback.CheckoutRequestID;
 
     try {
       const idempotencyStatus = await mpesa.checkIdempotency(checkoutRequestId);
@@ -161,11 +198,11 @@ router.post('/mpesa/callback',
         return res.json({ ResultCode: 0, ResultDesc: 'Success' });
       } else {
         logger.warn('M-Pesa callback processing failed', { checkoutRequestId, message: result.message });
-        return res.json({ ResultCode: 0, ResultDesc: 'Success' });
+        return res.json({ ResultCode: 1, ResultDesc: result.message || 'Processing failed' });
       }
     } catch (error) {
       logger.error('M-Pesa callback processing error', { error, checkoutRequestId });
-      return res.json({ ResultCode: 1, ResultDesc: 'Rejected' });
+      return res.status(500).json({ ResultCode: 1, ResultDesc: 'Internal error' });
     }
   })
 );

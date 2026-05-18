@@ -47,28 +47,27 @@ export function CartPage({ onBack, onPlaceOrder }: CartPageProps) {
   const serviceFee = Math.round(subtotal * 0.05)
   const total = subtotal + tipAmount + serviceFee
 
-  const handlePlaceOrder = () => {
+  const handlePlaceOrder = async () => {
     if (!paymentMethod) return
+    if (!onPlaceOrder) return
     setPlacing(true)
-    setTimeout(() => {
+    try {
+      await onPlaceOrder({
+        items: cart.map((c) => ({
+          ...c.item,
+          quantity: c.quantity,
+          specialInstructions: c.specialInstructions,
+        })),
+        total,
+        tip: tipAmount,
+        notes,
+        paymentMethod,
+      })
       setPlaced(true)
-      if (onPlaceOrder) {
-        onPlaceOrder({
-          items: cart.map((c) => ({
-            ...c.item,
-            quantity: c.quantity,
-            specialInstructions: c.specialInstructions,
-          })),
-          total,
-          tip: tipAmount,
-          notes,
-          paymentMethod,
-        })
-      }
-      setTimeout(() => {
-        clearCart()
-      }, 500)
-    }, 1500)
+      setTimeout(() => clearCart(), 500)
+    } catch {
+      setPlacing(false)
+    }
   }
 
   const t = (key: string): string => {

@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo } from 'react'
+import { useState, useEffect, useMemo, useRef } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import {
   Clock, Search, Filter, ChevronDown, ChevronUp, AlertTriangle, CheckCircle2,
@@ -17,7 +17,17 @@ type Tab = 'live' | 'history' | 'kitchen'
 export default function OrdersPage() {
   const [activeTab, setActiveTab] = useState<Tab>('live')
   const orders = useStore((s) => s.orders)
+  const liveOrders = useStore((s) => s.liveOrders)
+  const fetchLiveOrders = useStore((s) => s.fetchLiveOrders)
   const updateOrderStatus = useStore((s) => s.updateOrderStatus)
+
+  useEffect(() => {
+    if (activeTab === 'live') {
+      fetchLiveOrders()
+      const interval = setInterval(fetchLiveOrders, 15000)
+      return () => clearInterval(interval)
+    }
+  }, [activeTab])
 
   return (
     <div className="space-y-6">
@@ -44,7 +54,7 @@ export default function OrdersPage() {
         ))}
       </div>
 
-      {activeTab === 'live' && <LiveOrdersView orders={orders} updateOrderStatus={updateOrderStatus} />}
+      {activeTab === 'live' && <LiveOrdersView orders={liveOrders.length > 0 ? liveOrders : orders} updateOrderStatus={updateOrderStatus} />}
       {activeTab === 'history' && <OrderHistory orders={orders} />}
       {activeTab === 'kitchen' && <KitchenDisplay orders={orders} updateOrderStatus={updateOrderStatus} />}
     </div>
@@ -202,22 +212,28 @@ function OrderHistory({ orders }: { orders: Order[] }) {
 }
 
 function KitchenDisplay({ orders, updateOrderStatus }: { orders: Order[]; updateOrderStatus: (id: string, status: Order['status']) => void }) {
-  const kitchenOrders = orders.filter((o) => o.status === 'new' || o.status === 'preparing')
+  const kitchenOrders = useMemo(() =>
+    orders.filter((o) => o.status === 'new' || o.status === 'preparing'),
+  [orders])
   const [timers, setTimers] = useState<Record<string, string>>({})
+  const timerRef = useRef<ReturnType<typeof setInterval> | null>(null)
 
   useEffect(() => {
-    const interval = setInterval(() => {
-      const newTimers: Record<string, string> = {}
-      kitchenOrders.forEach((o) => {
-        const diff = Date.now() - new Date(o.createdAt).getTime()
-        const mins = Math.floor(diff / 60000)
-        const secs = Math.floor((diff % 60000) / 1000)
-        newTimers[o.id] = `${mins.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`
+    timerRef.current = setInterval(() => {
+      setTimers(() => {
+        const newTimers: Record<string, string> = {}
+        const currentOrders = orders.filter((o) => o.status === 'new' || o.status === 'preparing')
+        currentOrders.forEach((o) => {
+          const diff = Date.now() - new Date(o.createdAt).getTime()
+          const mins = Math.floor(diff / 60000)
+          const secs = Math.floor((diff % 60000) / 1000)
+          newTimers[o.id] = `${mins.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`
+        })
+        return newTimers
       })
-      setTimers(newTimers)
     }, 1000)
-    return () => clearInterval(interval)
-  }, [kitchenOrders])
+    return () => { if (timerRef.current) clearInterval(timerRef.current) }
+  }, [orders])
 
   return (
     <div>

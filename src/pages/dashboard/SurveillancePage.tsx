@@ -37,9 +37,24 @@ export default function SurveillancePage() {
     if (!newCam.ip) return
     setTesting(true)
     setTestResult('idle')
-    await new Promise((r) => setTimeout(r, 2000))
-    setTesting(false)
-    setTestResult(Math.random() > 0.3 ? 'success' : 'fail')
+    try {
+      const controller = new AbortController()
+      const timeout = setTimeout(() => controller.abort(), 5000)
+      const res = await fetch(`http://${newCam.ip}:${newCam.port || 554}`, {
+        method: 'HEAD',
+        signal: controller.signal,
+      })
+      clearTimeout(timeout)
+      if (res.ok || res.status === 401 || res.status === 403) {
+        setTestResult('success')
+      } else {
+        setTestResult('fail')
+      }
+    } catch {
+      setTestResult('fail')
+    } finally {
+      setTesting(false)
+    }
   }
 
   const handleAddCamera = async () => {

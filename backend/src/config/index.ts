@@ -40,17 +40,45 @@ interface Config {
 }
 
 function loadConfig(): Config {
+  const nodeEnv = process.env.NODE_ENV || 'development';
+  const isProd = nodeEnv === 'production';
+
+  const jwtAccessSecret = process.env.JWT_ACCESS_SECRET;
+  const jwtRefreshSecret = process.env.JWT_REFRESH_SECRET;
+  const encryptionKey = process.env.ENCRYPTION_KEY;
+
+  if (isProd) {
+    const required: Record<string, string | undefined> = {
+      DATABASE_URL: process.env.DATABASE_URL,
+      JWT_ACCESS_SECRET: jwtAccessSecret,
+      JWT_REFRESH_SECRET: jwtRefreshSecret,
+      ENCRYPTION_KEY: encryptionKey,
+    };
+
+    const missing = Object.entries(required)
+      .filter(([, v]) => !v)
+      .map(([k]) => k);
+
+    if (missing.length > 0) {
+      throw new Error(`Missing required environment variables in production: ${missing.join(', ')}`);
+    }
+
+    if (!process.env.OPENAI_API_KEY && !process.env.DEEPSEEK_API_KEY) {
+      throw new Error('Missing required environment variable: OPENAI_API_KEY or DEEPSEEK_API_KEY');
+    }
+  }
+
   const cfg: Config = {
-    nodeEnv: process.env.NODE_ENV || 'development',
+    nodeEnv,
     port: parseInt(process.env.PORT || '3001', 10),
     databaseUrl: process.env.DATABASE_URL || 'postgresql://user:password@localhost:5432/menumoja',
     redisUrl: process.env.REDIS_URL || '',
-    jwtAccessSecret: process.env.JWT_ACCESS_SECRET || 'dev-access-secret-not-for-production',
-    jwtRefreshSecret: process.env.JWT_REFRESH_SECRET || 'dev-refresh-secret-not-for-production',
-    encryptionKey: process.env.ENCRYPTION_KEY || 'dev-encryption-key-32chars!!!!!',
-    frontendUrl: process.env.FRONTEND_URL || 'http://localhost:5173',
-    apiUrl: process.env.API_URL || 'http://localhost:3001',
-    adminEmail: process.env.ADMIN_EMAIL || 'admin@menumoja.co.ke',
+    jwtAccessSecret: jwtAccessSecret || '',
+    jwtRefreshSecret: jwtRefreshSecret || '',
+    encryptionKey: encryptionKey || '',
+    frontendUrl: process.env.FRONTEND_URL || '',
+    apiUrl: process.env.API_URL || '',
+    adminEmail: process.env.ADMIN_EMAIL || '',
     cloudinaryCloudName: process.env.CLOUDINARY_CLOUD_NAME || '',
     cloudinaryApiKey: process.env.CLOUDINARY_API_KEY || '',
     cloudinaryApiSecret: process.env.CLOUDINARY_API_SECRET || '',
@@ -75,25 +103,6 @@ function loadConfig(): Config {
     resendApiKey: process.env.RESEND_API_KEY || '',
     sentryDsn: process.env.SENTRY_DSN || '',
   };
-
-  if (cfg.nodeEnv === 'production') {
-    const required: (keyof Config)[] = [
-      'databaseUrl',
-      'jwtAccessSecret',
-      'jwtRefreshSecret',
-      'encryptionKey',
-    ];
-
-    for (const key of required) {
-      if (!cfg[key]) {
-        throw new Error(`Missing required environment variable: ${key}`);
-      }
-    }
-
-    if (!cfg.openaiApiKey && !cfg.deepseekApiKey) {
-      throw new Error('Missing required environment variable: OPENAI_API_KEY or DEEPSEEK_API_KEY');
-    }
-  }
 
   return cfg;
 }

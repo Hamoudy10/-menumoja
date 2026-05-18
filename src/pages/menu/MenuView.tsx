@@ -1,18 +1,96 @@
-import { useState } from 'react'
-import { motion, AnimatePresence } from 'framer-motion'
+import { useState, useEffect } from 'react'
+import { motion } from 'framer-motion'
 import { useParams, useNavigate } from 'react-router-dom'
-import { ShoppingCart, Plus, Minus, ChefHat, MapPin, Star, Search } from 'lucide-react'
+import { ShoppingCart, Plus, Minus, ChefHat, MapPin, Star, Search, Loader2 } from 'lucide-react'
 import { useStore } from '@/store/useStore'
 import { Button } from '@/components/ui/Button'
 import { Badge } from '@/components/ui/Badge'
+import * as menuApi from '@/api/menu'
 
 export default function MenuView() {
   const { restaurantSlug } = useParams()
   const navigate = useNavigate()
-  const { categories, cart, addToCart, updateCartQuantity, restaurant } = useStore()
-  const [activeCategory, setActiveCategory] = useState(categories[0]?.id || '')
+  const { categories, cart, addToCart, updateCartQuantity, setLanguage } = useStore()
+  const [activeCategory, setActiveCategory] = useState('')
+  const [loading, setLoading] = useState(true)
+  const [error, setError] = useState('')
+  const [restaurantInfo, setRestaurantInfo] = useState<any>(null)
+  const [menuCategories, setMenuCategories] = useState<any[]>([])
 
   const cartCount = cart.reduce((s, i) => s + i.quantity, 0)
+
+  useEffect(() => {
+    if (!restaurantSlug) return
+    let cancelled = false
+
+    const loadMenu = async () => {
+      setLoading(true)
+      setError('')
+      try {
+        const data = await menuApi.getPublicMenu(restaurantSlug)
+        if (cancelled) return
+        const restaurant = data.restaurant || data
+        const cats = data.categories || data.items
+          ? [{ id: 'all', name: 'All', items: data.items || [] }]
+          : []
+
+        setRestaurantInfo(restaurant)
+        setMenuCategories(cats)
+        if (cats.length > 0) setActiveCategory(cats[0]?.id || '')
+        if (restaurant?.language) setLanguage(restaurant.language)
+      } catch (err: any) {
+        if (cancelled) return
+        setError(err?.response?.data?.message || err?.message || 'Failed to load menu')
+      } finally {
+        if (!cancelled) setLoading(false)
+      }
+    }
+
+    loadMenu()
+    return () => { cancelled = true }
+  }, [restaurantSlug])
+
+  if (loading) {
+    return (
+      <div className="min-h-screen bg-background-light flex items-center justify-center">
+        <div className="flex flex-col items-center gap-3">
+          <div className="w-8 h-8 border-2 border-secondary border-t-transparent rounded-full animate-spin" />
+          <p className="font-accent text-xs text-text-secondary">Loading menu...</p>
+        </div>
+      </div>
+    )
+  }
+
+  if (error) {
+    return (
+      <div className="min-h-screen bg-background-light flex items-center justify-center p-4">
+        <div className="text-center max-w-md">
+          <ChefHat className="w-12 h-12 mx-auto text-text-secondary/30 mb-4" />
+          <h2 className="text-xl font-heading font-bold text-primary mb-2">Menu Unavailable</h2>
+          <p className="text-text-secondary text-sm mb-6">{error}</p>
+          <Button variant="primary" onClick={() => window.location.reload()}>
+            Try Again
+          </Button>
+        </div>
+      </div>
+    )
+  }
+
+  if (menuCategories.length === 0) {
+    return (
+      <div className="min-h-screen bg-background-light flex items-center justify-center p-4">
+        <div className="text-center max-w-md">
+          <ChefHat className="w-12 h-12 mx-auto text-text-secondary/30 mb-4" />
+          <h2 className="text-xl font-heading font-bold text-primary mb-2">
+            {restaurantInfo?.name || 'Restaurant'} Menu
+          </h2>
+          <p className="text-text-secondary text-sm">Menu items coming soon!</p>
+        </div>
+      </div>
+    )
+  }
+
+  const displayCategories = menuCategories.filter(c => !activeCategory || c.id === activeCategory || activeCategory === 'all')
 
   return (
     <div className="min-h-screen bg-background-light">
@@ -24,7 +102,9 @@ export default function MenuView() {
                 <ChefHat className="w-5 h-5 text-white" />
               </div>
               <div>
-                <h1 className="font-heading font-bold text-primary text-sm">{restaurant?.name || restaurantSlug || 'Restaurant'}</h1>
+                <h1 className="font-heading font-bold text-primary text-sm">
+                  {restaurantInfo?.name || restaurantSlug || 'Restaurant'}
+                </h1>
                 <p className="text-[10px] text-text-secondary">Digital Menu</p>
               </div>
             </div>
@@ -41,8 +121,8 @@ export default function MenuView() {
             </button>
           </div>
 
-          <div className="flex gap-1 overflow-x-auto pb-1 scrollbar-none">
-            {categories.map((cat) => (
+          <div className="flex gap-1 overflow-x-auto pb-1">
+            {menuCategories.map((cat) => (
               <button
                 key={cat.id}
                 onClick={() => setActiveCategory(cat.id)}
@@ -60,11 +140,11 @@ export default function MenuView() {
       </header>
 
       <main className="max-w-lg mx-auto px-4 py-4 space-y-4">
-        {categories.filter(c => !activeCategory || c.id === activeCategory).map((category) => (
+        {displayCategories.map((category) => (
           <div key={category.id}>
             <h2 className="font-heading font-bold text-primary text-lg mb-3">{category.name}</h2>
             <div className="space-y-3">
-              {category.items.map((item) => {
+              {category.items.map((item: any) => {
                 const cartItem = cart.find(c => c.item.id === item.id)
                 const qty = cartItem?.quantity || 0
                 return (
@@ -82,7 +162,7 @@ export default function MenuView() {
                         </div>
                         <p className="text-xs text-text-secondary mt-1 line-clamp-2">{item.description}</p>
                         <div className="flex items-center gap-2 mt-2">
-                          {item.dietaryTags.map((tag) => (
+                          {(item.dietaryTags || []).map((tag: string) => (
                             <span key={tag} className="text-[9px] px-1.5 py-0.5 rounded-full bg-gray-100 text-text-secondary font-medium">{tag}</span>
                           ))}
                         </div>

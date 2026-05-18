@@ -3,11 +3,12 @@ import { motion, AnimatePresence } from 'framer-motion'
 import {
   Megaphone, Image, MessageSquare, MessageCircle, Music, Bot,
   Calendar, CheckCircle2, Clock, XCircle, BarChart3, Eye, Heart, MousePointerClick,
-  Activity, RefreshCw, Link2, Unlink, Loader2,
+  Activity, RefreshCw, Link2, Unlink, Loader2, Sparkles, ChevronDown, ChevronUp,
 } from 'lucide-react'
 const Instagram = Image
 const Facebook = MessageSquare
 import { useStore } from '@/store/useStore'
+import { useTranslation } from 'react-i18next'
 import { Button } from '@/components/ui/Button'
 import { Badge } from '@/components/ui/Badge'
 import { Toggle } from '@/components/ui/Toggle'
@@ -27,6 +28,7 @@ const platformConfig: Record<string, { icon: any; color: string; bg: string; lab
 const platforms = ['instagram', 'facebook', 'whatsapp', 'tiktok'] as const
 
 export default function MarketingPage() {
+  const { t } = useTranslation()
   const { posts, addPost, updatePost, approvePost, publishPost, fetchPosts } = useStore()
   const [autoMode, setAutoMode] = useState(true)
   const [frequency, setFrequency] = useState('daily')
@@ -36,6 +38,11 @@ export default function MarketingPage() {
   const [loadingConnections, setLoadingConnections] = useState(true)
   const [generating, setGenerating] = useState(false)
   const [contentStyle, setContentStyle] = useState('fun')
+  const [contentContext, setContentContext] = useState('')
+
+  const [aiOptions, setAiOptions] = useState<Array<{ id: string; caption: string; imageUrl: string; hashtags: string }>>([])
+  const [showAiOptions, setShowAiOptions] = useState(false)
+  const [selectedOptionId, setSelectedOptionId] = useState<string | null>(null)
 
   useEffect(() => {
     fetchPosts()
@@ -46,45 +53,76 @@ export default function MarketingPage() {
     setLoadingConnections(true)
     try {
       const data = await marketingApi.getConnections()
-      setConnections(data.connections || data || [])
-    } catch { setConnections([]) } finally { setLoadingConnections(false) }
+      const serverConns = data.connections || data || []
+      const localConns: any[] = []
+      platforms.forEach((p) => {
+        const stored = localStorage.getItem(`social_conn_${p}`)
+        if (stored) {
+          try { localConns.push(JSON.parse(stored)) } catch {}
+        }
+      })
+      const merged = [...serverConns]
+      localConns.forEach((lc) => {
+        if (!merged.find((c: any) => c.platform === lc.platform)) {
+          merged.push(lc)
+        }
+      })
+      setConnections(merged)
+    } catch {
+      const localConns: any[] = []
+      platforms.forEach((p) => {
+        const stored = localStorage.getItem(`social_conn_${p}`)
+        if (stored) {
+          try { localConns.push(JSON.parse(stored)) } catch {}
+        }
+      })
+      setConnections(localConns)
+    } finally { setLoadingConnections(false) }
   }
 
   const handleConnect = (platform: string) => {
-    const redirectUri = `${window.location.origin}/dashboard/marketing`
-    const oauthUrls: Record<string, string> = {
-      facebook: `https://www.facebook.com/v18.0/dialog/oauth?client_id=${import.meta.env.VITE_FACEBOOK_APP_ID || 'YOUR_APP_ID'}&redirect_uri=${redirectUri}&scope=pages_manage_posts,pages_read_engagement&state=${platform}`,
-      instagram: `https://api.instagram.com/oauth/authorize?client_id=${import.meta.env.VITE_INSTAGRAM_CLIENT_ID || 'YOUR_CLIENT_ID'}&redirect_uri=${redirectUri}&scope=instagram_basic,instagram_content_publish&response_type=code&state=${platform}`,
-      tiktok: `https://www.tiktok.com/v2/auth/authorize?client_key=${import.meta.env.VITE_TIKTOK_CLIENT_KEY || 'YOUR_KEY'}&redirect_uri=${redirectUri}&scope=user.info.basic,video.publish&state=${platform}`,
-      whatsapp: '#',
+    const existing = connections.find((c: any) => c.platform === platform)
+    if (existing) {
+      handleDisconnect(platform)
+      return
     }
-    const url = oauthUrls[platform]
-    if (url && url !== '#') {
-      window.open(url, '_blank', 'width=600,height=700')
-    } else {
-      setConnections((prev: any[]) => {
-        const existing = prev.find((c: any) => c.platform === platform)
-        if (existing) return prev
-        return [...prev, { platform, accountName: `${platform.charAt(0).toUpperCase() + platform.slice(1)} Page`, connectedAt: new Date().toISOString(), isActive: true }]
-      })
-      showSuccessToast(`${platform.charAt(0).toUpperCase() + platform.slice(1)} connected!`)
+
+    const mockConnection = {
+      platform,
+      id: `conn-${Date.now()}`,
+      accountName: `${platform.charAt(0).toUpperCase() + platform.slice(1)} Page`,
+      accountId: `page_${Date.now()}`,
+      connectedAt: new Date().toISOString(),
+      isActive: true,
+      isSimulated: true,
     }
+
+    setConnections((prev: any[]) => [...prev, mockConnection])
+    localStorage.setItem(`social_conn_${platform}`, JSON.stringify(mockConnection))
+    showSuccessToast(`${platformConfig[platform]?.label || platform} connected! (Simulated)`)
   }
 
   const handleDisconnect = async (platform: string) => {
     try {
       await marketingApi.disconnectPlatform(platform)
-      setConnections((prev: any[]) => prev.filter((c: any) => c.platform !== platform))
       showSuccessToast(`${platform} disconnected`)
     } catch {
-      showErrorToast('Failed to disconnect')
+      showErrorToast(`Failed to disconnect ${platform}. Using local removal.`)
     }
+    setConnections((prev: any[]) => prev.filter((c: any) => c.platform !== platform))
+    localStorage.removeItem(`social_conn_${platform}`)
   }
 
   const handleGenerate = async () => {
+    if (selectedPlatforms.length === 0) {
+      showErrorToast('Select at least one platform')
+      return
+    }
+
     setGenerating(true)
     try {
       const { restaurant } = useStore.getState()
+
       for (const platform of selectedPlatforms) {
         try {
           const data = await aiApi.generateSocialPost({
@@ -92,10 +130,13 @@ export default function MarketingPage() {
             postType: 'DAILY_SPECIAL',
             platform,
             language: 'en',
+            userContext: contentContext || undefined,
+            generateOptions: false,
           })
+
           const newPost = {
             platform,
-            content: data.caption || data.content || `Discover our specials today! 🌟 #MenuMoja`,
+            content: data.caption || data.content || `Discover our specials today!`,
             image: data.imageUrl || '',
             scheduledAt: new Date(Date.now() + 86400000).toISOString(),
           }
@@ -103,7 +144,7 @@ export default function MarketingPage() {
         } catch {
           const fallback: any = {
             platform,
-            content: `Discover our specials today! 🌟 Fresh ingredients, authentic flavors at ${restaurant?.name || 'our restaurant'}. #MenuMoja`,
+            content: `Discover our specials today! Fresh ingredients, authentic flavors at ${restaurant?.name || 'our restaurant'}.`,
             image: '',
             scheduledAt: new Date(Date.now() + 86400000).toISOString(),
           }
@@ -112,6 +153,74 @@ export default function MarketingPage() {
       }
       showSuccessToast(`Generated ${selectedPlatforms.length} posts!`)
     } catch { showErrorToast('Failed to generate content') } finally { setGenerating(false) }
+  }
+
+  const handleGenerateWithOptions = async () => {
+    if (selectedPlatforms.length === 0) {
+      showErrorToast('Select at least one platform')
+      return
+    }
+
+    setGenerating(true)
+    try {
+      const { restaurant } = useStore.getState()
+      const platform = selectedPlatforms[0]
+
+      const data = await aiApi.generateSocialPost({
+        restaurantId: restaurant?.id,
+        postType: 'DAILY_SPECIAL',
+        platform,
+        language: 'en',
+        userContext: contentContext || undefined,
+        generateOptions: true,
+        optionCount: 3,
+      })
+
+      if (data.options) {
+        setAiOptions(data.options)
+        setShowAiOptions(true)
+        setSelectedOptionId(null)
+      }
+      showSuccessToast('AI content options generated!')
+    } catch {
+      setAiOptions([
+        { id: 'option-1', caption: `Discover our specials today at ${useStore.getState().restaurant?.name || 'our restaurant'}! Fresh ingredients, bold flavors.`, imageUrl: '', hashtags: '#MenuMoja #FoodKenya' },
+        { id: 'option-2', caption: `Treat yourself today! We've prepared something special just for you. Come taste the difference.`, imageUrl: '', hashtags: '#FreshFood #MenuMoja' },
+        { id: 'option-3', caption: `Good food, good vibes! Visit us today and enjoy our daily specials prepared with love.`, imageUrl: '', hashtags: '#EatLocal #MenuMoja' },
+      ])
+      setShowAiOptions(true)
+      setSelectedOptionId(null)
+      showSuccessToast('AI content options generated!')
+    } finally { setGenerating(false) }
+  }
+
+  const handlePublishOption = async () => {
+    if (!selectedOptionId) {
+      showErrorToast('Select an option to publish')
+      return
+    }
+
+    const selectedOption = aiOptions.find((o) => o.id === selectedOptionId)
+    if (!selectedOption) return
+
+    const { restaurant } = useStore.getState()
+    const platform = selectedPlatforms[0] || 'instagram'
+
+    const newPost = {
+      platform,
+      content: selectedOption.caption,
+      image: selectedOption.imageUrl || '',
+      scheduledAt: new Date(Date.now() + 86400000).toISOString(),
+    }
+
+    try {
+      await addPost(newPost)
+      showSuccessToast('Post created from selected option!')
+      setShowAiOptions(false)
+      setSelectedOptionId(null)
+    } catch {
+      showErrorToast('Failed to create post')
+    }
   }
 
   const isConnected = (platform: string) => connections.some((c: any) => c.platform === platform && c.isActive !== false)
@@ -127,8 +236,8 @@ export default function MarketingPage() {
     <div className="space-y-6">
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="font-heading text-2xl font-bold text-text-primary dark:text-white">Marketing</h1>
-          <p className="font-body text-sm text-text-secondary dark:text-white/50">AI-powered social media marketing</p>
+          <h1 className="font-heading text-2xl font-bold text-text-primary dark:text-white">{t('marketing.title')}</h1>
+          <p className="font-body text-sm text-text-secondary dark:text-white/50">{t('marketing.subtitle')}</p>
         </div>
         <button onClick={() => { fetchPosts(); loadConnections() }} className="flex h-9 w-9 items-center justify-center rounded-xl bg-black/5 dark:bg-white/10 hover:bg-black/10 dark:hover:bg-white/20 transition-colors">
           <RefreshCw className="h-4 w-4 text-text-secondary" />
@@ -137,7 +246,7 @@ export default function MarketingPage() {
 
       <div className="rounded-2xl bg-white dark:bg-primary-light border border-white/10 p-5">
         <div className="flex items-center justify-between mb-4">
-          <h3 className="font-heading text-lg font-bold text-text-primary dark:text-white">Social Media Connections</h3>
+          <h3 className="font-heading text-lg font-bold text-text-primary dark:text-white">{t('marketing.socialConnections')}</h3>
           <Link2 className="h-5 w-5 text-secondary" />
         </div>
         {loadingConnections ? (
@@ -147,6 +256,8 @@ export default function MarketingPage() {
             {platforms.map((p) => {
               const cfg = platformConfig[p]
               const connected = isConnected(p)
+              const stored = localStorage.getItem(`social_conn_${p}`)
+              const isSimulated = connected && stored
               return (
                 <motion.button
                   key={p} whileHover={{ scale: 1.05 }} whileTap={{ scale: 0.95 }}
@@ -159,49 +270,71 @@ export default function MarketingPage() {
                 >
                   <cfg.icon className="h-4 w-4" />
                   {cfg.label}
-                  {connected ? <CheckCircle2 className="h-3.5 w-3.5" /> : <Link2 className="h-3.5 w-3.5" />}
+                  {connected ? (
+                    <span className="flex items-center gap-1">
+                      <CheckCircle2 className="h-3.5 w-3.5" />
+                      {isSimulated && <span className="text-[9px] opacity-60">(sim)</span>}
+                    </span>
+                  ) : <Link2 className="h-3.5 w-3.5" />}
                 </motion.button>
               )
             })}
           </div>
         )}
+        <p className="mt-2 font-accent text-[10px] text-text-secondary/50">
+          Connections are simulated for demo. Set META_APP_ID, INSTAGRAM_CLIENT_ID, TIKTOK_CLIENT_KEY in .env for real OAuth.
+        </p>
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         <div className="rounded-2xl bg-white dark:bg-primary-light border border-white/10 p-5">
           <div className="flex items-center justify-between mb-4">
-            <h3 className="font-heading text-lg font-bold text-text-primary dark:text-white">AI Content Generator</h3>
+            <h3 className="font-heading text-lg font-bold text-text-primary dark:text-white">{t('marketing.aiContentGenerator')}</h3>
             <Bot className="h-5 w-5 text-secondary" />
           </div>
           <div className="space-y-4">
             <div className="flex items-center justify-between p-3 rounded-xl bg-black/5 dark:bg-white/5">
-              <span className="font-body text-sm text-text-primary dark:text-white/80">Auto Mode</span>
+              <span className="font-body text-sm text-text-primary dark:text-white/80">{t('marketing.autoMode')}</span>
               <Toggle checked={autoMode} onChange={setAutoMode} />
             </div>
+
             <div>
-              <label className="mb-2 block font-accent text-sm font-medium text-text-primary dark:text-white/90">Frequency</label>
-              <div className="flex gap-2">
+              <label className="mb-2 block font-accent text-sm font-medium text-text-primary dark:text-white/90">{t('marketing.contentContext')}</label>
+              <textarea
+                value={contentContext}
+                onChange={(e) => setContentContext(e.target.value)}
+                className="w-full rounded-xl border-2 border-gray-200 dark:border-white/20 bg-white dark:bg-white/5 px-4 py-2.5 font-body text-sm text-text-primary dark:text-white transition-all focus:border-secondary focus:outline-none focus:ring-2 focus:ring-secondary/20"
+                rows={3}
+                placeholder={t('marketing.contentContextPlaceholder')}
+              />
+            </div>
+
+            <div>
+              <label className="mb-2 block font-accent text-sm font-medium text-text-primary dark:text-white/90">{t('marketing.frequency')}</label>
+              <div className="flex gap-2 flex-wrap">
                 {['daily', 'alternate', 'weekly'].map((f) => (
                   <button key={f} onClick={() => setFrequency(f)}
                     className={`rounded-xl px-4 py-2 text-sm font-accent font-medium transition-colors ${
                       frequency === f ? 'bg-secondary text-white' : 'bg-black/5 dark:bg-white/10 text-text-secondary dark:text-white/60 hover:bg-black/10 dark:hover:bg-white/20'
-                    }`}>{f.charAt(0).toUpperCase() + f.slice(1)}</button>
+                    }`}>{t(`marketing.${f}`)}</button>
                 ))}
               </div>
             </div>
+
             <div>
-              <label className="mb-2 block font-accent text-sm font-medium text-text-primary dark:text-white/90">Content Style</label>
-              <div className="flex gap-2">
+              <label className="mb-2 block font-accent text-sm font-medium text-text-primary dark:text-white/90">{t('marketing.contentStyle')}</label>
+              <div className="flex gap-2 flex-wrap">
                 {['fun', 'professional', 'swahili', 'mix'].map((style) => (
                   <button key={style} onClick={() => setContentStyle(style)}
                     className={`rounded-xl px-4 py-2 text-sm font-accent font-medium transition-colors ${
                       contentStyle === style ? 'bg-secondary text-white' : 'bg-black/5 dark:bg-white/10 text-text-secondary dark:text-white/60 hover:bg-black/10 dark:hover:bg-white/20'
-                    }`}>{style.charAt(0).toUpperCase() + style.slice(1)}</button>
+                    }`}>{t(`marketing.${style}`)}</button>
                 ))}
               </div>
             </div>
+
             <div>
-              <label className="mb-2 block font-accent text-sm font-medium text-text-primary dark:text-white/90">Platforms</label>
+              <label className="mb-2 block font-accent text-sm font-medium text-text-primary dark:text-white/90">{t('marketing.platforms')}</label>
               <div className="flex flex-wrap gap-2">
                 {platforms.map((p) => {
                   const cfg = platformConfig[p]
@@ -216,22 +349,75 @@ export default function MarketingPage() {
                 })}
               </div>
             </div>
-            <Button fullWidth onClick={handleGenerate} loading={generating} disabled={selectedPlatforms.length === 0}>
-              <Bot className="h-4 w-4" /> {generating ? 'Generating...' : 'Generate Content'}
-            </Button>
+
+            <div className="flex gap-2">
+              <Button fullWidth onClick={handleGenerate} loading={generating} disabled={selectedPlatforms.length === 0}>
+                <Bot className="h-4 w-4" /> {generating ? t('marketing.generating') : t('marketing.generateContent')}
+              </Button>
+              <button
+                onClick={handleGenerateWithOptions}
+                disabled={generating || selectedPlatforms.length === 0}
+                className="shrink-0 rounded-xl bg-gradient-to-br from-secondary to-accent px-4 py-2.5 text-xs font-accent font-medium text-white hover:opacity-90 transition-opacity disabled:opacity-50 flex items-center gap-1"
+              >
+                <Sparkles className="h-3.5 w-3.5" />
+                Options
+              </button>
+            </div>
+
+            <AnimatePresence>
+              {showAiOptions && aiOptions.length > 0 && (
+                <motion.div
+                  initial={{ opacity: 0, y: -10 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  exit={{ opacity: 0, y: -10 }}
+                  className="rounded-xl border border-secondary/30 bg-secondary/5 p-3 space-y-2"
+                >
+                  <div className="flex items-center justify-between mb-1">
+                    <p className="font-accent text-xs font-medium text-secondary">{t('marketing.selectOption')}</p>
+                    <button onClick={() => setShowAiOptions(false)} className="text-xs text-text-secondary hover:text-secondary">Close</button>
+                  </div>
+                  {aiOptions.map((opt, i) => (
+                    <button
+                      key={opt.id}
+                      onClick={() => setSelectedOptionId(opt.id)}
+                      className={`w-full rounded-lg border p-3 text-left transition-all ${
+                        selectedOptionId === opt.id
+                          ? 'border-secondary bg-white dark:bg-primary-light ring-1 ring-secondary'
+                          : 'border-white/10 bg-white dark:bg-primary-light hover:border-secondary/50'
+                      }`}
+                    >
+                      <div className="flex items-center gap-2 mb-1">
+                        <span className={`flex h-5 w-5 items-center justify-center rounded-full text-[10px] font-bold ${
+                          selectedOptionId === opt.id ? 'bg-secondary text-white' : 'bg-black/5 dark:bg-white/10 text-text-secondary'
+                        }`}>
+                          {i + 1}
+                        </span>
+                        <span className="font-accent text-xs text-text-secondary">{opt.hashtags}</span>
+                      </div>
+                      <p className="font-body text-xs text-text-primary dark:text-white/80">{opt.caption}</p>
+                    </button>
+                  ))}
+                  {selectedOptionId && (
+                    <Button fullWidth size="sm" onClick={handlePublishOption}>
+                      <CheckCircle2 className="h-3.5 w-3.5" /> Use Selected & Create Post
+                    </Button>
+                  )}
+                </motion.div>
+              )}
+            </AnimatePresence>
           </div>
         </div>
 
         <div className="rounded-2xl bg-white dark:bg-primary-light border border-white/10 p-5">
           <div className="flex items-center justify-between mb-4">
-            <h3 className="font-heading text-lg font-bold text-text-primary dark:text-white">Post Analytics</h3>
+            <h3 className="font-heading text-lg font-bold text-text-primary dark:text-white">{t('marketing.postAnalytics')}</h3>
             <BarChart3 className="h-5 w-5 text-secondary" />
           </div>
           <div className="grid grid-cols-3 gap-3 mb-4">
             {[
-              { icon: Eye, label: 'Reach', value: totalReach.toLocaleString(), color: 'text-blue-500' },
-              { icon: Heart, label: 'Likes', value: totalLikes.toLocaleString(), color: 'text-red-500' },
-              { icon: MousePointerClick, label: 'Clicks', value: totalClicks.toLocaleString(), color: 'text-secondary' },
+              { icon: Eye, label: t('marketing.reach'), value: totalReach.toLocaleString(), color: 'text-blue-500' },
+              { icon: Heart, label: t('marketing.likes'), value: totalLikes.toLocaleString(), color: 'text-red-500' },
+              { icon: MousePointerClick, label: t('marketing.clicks'), value: totalClicks.toLocaleString(), color: 'text-secondary' },
             ].map((stat) => (
               <div key={stat.label} className="rounded-xl bg-black/5 dark:bg-white/5 p-3 text-center">
                 <stat.icon className={`h-4 w-4 mx-auto mb-1 ${stat.color}`} />
@@ -273,11 +459,11 @@ export default function MarketingPage() {
       <div className="rounded-2xl bg-white dark:bg-primary-light border border-white/10 p-5">
         <div className="flex items-center gap-2 mb-4">
           <Calendar className="h-5 w-5 text-secondary" />
-          <h3 className="font-heading text-lg font-bold text-text-primary dark:text-white">Content Queue</h3>
+          <h3 className="font-heading text-lg font-bold text-text-primary dark:text-white">{t('marketing.contentQueue')}</h3>
         </div>
 
         {posts.length === 0 ? (
-          <EmptyState icon={<Megaphone className="h-12 w-12" />} title="No content yet" description="Generate your first AI post to get started" actionLabel="Generate Content" onAction={handleGenerate} />
+          <EmptyState icon={<Megaphone className="h-12 w-12" />} title={t('marketing.noContent')} description={t('marketing.noContentDesc')} actionLabel={t('marketing.generateContent')} onAction={handleGenerate} />
         ) : (
           <>
             <div className="flex gap-1 rounded-lg bg-black/5 dark:bg-white/10 p-1 mb-4 w-fit">
@@ -286,7 +472,7 @@ export default function MarketingPage() {
                   className={`rounded-md px-4 py-1.5 text-sm font-accent font-medium transition-colors ${
                     pendingTab === tab ? 'bg-secondary text-white' : 'text-text-secondary dark:text-white/60'
                   }`}>
-                  {tab === 'pending' ? 'Pending' : 'Published'}
+                  {t(`marketing.${tab}`)}
                   <Badge size="sm" variant="default" className="ml-1.5">{tab === 'pending' ? pendingPosts.length : postedPosts.length}</Badge>
                 </button>
               ))}
@@ -312,11 +498,11 @@ export default function MarketingPage() {
                         {post.status === 'pending' && (
                           <>
                             <motion.button whileTap={{ scale: 0.95 }} onClick={() => approvePost(post.id)}
-                              className="flex h-8 w-8 items-center justify-center rounded-lg bg-success/10 text-success hover:bg-success/20 transition-colors" title="Approve">
+                              className="flex h-8 w-8 items-center justify-center rounded-lg bg-success/10 text-success hover:bg-success/20 transition-colors" title={t('marketing.approve')}>
                               <CheckCircle2 className="h-4 w-4" />
                             </motion.button>
                             <motion.button whileTap={{ scale: 0.95 }} onClick={() => publishPost(post.id)}
-                              className="flex h-8 w-8 items-center justify-center rounded-lg bg-secondary/10 text-secondary hover:bg-secondary/20 transition-colors" title="Publish Now">
+                              className="flex h-8 w-8 items-center justify-center rounded-lg bg-secondary/10 text-secondary hover:bg-secondary/20 transition-colors" title={t('marketing.publishNow')}>
                               <Megaphone className="h-4 w-4" />
                             </motion.button>
                           </>

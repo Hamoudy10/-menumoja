@@ -64,7 +64,7 @@ export function CategoryTabs({ activeCategory, onCategoryChange }: CategoryTabsP
         >
           {activeCategory === 'all' && (
             <motion.div
-              layoutId="cat-bg"
+              layoutId="active-cat-bg"
               className="absolute inset-0 rounded-full bg-secondary"
               transition={{ type: 'spring', stiffness: 400, damping: 30 }}
             />
@@ -86,7 +86,7 @@ export function CategoryTabs({ activeCategory, onCategoryChange }: CategoryTabsP
           >
             {activeCategory === cat.id && (
               <motion.div
-                layoutId="cat-bg"
+                layoutId={`active-cat-bg-${cat.id}`}
                 className="absolute inset-0 rounded-full bg-secondary"
                 transition={{ type: 'spring', stiffness: 400, damping: 30 }}
               />

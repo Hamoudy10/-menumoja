@@ -105,12 +105,16 @@ export default function AnalyticsPage() {
         ])
       }
 
-      setDeviceData([
-        { name: 'Mobile', value: 65, color: '#3B82F6' },
-        { name: 'Desktop', value: 25, color: '#FF6B35' },
-        { name: 'Tablet', value: 10, color: '#2ECC71' },
-      ])
-      setBusiestHour(paymentData?.peakHour ? `${paymentData.peakHour}:00` : '8 PM')
+      if (paymentData?.devices) {
+        setDeviceData([
+          { name: 'Mobile', value: paymentData.devices.mobile || 0, color: '#3B82F6' },
+          { name: 'Desktop', value: paymentData.devices.desktop || 0, color: '#FF6B35' },
+          { name: 'Tablet', value: paymentData.devices.tablet || 0, color: '#2ECC71' },
+        ])
+      } else {
+        setDeviceData([])
+      }
+      setBusiestHour(paymentData?.peakHour ? `${paymentData.peakHour}:00` : '')
     } catch {
     } finally {
       setLoading(false)
@@ -274,32 +278,41 @@ export default function AnalyticsPage() {
             <AnimatedSection>
               <div className="rounded-2xl bg-white dark:bg-primary-light border border-white/10 p-5">
                 <h3 className="font-heading text-lg font-bold text-text-primary dark:text-white mb-4">Devices</h3>
-                <div className="flex items-center justify-center h-48">
-                  <ResponsiveContainer width="100%" height="100%">
-                    <RePieChart>
-                      <Pie data={deviceData} cx="50%" cy="50%" innerRadius={40} outerRadius={70} paddingAngle={4} dataKey="value" animationDuration={1500}>
-                        {deviceData.map((entry, i) => (<Cell key={i} fill={entry.color} />))}
-                      </Pie>
-                      <Tooltip />
-                    </RePieChart>
-                  </ResponsiveContainer>
-                </div>
-                <div className="space-y-2 mt-2">
-                  {deviceData.map((entry) => (
-                    <div key={entry.name} className="flex items-center gap-3">
-                      {entry.name === 'Mobile' ? <Smartphone className="h-4 w-4 text-blue-500" /> : entry.name === 'Desktop' ? <Monitor className="h-4 w-4 text-secondary" /> : <Smartphone className="h-4 w-4 text-success" />}
-                      <div className="flex-1">
-                        <div className="flex justify-between text-xs font-accent mb-1">
-                          <span className="text-text-primary dark:text-white/80">{entry.name}</span>
-                          <span className="text-text-secondary">{entry.value}%</span>
-                        </div>
-                        <div className="h-1.5 w-full rounded-full bg-black/5 dark:bg-white/10 overflow-hidden">
-                          <div className="h-full rounded-full transition-all" style={{ width: `${entry.value}%`, backgroundColor: entry.color }} />
-                        </div>
-                      </div>
+                {deviceData.length === 0 ? (
+                  <div className="flex flex-col items-center justify-center h-48 text-text-secondary/50">
+                    <Smartphone className="h-8 w-8 mb-2" />
+                    <p className="font-accent text-xs">No device data available</p>
+                  </div>
+                ) : (
+                  <>
+                    <div className="flex items-center justify-center h-48">
+                      <ResponsiveContainer width="100%" height="100%">
+                        <RePieChart>
+                          <Pie data={deviceData} cx="50%" cy="50%" innerRadius={40} outerRadius={70} paddingAngle={4} dataKey="value" animationDuration={1500}>
+                            {deviceData.map((entry, i) => (<Cell key={i} fill={entry.color} />))}
+                          </Pie>
+                          <Tooltip />
+                        </RePieChart>
+                      </ResponsiveContainer>
                     </div>
-                  ))}
-                </div>
+                    <div className="space-y-2 mt-2">
+                      {deviceData.map((entry) => (
+                        <div key={entry.name} className="flex items-center gap-3">
+                          {entry.name === 'Mobile' ? <Smartphone className="h-4 w-4 text-blue-500" /> : entry.name === 'Desktop' ? <Monitor className="h-4 w-4 text-secondary" /> : <Smartphone className="h-4 w-4 text-success" />}
+                          <div className="flex-1">
+                            <div className="flex justify-between text-xs font-accent mb-1">
+                              <span className="text-text-primary dark:text-white/80">{entry.name}</span>
+                              <span className="text-text-secondary">{entry.value}%</span>
+                            </div>
+                            <div className="h-1.5 w-full rounded-full bg-black/5 dark:bg-white/10 overflow-hidden">
+                              <div className="h-full rounded-full transition-all" style={{ width: `${entry.value}%`, backgroundColor: entry.color }} />
+                            </div>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </>
+                )}
               </div>
             </AnimatedSection>
           </div>

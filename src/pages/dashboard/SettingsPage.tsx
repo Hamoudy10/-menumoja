@@ -3,35 +3,58 @@ import { motion, AnimatePresence } from 'framer-motion'
 import {
   User, Palette, QrCode, Users, Bell, CreditCard, Globe, Crown, Trash2,
   Plus, X, Shield, Moon, Sun, Save, Loader2, CheckCircle2, Download,
+  Image, Palette as PaletteIcon, Type, Smartphone, Banknote,
+  Phone, ArrowLeftRight, Dices,
 } from 'lucide-react'
 import { useStore } from '@/store/useStore'
+import { useTranslation } from 'react-i18next'
 import { Button } from '@/components/ui/Button'
 import { Input } from '@/components/ui/Input'
 import { Toggle } from '@/components/ui/Toggle'
 import { Badge } from '@/components/ui/Badge'
 import { showSuccessToast, showErrorToast } from '@/components/ui/Toast'
+import { useTheme, googleFonts } from '@/components/theme/ThemeProvider'
 import * as restaurantApi from '@/api/restaurant'
+import * as qrcodesApi from '@/api/qrcodes'
 
 const settingsSections = [
-  { id: 'profile', label: 'Profile', icon: User },
-  { id: 'appearance', label: 'Appearance', icon: Palette },
-  { id: 'qr', label: 'QR Manager', icon: QrCode },
-  { id: 'staff', label: 'Staff', icon: Users },
-  { id: 'notifications', label: 'Notifications', icon: Bell },
-  { id: 'payments', label: 'Payment Settings', icon: CreditCard },
-  { id: 'language', label: 'Language', icon: Globe },
-  { id: 'subscription', label: 'Subscription', icon: Crown },
-  { id: 'delete', label: 'Delete Account', icon: Trash2 },
+  { id: 'profile', labelKey: 'settings.profile', icon: User },
+  { id: 'appearance', labelKey: 'settings.appearance', icon: Palette },
+  { id: 'qr', labelKey: 'settings.qrManager', icon: QrCode },
+  { id: 'staff', labelKey: 'settings.staff', icon: Users },
+  { id: 'notifications', labelKey: 'settings.notifications', icon: Bell },
+  { id: 'payments', labelKey: 'settings.paymentSettings', icon: CreditCard },
+  { id: 'language', labelKey: 'settings.language', icon: Globe },
+  { id: 'subscription', labelKey: 'settings.subscription', icon: Crown },
+  { id: 'delete', labelKey: 'settings.deleteAccount', icon: Trash2 },
 ]
 
 const languages = [
-  { code: 'en', label: 'English', flag: '🇬🇧' },
-  { code: 'sw', label: 'Kiswahili', flag: '🇰🇪' },
-  { code: 'ar', label: 'Arabic', flag: '🇸🇦' },
+  { code: 'en', label: 'English', flag: '🇬🇧', nativeName: 'English' },
+  { code: 'sw', label: 'Kiswahili', flag: '🇰🇪', nativeName: 'Kiswahili' },
+  { code: 'ar', label: 'Arabic', flag: '🇸🇦', nativeName: 'العربية' },
+]
+
+const mpesaProducts = [
+  { id: 'stk_push', label: 'STK Push', icon: Smartphone, desc: 'Customer initiates payment on their phone' },
+  { id: 'till_number', label: 'Till Number', icon: Banknote, desc: 'Paybill/Till number payments' },
+  { id: 'paybill', label: 'PayBill', icon: Banknote, desc: 'Business PayBill number' },
+  { id: 'c2b', label: 'C2B', icon: ArrowLeftRight, desc: 'Customer to Business payments' },
+  { id: 'b2c', label: 'B2C', icon: Phone, desc: 'Business to Customer payments (withdrawals)' },
+  { id: 'buy_goods', label: 'Buy Goods', icon: Dices, desc: 'Buy Goods till number payments' },
 ]
 
 export default function SettingsPage() {
-  const { darkMode, toggleDarkMode, restaurant, updateRestaurant, staff, addStaff, removeStaff, fetchStaff, language, setLanguage, qrCodes, fetchQrCodes, generateQrCode, generateBatchQrCodes, deleteQrCode } = useStore()
+  const { t, i18n } = useTranslation()
+  const {
+    darkMode, toggleDarkMode, restaurant, updateRestaurant,
+    staff, addStaff, removeStaff, fetchStaff,
+    language, setLanguage,
+    qrCodes, fetchQrCodes, generateQrCode, generateBatchQrCodes, deleteQrCode,
+    fetchNotifications,
+  } = useStore()
+  const { theme, updateTheme } = useTheme()
+
   const [section, setSection] = useState('profile')
   const [showAddStaff, setShowAddStaff] = useState(false)
   const [newStaff, setNewStaff] = useState<{ name: string; phone: string; role: 'waiter' | 'cashier' | 'kitchen' | 'manager'; pin: string }>({ name: '', phone: '', role: 'waiter', pin: '' })
@@ -40,18 +63,57 @@ export default function SettingsPage() {
     name: '', ownerName: '', email: '', phone: '', cuisine: '', location: '', description: '',
   })
   const [brandColor, setBrandColor] = useState('#FF6B35')
+  const [colorPickerInput, setColorPickerInput] = useState('#FF6B35')
+  const [gradientStart, setGradientStart] = useState('#FF6B35')
+  const [gradientEnd, setGradientEnd] = useState('#FFD700')
+  const [useGradient, setUseGradient] = useState(false)
   const [fontStyle, setFontStyle] = useState<'modern' | 'elegant' | 'classic'>('modern')
+  const [selectedHeadingFont, setSelectedHeadingFont] = useState('Playfair Display')
+  const [selectedBodyFont, setSelectedBodyFont] = useState('Inter')
+  const [selectedAccentFont, setSelectedAccentFont] = useState('Space Grotesk')
   const [notifSettings, setNotifSettings] = useState({ newOrders: true, payments: true, reviews: true, marketing: false, system: true })
   const [deleteConfirm, setDeleteConfirm] = useState('')
   const [deletePassword, setDeletePassword] = useState('')
+  const [isGoogleUser, setIsGoogleUser] = useState(false)
+
+  const [paymentSettings, setPaymentSettings] = useState({
+    mpesaEnabled: true,
+    cashEnabled: true,
+    selectedProducts: ['stk_push', 'till_number'],
+    tillNumber: '5273012',
+    paybillNumber: '',
+    businessName: '',
+    buyGoodsNumber: '',
+    stkPushEnabled: true,
+  })
+
+  const [qrDesign, setQrDesign] = useState({
+    qrColor: '#FF6B35',
+    qrBgColor: '#FFFFFF',
+    shape: 'rounded' as 'rounded' | 'square' | 'dots',
+    template: 1,
+  })
+
+  const [showTableQRInput, setShowTableQRInput] = useState(false)
+  const [tableQRNumber, setTableQRNumber] = useState('')
+  const [tableQRLabel, setTableQRLabel] = useState('')
+  const [showBatchInput, setShowBatchInput] = useState(false)
+  const [batchCount, setBatchCount] = useState('10')
 
   useEffect(() => {
     fetchStaff()
     fetchQrCodes()
+    const googleEmail = localStorage.getItem('google_email')
+    if (googleEmail) setIsGoogleUser(true)
+
     if (restaurant) {
       setProfile({
-        name: restaurant.name || '', ownerName: restaurant.ownerName || '', email: restaurant.email || '',
-        phone: restaurant.phone || '', cuisine: restaurant.cuisine || '', location: restaurant.location || '',
+        name: restaurant.name || '',
+        ownerName: restaurant.ownerName || '',
+        email: restaurant.email || (googleEmail || ''),
+        phone: restaurant.phone || '',
+        cuisine: restaurant.cuisine || '',
+        location: restaurant.location || '',
         description: restaurant.description || '',
       })
       setBrandColor(restaurant.brandColor || '#FF6B35')
@@ -63,24 +125,64 @@ export default function SettingsPage() {
     setSaving(true)
     try {
       await updateRestaurant(profile)
-      showSuccessToast('Profile saved')
+      showSuccessToast(t('settings.saveChanges'))
     } catch { showErrorToast('Failed to save profile') } finally { setSaving(false) }
   }
 
   const handleSaveAppearance = async () => {
     setSaving(true)
     try {
-      await updateRestaurant({ brandColor, fontStyle })
-      showSuccessToast('Appearance saved')
+      const fontMap: Record<string, string> = {
+        modern: 'Inter',
+        elegant: 'Playfair Display',
+        classic: 'Merriweather',
+      }
+
+      updateTheme({
+        brandColor,
+        gradientStart,
+        gradientEnd,
+        useGradient,
+        fontHeading: selectedHeadingFont,
+        fontBody: selectedBodyFont,
+        fontAccent: selectedAccentFont,
+      })
+
+      await updateRestaurant({
+        brandColor,
+        fontStyle,
+      })
+      showSuccessToast(t('settings.saveAppearance'))
     } catch { showErrorToast('Failed to save appearance') } finally { setSaving(false) }
   }
 
-  const handleAddStaff = () => {
+  const handleSaveLanguage = async () => {
+    setSaving(true)
+    try {
+      localStorage.setItem('app-language', language)
+      i18n.changeLanguage(language)
+      document.documentElement.dir = language === 'ar' ? 'rtl' : 'ltr'
+      await restaurantApi.updateSettings({ language })
+      showSuccessToast(t('language.languageSaved'))
+    } catch { showErrorToast('Failed to save language') } finally { setSaving(false) }
+  }
+
+  const handleSavePayments = async () => {
+    setSaving(true)
+    try {
+      await restaurantApi.updateSettings({ paymentSettings })
+      showSuccessToast('Payment settings updated')
+    } catch { showErrorToast('Failed to save payment settings') } finally { setSaving(false) }
+  }
+
+  const handleAddStaff = async () => {
     if (!newStaff.name || !newStaff.phone || !newStaff.pin) return
-    addStaff({ ...newStaff, active: true })
-    setNewStaff({ name: '', phone: '', role: 'waiter', pin: '' })
-    setShowAddStaff(false)
-    showSuccessToast('Staff added')
+    try {
+      await addStaff({ ...newStaff, active: true })
+      setNewStaff({ name: '', phone: '', role: 'waiter', pin: '' })
+      setShowAddStaff(false)
+      showSuccessToast('Staff added')
+    } catch {}
   }
 
   const handleSaveNotifications = async () => {
@@ -92,11 +194,59 @@ export default function SettingsPage() {
   }
 
   const handleDeleteAccount = () => {
-    if (deleteConfirm !== 'DELETE') { showErrorToast('Type DELETE to confirm'); return }
+    if (deleteConfirm !== 'DELETE') { showErrorToast(t('common.typeToConfirm')); return }
     if (!deletePassword) { showErrorToast('Enter your password'); return }
-    showSuccessToast('Account deletion requested. We\'ll process it shortly.')
+    showSuccessToast('Account deletion requested')
     setDeleteConfirm('')
     setDeletePassword('')
+  }
+
+  const handleGenerateMainQR = async () => {
+    const qr = await generateQrCode({
+      label: `${restaurant?.name || 'Menu'} QR`,
+      type: 'GENERAL',
+      color: qrDesign.qrColor,
+      bgColor: qrDesign.qrBgColor,
+      shape: qrDesign.shape,
+      template: qrDesign.template,
+    })
+    if (qr) showSuccessToast('QR code generated!')
+  }
+
+  const handleGenerateTableQR = async () => {
+    if (!tableQRNumber || isNaN(parseInt(tableQRNumber))) {
+      showErrorToast('Enter a valid table number')
+      return
+    }
+    const qr = await generateQrCode({
+      label: tableQRLabel || `Table ${tableQRNumber}`,
+      tableNumber: parseInt(tableQRNumber),
+      type: 'TABLE',
+      color: qrDesign.qrColor,
+      bgColor: qrDesign.qrBgColor,
+      shape: qrDesign.shape,
+      template: qrDesign.template,
+    })
+    if (qr) {
+      showSuccessToast(`QR for Table ${tableQRNumber} generated!`)
+      setShowTableQRInput(false)
+      setTableQRNumber('')
+      setTableQRLabel('')
+    }
+  }
+
+  const handleGenerateBatchQRs = async () => {
+    const n = parseInt(batchCount)
+    if (isNaN(n) || n < 1) { showErrorToast('Enter a valid number'); return }
+    await generateBatchQrCodes({
+      numberOfTables: n,
+      template: qrDesign.template,
+      color: qrDesign.qrColor,
+      bgColor: qrDesign.qrBgColor,
+      shape: qrDesign.shape,
+    })
+    setShowBatchInput(false)
+    setBatchCount('10')
   }
 
   const ActiveSection = () => {
@@ -110,23 +260,37 @@ export default function SettingsPage() {
               </div>
               <div>
                 <h3 className="font-heading text-lg font-bold text-text-primary dark:text-white">{restaurant?.name || 'Your Restaurant'}</h3>
-                <p className="font-body text-sm text-text-secondary dark:text-white/50">Owner since {restaurant?.createdAt ? new Date(restaurant.createdAt).toLocaleDateString('en-US', { month: 'long', year: 'numeric' }) : 'Jan 2025'}</p>
+                <p className="font-body text-sm text-text-secondary dark:text-white/50">{t('settings.ownerSince')} {restaurant?.createdAt ? new Date(restaurant.createdAt).toLocaleDateString('en-US', { month: 'long', year: 'numeric' }) : 'Jan 2025'}</p>
               </div>
             </div>
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-              <Input label="Restaurant Name" value={profile.name} onChange={(e) => setProfile({ ...profile, name: e.target.value })} />
-              <Input label="Owner Name" value={profile.ownerName} onChange={(e) => setProfile({ ...profile, ownerName: e.target.value })} />
-              <Input label="Email" value={profile.email} onChange={(e) => setProfile({ ...profile, email: e.target.value })} type="email" />
-              <Input label="Phone" value={profile.phone} onChange={(e) => setProfile({ ...profile, phone: e.target.value })} />
-              <Input label="Cuisine" value={profile.cuisine} onChange={(e) => setProfile({ ...profile, cuisine: e.target.value })} placeholder="e.g., Swahili, Seafood" />
-              <Input label="Location" value={profile.location} onChange={(e) => setProfile({ ...profile, location: e.target.value })} placeholder="e.g., Nyali, Mombasa" />
+              <Input label={t('settings.restaurantName')} value={profile.name} onChange={(e) => setProfile({ ...profile, name: e.target.value })} />
+              <Input label={t('settings.ownerName')} value={profile.ownerName} onChange={(e) => setProfile({ ...profile, ownerName: e.target.value })} />
+              <Input
+                label={t('settings.email')}
+                value={profile.email}
+                onChange={(e) => {
+                  if (!isGoogleUser) setProfile({ ...profile, email: e.target.value })
+                }}
+                type="email"
+                disabled={isGoogleUser}
+                className={isGoogleUser ? 'opacity-60 cursor-not-allowed' : ''}
+              />
+              {isGoogleUser && (
+                <p className="text-xs text-text-secondary dark:text-white/50 -mt-2">
+                  Email is set from your Google account and cannot be changed
+                </p>
+              )}
+              <Input label={t('settings.phone')} value={profile.phone} onChange={(e) => setProfile({ ...profile, phone: e.target.value })} />
+              <Input label={t('settings.cuisine')} value={profile.cuisine} onChange={(e) => setProfile({ ...profile, cuisine: e.target.value })} placeholder="e.g., Swahili, Seafood" />
+              <Input label={t('settings.location')} value={profile.location} onChange={(e) => setProfile({ ...profile, location: e.target.value })} placeholder="e.g., Nyali, Mombasa" />
             </div>
             <div>
-              <label className="mb-2 block font-accent text-sm font-medium text-text-primary dark:text-white/90">Description</label>
+              <label className="mb-2 block font-accent text-sm font-medium text-text-primary dark:text-white/90">{t('settings.description')}</label>
               <textarea value={profile.description} onChange={(e) => setProfile({ ...profile, description: e.target.value })}
                 className="w-full rounded-xl border-2 border-gray-200 dark:border-white/20 bg-white dark:bg-white/5 px-4 py-2.5 font-body text-text-primary dark:text-white transition-all focus:border-secondary focus:outline-none focus:ring-2 focus:ring-secondary/20" rows={3} />
             </div>
-            <Button onClick={handleSaveProfile} loading={saving}><Save className="h-4 w-4" /> Save Changes</Button>
+            <Button onClick={handleSaveProfile} loading={saving}><Save className="h-4 w-4" /> {t('app.save')}</Button>
           </div>
         )
 
@@ -137,62 +301,179 @@ export default function SettingsPage() {
               <div className="flex items-center gap-3">
                 {darkMode ? <Moon className="h-5 w-5 text-blue-400" /> : <Sun className="h-5 w-5 text-amber-500" />}
                 <div>
-                  <p className="font-body text-sm font-medium text-text-primary dark:text-white">Dark Mode</p>
-                  <p className="font-accent text-xs text-text-secondary dark:text-white/50">Toggle dark/light theme</p>
+                  <p className="font-body text-sm font-medium text-text-primary dark:text-white">{t('settings.darkMode')}</p>
+                  <p className="font-accent text-xs text-text-secondary dark:text-white/50">{t('settings.darkModeDesc')}</p>
                 </div>
               </div>
-              <Toggle checked={darkMode} onChange={toggleDarkMode} />
+              <Toggle checked={darkMode} onChange={() => { toggleDarkMode(); updateTheme({ darkMode: !darkMode }) }} />
             </div>
+
             <div>
-              <label className="mb-2 block font-accent text-sm font-medium text-text-primary dark:text-white/90">Brand Color</label>
-              <div className="flex gap-3">
-                {['#FF6B35', '#0A1628', '#2ECC71', '#3B82F6', '#8B5CF6', '#EC4899'].map((color) => (
-                  <button key={color} onClick={() => setBrandColor(color)}
-                    className={`h-10 w-10 rounded-xl border-2 transition-transform hover:scale-110 ${brandColor === color ? 'border-secondary scale-110' : 'border-white/10'}`}
+              <label className="mb-2 block font-accent text-sm font-medium text-text-primary dark:text-white/90">{t('settings.brandColor')}</label>
+              <div className="flex gap-3 flex-wrap">
+                {['#FF6B35', '#0A1628', '#2ECC71', '#3B82F6', '#8B5CF6', '#EC4899', '#E74C3C', '#F39C12', '#1ABC9C'].map((color) => (
+                  <button key={color} onClick={() => { setBrandColor(color); setColorPickerInput(color) }}
+                    className={`h-10 w-10 rounded-xl border-2 transition-transform hover:scale-110 ${brandColor === color ? 'border-secondary scale-110 ring-2 ring-secondary/30' : 'border-white/10'}`}
                     style={{ backgroundColor: color }} />
                 ))}
               </div>
-            </div>
-            <div>
-              <label className="mb-2 block font-accent text-sm font-medium text-text-primary dark:text-white/90">Font Style</label>
-              <div className="flex gap-3">
-                {(['modern', 'elegant', 'classic'] as const).map((font) => (
-                  <button key={font} onClick={() => setFontStyle(font)}
-                    className={`rounded-xl px-4 py-2 text-sm font-accent font-medium transition-colors ${fontStyle === font ? 'bg-secondary text-white' : 'bg-black/5 dark:bg-white/10 text-text-secondary dark:text-white/60'}`}>
-                    {font.charAt(0).toUpperCase() + font.slice(1)}
-                  </button>
-                ))}
+              <div className="mt-3 flex items-center gap-3">
+                <label className="font-accent text-xs text-text-secondary">{t('settings.colorPicker')}:</label>
+                <input
+                  type="color"
+                  value={colorPickerInput}
+                  onChange={(e) => { setBrandColor(e.target.value); setColorPickerInput(e.target.value) }}
+                  className="h-10 w-16 rounded-lg border border-white/10 bg-transparent cursor-pointer"
+                />
+                <input
+                  type="text"
+                  value={colorPickerInput}
+                  onChange={(e) => { setBrandColor(e.target.value); setColorPickerInput(e.target.value) }}
+                  className="rounded-lg border border-white/10 bg-transparent px-3 py-1.5 text-xs font-accent text-text-primary dark:text-white w-24"
+                />
               </div>
             </div>
-            <Button onClick={handleSaveAppearance} loading={saving}><Save className="h-4 w-4" /> Save Appearance</Button>
+
+            <div>
+              <div className="flex items-center gap-2 mb-2">
+                <Toggle checked={useGradient} onChange={setUseGradient} />
+                <label className="font-accent text-sm font-medium text-text-primary dark:text-white/90">{t('settings.gradientPicker')}</label>
+              </div>
+              {useGradient && (
+                <div className="flex gap-3 items-center">
+                  <input type="color" value={gradientStart} onChange={(e) => setGradientStart(e.target.value)}
+                    className="h-10 w-16 rounded-lg border border-white/10 bg-transparent cursor-pointer" />
+                  <span className="text-text-secondary">→</span>
+                  <input type="color" value={gradientEnd} onChange={(e) => setGradientEnd(e.target.value)}
+                    className="h-10 w-16 rounded-lg border border-white/10 bg-transparent cursor-pointer" />
+                  <div className="h-10 w-20 rounded-xl" style={{ background: `linear-gradient(135deg, ${gradientStart}, ${gradientEnd})` }} />
+                </div>
+              )}
+            </div>
+
+            <div>
+              <label className="mb-2 block font-accent text-sm font-medium text-text-primary dark:text-white/90">{t('theme.headingFont')}</label>
+              <select
+                value={selectedHeadingFont}
+                onChange={(e) => setSelectedHeadingFont(e.target.value)}
+                className="w-full rounded-xl border-2 border-gray-200 dark:border-white/20 bg-white dark:bg-white/5 px-4 py-2.5 font-body text-text-primary dark:text-white"
+              >
+                {googleFonts.map((f) => (
+                  <option key={f.name} value={f.family}>{f.name} ({f.category})</option>
+                ))}
+              </select>
+            </div>
+
+            <div>
+              <label className="mb-2 block font-accent text-sm font-medium text-text-primary dark:text-white/90">{t('theme.bodyFont')}</label>
+              <select
+                value={selectedBodyFont}
+                onChange={(e) => setSelectedBodyFont(e.target.value)}
+                className="w-full rounded-xl border-2 border-gray-200 dark:border-white/20 bg-white dark:bg-white/5 px-4 py-2.5 font-body text-text-primary dark:text-white"
+              >
+                {googleFonts.map((f) => (
+                  <option key={f.name} value={f.family}>{f.name} ({f.category})</option>
+                ))}
+              </select>
+            </div>
+
+            <div>
+              <label className="mb-2 block font-accent text-sm font-medium text-text-primary dark:text-white/90">{t('theme.accentFont')}</label>
+              <select
+                value={selectedAccentFont}
+                onChange={(e) => setSelectedAccentFont(e.target.value)}
+                className="w-full rounded-xl border-2 border-gray-200 dark:border-white/20 bg-white dark:bg-white/5 px-4 py-2.5 font-body text-text-primary dark:text-white"
+              >
+                {googleFonts.map((f) => (
+                  <option key={f.name} value={f.family}>{f.name} ({f.category})</option>
+                ))}
+              </select>
+            </div>
+
+            <div className="rounded-xl bg-black/5 dark:bg-white/5 p-4">
+              <label className="block font-accent text-sm font-medium text-text-primary dark:text-white/90 mb-2">{t('theme.preview')}</label>
+              <p className="font-heading text-xl text-text-primary dark:text-white mb-1">Heading - The quick brown fox</p>
+              <p className="font-body text-sm text-text-secondary dark:text-white/70 mb-1">Body text - MenuMoja brings you the finest dining experience with fresh ingredients.</p>
+              <p className="font-accent text-xs text-text-secondary/50">Accent text - KES 1,500 · 15 min prep</p>
+            </div>
+
+            <Button onClick={handleSaveAppearance} loading={saving}><Save className="h-4 w-4" /> {t('settings.saveAppearance')}</Button>
           </div>
         )
 
       case 'qr':
         return (
           <div className="space-y-4">
-            <p className="font-body text-sm text-text-secondary dark:text-white/70">
-              Generate QR codes for your restaurant. Customers scan to view your digital menu.
-            </p>
+            <p className="font-body text-sm text-text-secondary dark:text-white/70">{t('qr.desc')}</p>
 
-            <div className="flex items-center gap-3">
-              <Button size="sm" onClick={async () => {
-                const qr = await generateQrCode({ label: `${restaurant?.name || 'Menu'} QR`, type: 'GENERAL' })
-                if (qr) showSuccessToast('QR code generated!')
-              }}><Plus className="h-3.5 w-3.5" /> Generate Main QR</Button>
-              <Button size="sm" variant="ghost" onClick={async () => {
-                const n = prompt('Number of tables:', '10')
-                if (n && !isNaN(parseInt(n))) {
-                  await generateBatchQrCodes({ numberOfTables: parseInt(n), template: 1 })
-                }
-              }}><Plus className="h-3.5 w-3.5" /> Generate Table QRs</Button>
+            <div className="rounded-xl bg-black/5 dark:bg-white/5 p-4 space-y-3">
+              <h4 className="font-accent text-sm font-bold text-text-primary dark:text-white">{t('qr.design')}</h4>
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="block font-accent text-xs text-text-secondary mb-1">{t('qr.qrColor')}</label>
+                  <input type="color" value={qrDesign.qrColor} onChange={(e) => setQrDesign({ ...qrDesign, qrColor: e.target.value })}
+                    className="h-8 w-full rounded-lg border border-white/10 bg-transparent cursor-pointer" />
+                </div>
+                <div>
+                  <label className="block font-accent text-xs text-text-secondary mb-1">{t('qr.bgColor')}</label>
+                  <input type="color" value={qrDesign.qrBgColor} onChange={(e) => setQrDesign({ ...qrDesign, qrBgColor: e.target.value })}
+                    className="h-8 w-full rounded-lg border border-white/10 bg-transparent cursor-pointer" />
+                </div>
+              </div>
+              <div>
+                <label className="block font-accent text-xs text-text-secondary mb-1">{t('qr.shape')}</label>
+                <div className="flex gap-2">
+                  {(['rounded', 'square', 'dots'] as const).map((shape) => (
+                    <button key={shape} onClick={() => setQrDesign({ ...qrDesign, shape })}
+                      className={`rounded-lg px-3 py-1 text-xs font-accent font-medium transition-colors ${qrDesign.shape === shape ? 'bg-secondary text-white' : 'bg-black/5 dark:bg-white/10 text-text-secondary'}`}>
+                      {shape.charAt(0).toUpperCase() + shape.slice(1)}
+                    </button>
+                  ))}
+                </div>
+              </div>
             </div>
+
+            <div className="flex flex-wrap items-center gap-3">
+              <Button size="sm" onClick={handleGenerateMainQR}><Plus className="h-3.5 w-3.5" /> {t('qr.generateMainQR')}</Button>
+              <Button size="sm" variant="secondary" onClick={() => setShowTableQRInput(true)}>
+                <Plus className="h-3.5 w-3.5" /> {t('qr.generateTableQR')}
+              </Button>
+              <Button size="sm" variant="ghost" onClick={() => setShowBatchInput(true)}>
+                <Plus className="h-3.5 w-3.5" /> {t('qr.generateTableQRs')}
+              </Button>
+            </div>
+
+            <AnimatePresence>
+              {showTableQRInput && (
+                <motion.div initial={{ opacity: 0, height: 0 }} animate={{ opacity: 1, height: 'auto' }} exit={{ opacity: 0, height: 0 }} className="overflow-hidden">
+                  <div className="rounded-xl border border-white/10 p-4 space-y-3">
+                    <h4 className="font-accent text-sm font-bold text-text-primary dark:text-white">{t('qr.generateForTable')}</h4>
+                    <Input label={t('qr.tableNumber')} type="number" value={tableQRNumber} onChange={(e) => setTableQRNumber(e.target.value)} placeholder={t('qr.enterTableNumber')} />
+                    <Input label={t('qr.tableLabel')} value={tableQRLabel} onChange={(e) => setTableQRLabel(e.target.value)} placeholder="e.g., Window Table" />
+                    <div className="flex gap-2">
+                      <Button size="sm" onClick={handleGenerateTableQR}><Plus className="h-3.5 w-3.5" /> Generate</Button>
+                      <Button variant="ghost" size="sm" onClick={() => setShowTableQRInput(false)}>Cancel</Button>
+                    </div>
+                  </div>
+                </motion.div>
+              )}
+              {showBatchInput && (
+                <motion.div initial={{ opacity: 0, height: 0 }} animate={{ opacity: 1, height: 'auto' }} exit={{ opacity: 0, height: 0 }} className="overflow-hidden">
+                  <div className="rounded-xl border border-white/10 p-4 space-y-3">
+                    <h4 className="font-accent text-sm font-bold text-text-primary dark:text-white">{t('qr.generateTableQRs')}</h4>
+                    <Input label={t('qr.numberOfTables')} type="number" value={batchCount} onChange={(e) => setBatchCount(e.target.value)} placeholder="10" />
+                    <div className="flex gap-2">
+                      <Button size="sm" onClick={handleGenerateBatchQRs}><Plus className="h-3.5 w-3.5" /> Generate Batch</Button>
+                      <Button variant="ghost" size="sm" onClick={() => setShowBatchInput(false)}>Cancel</Button>
+                    </div>
+                  </div>
+                </motion.div>
+              )}
+            </AnimatePresence>
 
             <div className="space-y-2 max-h-80 overflow-y-auto">
               {qrCodes.length === 0 ? (
-                <p className="text-center font-body text-sm text-text-secondary dark:text-white/40 py-8">
-                  No QR codes yet. Generate one above.
-                </p>
+                <p className="text-center font-body text-sm text-text-secondary dark:text-white/40 py-8">{t('qr.noQRs')}</p>
               ) : (
                 qrCodes.map((qr: any) => (
                   <div key={qr.id} className="flex items-center gap-4 rounded-xl border border-white/10 p-3 hover:bg-black/5 dark:hover:bg-white/5 transition-colors">
@@ -200,27 +481,29 @@ export default function SettingsPage() {
                       <QrCode className="h-7 w-7 text-secondary" />
                     </div>
                     <div className="flex-1 min-w-0">
-                      <p className="font-accent text-sm font-medium text-text-primary dark:text-white truncate">{qr.label}</p>
+                      <p className="font-accent text-sm font-medium text-text-primary dark:text-white truncate">{qr.label || qr.name}</p>
                       <p className="font-accent text-xs text-text-secondary dark:text-white/50">
-                        {qr.tableNumber ? `Table ${qr.tableNumber} · ` : ''}{qr.totalScans || qr.scanCount || 0} scans
+                        {qr.tableNumber ? `${t('qr.table')} ${qr.tableNumber} · ` : ''}{qr.totalScans || qr.scanCount || 0} {t('qr.scans')}
                       </p>
                     </div>
                     <div className="flex gap-1">
                       <button
                         onClick={() => {
-                          const url = qr.qrImageUrl || qr.targetUrl
+                          const url = qr.qrImageUrl || qr.targetUrl || qr.imageUrl
                           if (url) window.open(url, '_blank')
                         }}
                         className="flex h-8 w-8 items-center justify-center rounded-lg bg-black/5 dark:bg-white/10 hover:bg-black/10 dark:hover:bg-white/20 transition-colors"
-                        title="View QR"
+                        title={t('qr.viewQR')}
                       >
                         <Download className="h-3.5 w-3.5 text-text-secondary" />
                       </button>
                       <button
                         onClick={async () => {
                           try {
+                            const { default: api } = await import('@/api/client')
                             const token = localStorage.getItem('accessToken')
-                            const res = await fetch(`https://menumoja-production.up.railway.app/api/v1/qr/${qr.id}/pdf`, {
+                            const apiUrl = import.meta.env.VITE_API_URL || '/api/v1'
+                            const res = await fetch(`${apiUrl}/qr/${qr.id}/pdf`, {
                               headers: { 'Authorization': `Bearer ${token}` }
                             })
                             if (!res.ok) throw new Error('Download failed')
@@ -232,13 +515,12 @@ export default function SettingsPage() {
                             a.click()
                             URL.revokeObjectURL(url)
                           } catch {
-                            showSuccessToast('Opening QR image instead')
-                            const viewUrl = qr.qrImageUrl || qr.targetUrl
+                            const viewUrl = qr.qrImageUrl || qr.targetUrl || qr.imageUrl
                             if (viewUrl) window.open(viewUrl, '_blank')
                           }
                         }}
                         className="flex h-8 w-8 items-center justify-center rounded-lg bg-black/5 dark:bg-white/10 hover:bg-black/10 dark:hover:bg-white/20 transition-colors"
-                        title="Download PDF"
+                        title={t('qr.downloadPDF')}
                       >
                         <span className="text-[10px] font-bold text-text-secondary">PDF</span>
                       </button>
@@ -246,7 +528,7 @@ export default function SettingsPage() {
                     <button
                       onClick={() => deleteQrCode(qr.id)}
                       className="flex h-8 w-8 items-center justify-center rounded-lg hover:bg-red-100 dark:hover:bg-red-900/30 text-text-secondary hover:text-red-500 transition-colors"
-                      title="Delete"
+                      title={t('app.delete')}
                     >
                       <Trash2 className="h-3.5 w-3.5" />
                     </button>
@@ -264,11 +546,11 @@ export default function SettingsPage() {
               <table className="w-full text-sm font-body">
                 <thead>
                   <tr className="border-b border-white/10">
-                    <th className="px-3 py-2 text-left font-accent text-xs text-text-secondary dark:text-white/50 uppercase">Name</th>
-                    <th className="px-3 py-2 text-left font-accent text-xs text-text-secondary dark:text-white/50 uppercase">Phone</th>
-                    <th className="px-3 py-2 text-left font-accent text-xs text-text-secondary dark:text-white/50 uppercase">Role</th>
-                    <th className="px-3 py-2 text-left font-accent text-xs text-text-secondary dark:text-white/50 uppercase">Status</th>
-                    <th className="px-3 py-2 text-right font-accent text-xs text-text-secondary dark:text-white/50 uppercase">Actions</th>
+                    <th className="px-3 py-2 text-left font-accent text-xs text-text-secondary dark:text-white/50 uppercase">{t('staff.name')}</th>
+                    <th className="px-3 py-2 text-left font-accent text-xs text-text-secondary dark:text-white/50 uppercase">{t('staff.phone')}</th>
+                    <th className="px-3 py-2 text-left font-accent text-xs text-text-secondary dark:text-white/50 uppercase">{t('staff.role')}</th>
+                    <th className="px-3 py-2 text-left font-accent text-xs text-text-secondary dark:text-white/50 uppercase">{t('staff.status')}</th>
+                    <th className="px-3 py-2 text-right font-accent text-xs text-text-secondary dark:text-white/50 uppercase">{t('staff.actions')}</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -277,13 +559,15 @@ export default function SettingsPage() {
                       <td className="px-3 py-3 font-medium text-text-primary dark:text-white">{member.name}</td>
                       <td className="px-3 py-3 text-text-secondary dark:text-white/60">{member.phone}</td>
                       <td className="px-3 py-3">
-                        <Badge variant={member.role === 'manager' ? 'info' : member.role === 'kitchen' ? 'warning' : member.role === 'cashier' ? 'success' : 'default'} size="sm" className="capitalize">{member.role}</Badge>
+                        <Badge variant={member.role === 'manager' ? 'info' : member.role === 'kitchen' ? 'warning' : member.role === 'cashier' ? 'success' : 'default'} size="sm" className="capitalize">
+                          {t(`staff.${member.role}`)}
+                        </Badge>
                       </td>
                       <td className="px-3 py-3">
-                        <Badge variant={member.active ? 'success' : 'danger'} size="sm">{member.active ? 'Active' : 'Inactive'}</Badge>
+                        <Badge variant={member.active ? 'success' : 'danger'} size="sm">{member.active ? t('staff.active') : t('staff.inactive')}</Badge>
                       </td>
                       <td className="px-3 py-3 text-right">
-                        <button onClick={() => { removeStaff(member.id); showSuccessToast('Staff removed') }}
+                        <button onClick={async () => { try { await removeStaff(member.id); showSuccessToast('Staff removed') } catch {} }}
                           className="p-1.5 rounded-lg hover:bg-red-100 dark:hover:bg-red-900/30 text-text-secondary hover:text-red-500 transition-colors">
                           <Trash2 className="h-3.5 w-3.5" />
                         </button>
@@ -297,28 +581,28 @@ export default function SettingsPage() {
               {showAddStaff ? (
                 <motion.div initial={{ opacity: 0, height: 0 }} animate={{ opacity: 1, height: 'auto' }} exit={{ opacity: 0, height: 0 }} className="overflow-hidden">
                   <div className="rounded-xl border border-white/10 p-4 space-y-3">
-                    <Input label="Name" value={newStaff.name} onChange={(e) => setNewStaff({ ...newStaff, name: e.target.value })} />
-                    <Input label="Phone" value={newStaff.phone} onChange={(e) => setNewStaff({ ...newStaff, phone: e.target.value })} placeholder="+2547XX XXX XXX" />
-                    <Input label="PIN (4 digits)" value={newStaff.pin} onChange={(e) => setNewStaff({ ...newStaff, pin: e.target.value })} maxLength={4} />
+                    <Input label={t('staff.name')} value={newStaff.name} onChange={(e) => setNewStaff({ ...newStaff, name: e.target.value })} />
+                    <Input label={t('staff.phone')} value={newStaff.phone} onChange={(e) => setNewStaff({ ...newStaff, phone: e.target.value })} placeholder="+2547XX XXX XXX" />
+                    <Input label={t('staff.pin')} value={newStaff.pin} onChange={(e) => setNewStaff({ ...newStaff, pin: e.target.value })} maxLength={4} />
                     <div>
-                      <label className="mb-2 block font-accent text-sm font-medium text-text-primary dark:text-white/90">Role</label>
+                      <label className="mb-2 block font-accent text-sm font-medium text-text-primary dark:text-white/90">{t('staff.role')}</label>
                       <div className="flex gap-2">
                         {(['waiter', 'cashier', 'kitchen', 'manager'] as const).map((role) => (
                           <button key={role} onClick={() => setNewStaff({ ...newStaff, role })}
                             className={`rounded-lg px-3 py-1.5 text-xs font-accent font-medium capitalize transition-colors ${
                               newStaff.role === role ? 'bg-secondary text-white' : 'bg-black/5 dark:bg-white/10 text-text-secondary dark:text-white/60'
-                            }`}>{role}</button>
+                            }`}>{t(`staff.${role}`)}</button>
                         ))}
                       </div>
                     </div>
                     <div className="flex gap-2">
-                      <Button size="sm" onClick={handleAddStaff}><Plus className="h-3.5 w-3.5" /> Add</Button>
-                      <Button variant="ghost" size="sm" onClick={() => setShowAddStaff(false)}>Cancel</Button>
+                      <Button size="sm" onClick={handleAddStaff}><Plus className="h-3.5 w-3.5" /> {t('staff.addStaff')}</Button>
+                      <Button variant="ghost" size="sm" onClick={() => setShowAddStaff(false)}>{t('app.cancel')}</Button>
                     </div>
                   </div>
                 </motion.div>
               ) : (
-                <Button onClick={() => setShowAddStaff(true)}><Plus className="h-4 w-4" /> Add Staff</Button>
+                <Button onClick={() => setShowAddStaff(true)}><Plus className="h-4 w-4" /> {t('staff.addStaff')}</Button>
               )}
             </AnimatePresence>
           </div>
@@ -330,12 +614,14 @@ export default function SettingsPage() {
             {Object.entries(notifSettings).map(([key, val]) => (
               <div key={key} className="flex items-center justify-between p-4 rounded-xl bg-black/5 dark:bg-white/5">
                 <div>
-                  <p className="font-body text-sm font-medium text-text-primary dark:text-white capitalize">{key.replace(/([A-Z])/g, ' $1').trim()}</p>
+                  <p className="font-body text-sm font-medium text-text-primary dark:text-white">
+                    {t(`notifications.${key}`, key.replace(/([A-Z])/g, ' $1').trim())}
+                  </p>
                 </div>
                 <Toggle checked={val} onChange={(checked) => setNotifSettings({ ...notifSettings, [key]: checked })} />
               </div>
             ))}
-            <Button onClick={handleSaveNotifications} loading={saving}><Save className="h-4 w-4" /> Save Preferences</Button>
+            <Button onClick={handleSaveNotifications} loading={saving}><Save className="h-4 w-4" /> {t('app.save')}</Button>
           </div>
         )
 
@@ -352,17 +638,83 @@ export default function SettingsPage() {
                   <p className="font-accent text-xs text-text-secondary dark:text-white/50">Receive payments via M-Pesa</p>
                 </div>
               </div>
-              <Badge variant="success">Active</Badge>
+              <Toggle checked={paymentSettings.mpesaEnabled} onChange={(checked) => setPaymentSettings({ ...paymentSettings, mpesaEnabled: checked })} />
             </div>
-            <Input label="Till Number" defaultValue="5273012" placeholder="e.g., 5273012" />
-            <Input label="Business Name" defaultValue={restaurant?.name || 'Your Restaurant'} placeholder="Business name registered with M-Pesa" />
-            <Button onClick={() => { showSuccessToast('Payment settings updated') }}><Save className="h-4 w-4" /> Update Payment Settings</Button>
+
+            <div className="flex items-center justify-between p-4 rounded-xl bg-black/5 dark:bg-white/5">
+              <div className="flex items-center gap-3">
+                <div className="h-8 w-8 rounded-lg bg-amber-100 dark:bg-amber-900/30 flex items-center justify-center">
+                  <Banknote className="h-4 w-4 text-amber-600" />
+                </div>
+                <div>
+                  <p className="font-body text-sm font-medium text-text-primary dark:text-white">Cash</p>
+                  <p className="font-accent text-xs text-text-secondary dark:text-white/50">Accept cash payments</p>
+                </div>
+              </div>
+              <Toggle checked={paymentSettings.cashEnabled} onChange={(checked) => setPaymentSettings({ ...paymentSettings, cashEnabled: checked })} />
+            </div>
+
+            <div className="border-t border-white/10 pt-4">
+              <h4 className="font-accent text-sm font-bold text-text-primary dark:text-white mb-3">M-Pesa Products</h4>
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                {mpesaProducts.map((product) => (
+                  <button
+                    key={product.id}
+                    onClick={() => {
+                      setPaymentSettings((prev) => ({
+                        ...prev,
+                        selectedProducts: prev.selectedProducts.includes(product.id)
+                          ? prev.selectedProducts.filter((p) => p !== product.id)
+                          : [...prev.selectedProducts, product.id],
+                      }))
+                    }}
+                    className={`flex items-start gap-3 rounded-xl border p-3 text-left transition-colors ${
+                      paymentSettings.selectedProducts.includes(product.id)
+                        ? 'border-secondary/50 bg-secondary/5'
+                        : 'border-white/10 hover:bg-black/5 dark:hover:bg-white/5'
+                    }`}
+                  >
+                    <div className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-lg ${
+                      paymentSettings.selectedProducts.includes(product.id)
+                        ? 'bg-secondary text-white'
+                        : 'bg-black/5 dark:bg-white/10 text-text-secondary'
+                    }`}>
+                      <product.icon className="h-4 w-4" />
+                    </div>
+                    <div className="min-w-0">
+                      <p className="font-accent text-sm font-medium text-text-primary dark:text-white">{product.label}</p>
+                      <p className="font-accent text-[10px] text-text-secondary dark:text-white/50">{product.desc}</p>
+                    </div>
+                    {paymentSettings.selectedProducts.includes(product.id) && (
+                      <CheckCircle2 className="h-4 w-4 text-secondary shrink-0 ml-auto mt-1" />
+                    )}
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            {paymentSettings.selectedProducts.includes('till_number') && (
+              <Input label="Till Number" value={paymentSettings.tillNumber}
+                onChange={(e) => setPaymentSettings({ ...paymentSettings, tillNumber: e.target.value })} placeholder="e.g., 5273012" />
+            )}
+            {paymentSettings.selectedProducts.includes('paybill') && (
+              <Input label="PayBill Number" value={paymentSettings.paybillNumber}
+                onChange={(e) => setPaymentSettings({ ...paymentSettings, paybillNumber: e.target.value })} placeholder="e.g., 247247" />
+            )}
+            {paymentSettings.selectedProducts.includes('buy_goods') && (
+              <Input label="Buy Goods Till Number" value={paymentSettings.buyGoodsNumber}
+                onChange={(e) => setPaymentSettings({ ...paymentSettings, buyGoodsNumber: e.target.value })} placeholder="e.g., 5273012" />
+            )}
+            <Input label="Business Name" value={paymentSettings.businessName || restaurant?.name || ''}
+              onChange={(e) => setPaymentSettings({ ...paymentSettings, businessName: e.target.value })} placeholder="Business name registered with M-Pesa" />
+            <Button onClick={handleSavePayments} loading={saving}><Save className="h-4 w-4" /> Update Payment Settings</Button>
           </div>
         )
 
       case 'language':
         return (
           <div className="space-y-3">
+            <p className="font-accent text-xs text-text-secondary dark:text-white/50 mb-2">{t('language.applied')}</p>
             {languages.map((lang) => (
               <button key={lang.code} onClick={() => setLanguage(lang.code as 'en' | 'sw' | 'ar')}
                 className={`w-full flex items-center gap-3 rounded-xl p-4 transition-colors border ${
@@ -370,13 +722,13 @@ export default function SettingsPage() {
                 }`}>
                 <span className="text-2xl">{lang.flag}</span>
                 <div className="text-left">
-                  <p className="font-body text-sm font-medium text-text-primary dark:text-white">{lang.label}</p>
-                  <p className="font-accent text-xs text-text-secondary dark:text-white/50 uppercase">{lang.code}</p>
+                  <p className="font-body text-sm font-medium text-text-primary dark:text-white">{lang.nativeName}</p>
+                  <p className="font-accent text-xs text-text-secondary dark:text-white/50 uppercase">{lang.code} · {lang.label}</p>
                 </div>
                 {language === lang.code && <CheckCircle2 className="h-5 w-5 text-secondary ml-auto" />}
               </button>
             ))}
-            <Button onClick={() => { showSuccessToast('Language preference saved') }}><Save className="h-4 w-4" /> Save Language</Button>
+            <Button onClick={handleSaveLanguage} loading={saving}><Save className="h-4 w-4" /> {t('language.saveLanguage')}</Button>
           </div>
         )
 
@@ -385,18 +737,18 @@ export default function SettingsPage() {
           <div className="space-y-4">
             <div className="rounded-2xl bg-gradient-to-br from-primary to-primary-light p-6 text-white">
               <Crown className="h-8 w-8 text-accent mb-3" />
-              <h3 className="font-heading text-xl font-bold">Business Plan</h3>
+              <h3 className="font-heading text-xl font-bold">{t('subscription.businessPlan')}</h3>
               <p className="font-body text-sm text-white/70 mt-1">KES 2,500/month</p>
               <div className="mt-4 space-y-2">
-                {['Unlimited menu items', 'AI marketing', 'Staff management', 'QR codes', 'Analytics', 'Priority support'].map((feature) => (
+                {['unlimitedItems', 'aiMarketing', 'staffManagement', 'qrCodes', 'analytics', 'prioritySupport'].map((feature) => (
                   <div key={feature} className="flex items-center gap-2 text-sm text-white/80">
                     <Shield className="h-3.5 w-3.5 text-accent" />
-                    {feature}
+                    {t(`subscription.features.${feature}`)}
                   </div>
                 ))}
               </div>
             </div>
-            <Button variant="secondary" fullWidth><Crown className="h-4 w-4" /> Upgrade to Premium</Button>
+            <Button variant="secondary" fullWidth><Crown className="h-4 w-4" /> {t('subscription.upgrade')}</Button>
           </div>
         )
 
@@ -406,15 +758,15 @@ export default function SettingsPage() {
             <div className="rounded-xl bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-900/50 p-4">
               <div className="flex items-center gap-2 text-red-600 dark:text-red-400 mb-2">
                 <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="h-5 w-5"><path d="M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z" /><line x1="12" y1="9" x2="12" y2="13" /><line x1="12" y1="17" x2="12.01" y2="17" /></svg>
-                <span className="font-accent font-bold text-sm uppercase">Danger Zone</span>
+                <span className="font-accent font-bold text-sm uppercase">{t('common.dangerZone')}</span>
               </div>
-              <p className="font-body text-sm text-red-600 dark:text-red-400/80">This action is irreversible. All data including menu, orders, and settings will be permanently deleted.</p>
+              <p className="font-body text-sm text-red-600 dark:text-red-400/80">{t('common.irreversible')}</p>
             </div>
             <div className="space-y-3">
-              <Input label="Type 'DELETE' to confirm" value={deleteConfirm} onChange={(e) => setDeleteConfirm(e.target.value)} placeholder="DELETE" />
-              <Input label="Password" type="password" value={deletePassword} onChange={(e) => setDeletePassword(e.target.value)} placeholder="Enter your password" />
+              <Input label={t('common.typeToConfirm')} value={deleteConfirm} onChange={(e) => setDeleteConfirm(e.target.value)} placeholder="DELETE" />
+              <Input label={t('auth.passwordPlaceholder')} type="password" value={deletePassword} onChange={(e) => setDeletePassword(e.target.value)} placeholder={t('auth.passwordPlaceholder')} />
               <Button variant="ghost" fullWidth className="text-red-500 border-red-500/30 hover:bg-red-500/10" onClick={handleDeleteAccount}>
-                <Trash2 className="h-4 w-4" /> Permanently Delete Account
+                <Trash2 className="h-4 w-4" /> {t('common.confirmDelete')}
               </Button>
             </div>
           </div>
@@ -428,27 +780,29 @@ export default function SettingsPage() {
   return (
     <div className="space-y-6">
       <div>
-        <h1 className="font-heading text-2xl font-bold text-text-primary dark:text-white">Settings</h1>
-        <p className="font-body text-sm text-text-secondary dark:text-white/50">Manage your restaurant settings</p>
+        <h1 className="font-heading text-2xl font-bold text-text-primary dark:text-white">{t('settings.title')}</h1>
+        <p className="font-body text-sm text-text-secondary dark:text-white/50">{t('settings.subtitle')}</p>
       </div>
 
-      <div className="flex gap-6">
-        <div className="w-56 shrink-0 space-y-1">
-          {settingsSections.map((s) => (
-            <button key={s.id} onClick={() => setSection(s.id)}
-              className={`flex w-full items-center gap-2 rounded-xl px-3 py-2.5 text-sm font-accent font-medium transition-colors ${
-                section === s.id ? 'bg-secondary text-white' : 'text-text-secondary dark:text-white/60 hover:bg-black/5 dark:hover:bg-white/10'
-              }`}>
-              <s.icon className="h-4 w-4" />
-              {s.label}
-            </button>
-          ))}
+      <div className="flex flex-col lg:flex-row gap-6">
+        <div className="w-full lg:w-56 shrink-0">
+          <div className="flex lg:flex-col gap-1 overflow-x-auto lg:overflow-visible pb-2 lg:pb-0">
+            {settingsSections.map((s) => (
+              <button key={s.id} onClick={() => setSection(s.id)}
+                className={`flex shrink-0 items-center gap-2 rounded-xl px-3 py-2.5 text-sm font-accent font-medium transition-colors whitespace-nowrap ${
+                  section === s.id ? 'bg-secondary text-white' : 'text-text-secondary dark:text-white/60 hover:bg-black/5 dark:hover:bg-white/10'
+                }`}>
+                <s.icon className="h-4 w-4" />
+                <span className="hidden lg:inline">{t(s.labelKey)}</span>
+              </button>
+            ))}
+          </div>
         </div>
 
-        <div className="flex-1">
+        <div className="flex-1 min-w-0">
           <div className="rounded-2xl bg-white dark:bg-primary-light border border-white/10 p-5">
             <h2 className="font-heading text-lg font-bold text-text-primary dark:text-white mb-4 capitalize">
-              {settingsSections.find((s) => s.id === section)?.label}
+              {t(settingsSections.find((s) => s.id === section)?.labelKey || '')}
             </h2>
             <ActiveSection />
           </div>

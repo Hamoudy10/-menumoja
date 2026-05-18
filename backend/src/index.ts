@@ -7,6 +7,7 @@ dotenv.config({ path: path.resolve(__dirname, '../.env') });
 import express, { Request, Response, NextFunction } from 'express';
 import helmet from 'helmet';
 import cors from 'cors';
+import compression from 'compression';
 import morgan from 'morgan';
 import cookieParser from 'cookie-parser';
 import { createServer } from 'http';
@@ -39,6 +40,11 @@ import {
   notificationRoutes,
 } from './routes';
 
+if (config.nodeEnv === 'production' && (!config.jwtAccessSecret || !config.jwtRefreshSecret || !config.encryptionKey)) {
+  logger.error('CRITICAL: JWT secrets or encryption key not configured. Server will not start.');
+  process.exit(1);
+}
+
 if (config.sentryDsn) {
   Sentry.init({
     dsn: config.sentryDsn,
@@ -55,13 +61,27 @@ if (config.sentryDsn) {
   app.use(Sentry.Handlers.requestHandler());
 }
 
+app.use(compression());
+
 app.use(helmet({
-  contentSecurityPolicy: false,
+  contentSecurityPolicy: {
+    directives: {
+      defaultSrc: ["'self'"],
+      scriptSrc: ["'self'", "'unsafe-inline'", "'unsafe-eval'", 'https://*.youtube.com', 'https://*.googleapis.com'],
+      styleSrc: ["'self'", "'unsafe-inline'", 'https://*.googleapis.com', 'https://fonts.gstatic.com'],
+      imgSrc: ["'self'", 'data:', 'blob:', 'https://*.cloudinary.com', 'https://img.youtube.com', 'https://*.googleusercontent.com'],
+      fontSrc: ["'self'", 'https://fonts.gstatic.com', 'https://*.googleapis.com'],
+      connectSrc: ["'self'", 'https://*.safaricom.co.ke', 'https://api.deepseek.com', 'https://api-inference.huggingface.co'],
+      frameSrc: ["'self'", 'https://*.youtube.com'],
+      objectSrc: ["'none'"],
+      upgradeInsecureRequests: [],
+    },
+  },
   crossOriginResourcePolicy: { policy: 'cross-origin' },
 }));
 
 app.use(cors({
-  origin: config.frontendUrl,
+  origin: config.frontendUrl ? [config.frontendUrl, ...(config.nodeEnv === 'development' ? ['http://localhost:5173'] : [])] : '*',
   credentials: true,
   methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
   allowedHeaders: ['Content-Type', 'Authorization', 'x-session-id', 'x-qr-code-id', 'x-staff-pin'],
@@ -73,8 +93,8 @@ if (config.nodeEnv !== 'test') {
   }));
 }
 
-app.use(express.json({ limit: '10mb' }));
-app.use(express.urlencoded({ extended: true, limit: '10mb' }));
+app.use(express.json({ limit: '1mb' }));
+app.use(express.urlencoded({ extended: true, limit: '1mb' }));
 app.use(cookieParser());
 
 app.use((req: Request, _res: Response, next: NextFunction) => {
@@ -100,12 +120,36 @@ app.use('/api/v1/ussd', ussdRoutes);
 app.use('/api/v1/sms', smsRoutes);
 app.use('/api/v1/notifications', notificationRoutes);
 
-app.get('/api/v1/health', (_req: Request, res: Response) => {
-  res.json({
-    status: 'ok',
+app.get('/api/v1/health', async (_req: Request, res: Response) => {
+  const checks: Record<string, string> = {};
+  let dbOk = false;
+  let redisOk = false;
+
+  try {
+    await prisma.$queryRaw`SELECT 1`;
+    dbOk = true;
+    checks.database = 'ok';
+  } catch {
+    checks.database = 'error';
+  }
+
+  try {
+    await redis.set('health:check', 'ok', 'EX', 10);
+    redisOk = true;
+    checks.redis = 'ok';
+  } catch {
+    checks.redis = 'error';
+  }
+
+  const isHealthy = dbOk;
+  const statusCode = isHealthy ? 200 : 503;
+
+  res.status(statusCode).json({
+    status: isHealthy ? 'ok' : 'degraded',
     timestamp: new Date().toISOString(),
     uptime: process.uptime(),
     version: '1.0.0',
+    checks,
   });
 });
 

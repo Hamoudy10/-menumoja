@@ -1,46 +1,47 @@
-import { Suspense } from 'react'
+import { Suspense, lazy, useEffect } from 'react'
 import { Routes, Route, useLocation } from 'react-router-dom'
+import { useStore } from '@/store/useStore'
 import { AnimatePresence, motion } from 'framer-motion'
 import { Toaster } from 'react-hot-toast'
 import { GoogleOAuthProvider } from '@react-oauth/google'
 
-import ProtectedRoute from '@/components/layout/ProtectedRoute'
-import DashboardLayout from '@/components/layout/DashboardLayout'
-import AdminLayout from '@/components/layout/AdminLayout'
-import NotFound from '@/components/layout/NotFound'
+const ProtectedRoute = lazy(() => import('@/components/layout/ProtectedRoute'))
+const DashboardLayout = lazy(() => import('@/components/layout/DashboardLayout'))
+const AdminLayout = lazy(() => import('@/components/layout/AdminLayout'))
+const NotFound = lazy(() => import('@/components/layout/NotFound'))
 
-import LandingPage from '@/pages/LandingPage'
-import LoginPage from '@/pages/LoginPage'
-import SignUpPage from '@/pages/SignUpPage'
-import DemoPage from '@/pages/DemoPage'
+const LandingPage = lazy(() => import('@/pages/LandingPage'))
+const LoginPage = lazy(() => import('@/pages/LoginPage'))
+const SignUpPage = lazy(() => import('@/pages/SignUpPage'))
+const DemoPage = lazy(() => import('@/pages/DemoPage'))
 
-import MenuView from '@/pages/menu/MenuView'
-import MenuCart from '@/pages/menu/MenuCart'
-import MenuOrderStatus from '@/pages/menu/MenuOrderStatus'
+const MenuView = lazy(() => import('@/pages/menu/MenuView'))
+const MenuCart = lazy(() => import('@/pages/menu/MenuCart'))
+const MenuOrderStatus = lazy(() => import('@/pages/menu/MenuOrderStatus'))
 
-import OnboardingWelcome from '@/pages/onboarding/OnboardingWelcome'
-import OnboardingProfile from '@/pages/onboarding/OnboardingProfile'
-import OnboardingMenu from '@/pages/onboarding/OnboardingMenu'
-import OnboardingAppearance from '@/pages/onboarding/OnboardingAppearance'
-import OnboardingAiSetup from '@/pages/onboarding/OnboardingAiSetup'
-import OnboardingQR from '@/pages/onboarding/OnboardingQR'
-import OnboardingMarketing from '@/pages/onboarding/OnboardingMarketing'
+const OnboardingWelcome = lazy(() => import('@/pages/onboarding/OnboardingWelcome'))
+const OnboardingProfile = lazy(() => import('@/pages/onboarding/OnboardingProfile'))
+const OnboardingMenu = lazy(() => import('@/pages/onboarding/OnboardingMenu'))
+const OnboardingAppearance = lazy(() => import('@/pages/onboarding/OnboardingAppearance'))
+const OnboardingAiSetup = lazy(() => import('@/pages/onboarding/OnboardingAiSetup'))
+const OnboardingQR = lazy(() => import('@/pages/onboarding/OnboardingQR'))
+const OnboardingMarketing = lazy(() => import('@/pages/onboarding/OnboardingMarketing'))
 
-import DashboardHome from '@/pages/dashboard/DashboardHome'
-import MenuManager from '@/pages/dashboard/MenuManager'
-import OrdersPage from '@/pages/dashboard/OrdersPage'
-import PaymentsPage from '@/pages/dashboard/PaymentsPage'
-import AnalyticsPage from '@/pages/dashboard/AnalyticsPage'
-import SurveillancePage from '@/pages/dashboard/SurveillancePage'
-import MarketingPage from '@/pages/dashboard/MarketingPage'
-import SettingsPage from '@/pages/dashboard/SettingsPage'
-import HelpPage from '@/pages/dashboard/HelpPage'
+const DashboardHome = lazy(() => import('@/pages/dashboard/DashboardHome'))
+const MenuManager = lazy(() => import('@/pages/dashboard/MenuManager'))
+const OrdersPage = lazy(() => import('@/pages/dashboard/OrdersPage'))
+const PaymentsPage = lazy(() => import('@/pages/dashboard/PaymentsPage'))
+const AnalyticsPage = lazy(() => import('@/pages/dashboard/AnalyticsPage'))
+const SurveillancePage = lazy(() => import('@/pages/dashboard/SurveillancePage'))
+const MarketingPage = lazy(() => import('@/pages/dashboard/MarketingPage'))
+const SettingsPage = lazy(() => import('@/pages/dashboard/SettingsPage'))
+const HelpPage = lazy(() => import('@/pages/dashboard/HelpPage'))
 
-import AdminOverview from '@/pages/admin/AdminOverview'
-import AdminRestaurants from '@/pages/admin/AdminRestaurants'
-import AdminSubscriptions from '@/pages/admin/AdminSubscriptions'
-import AdminSupport from '@/pages/admin/AdminSupport'
-import AdminSettings from '@/pages/admin/AdminSettings'
+const AdminOverview = lazy(() => import('@/pages/admin/AdminOverview'))
+const AdminRestaurants = lazy(() => import('@/pages/admin/AdminRestaurants'))
+const AdminSubscriptions = lazy(() => import('@/pages/admin/AdminSubscriptions'))
+const AdminSupport = lazy(() => import('@/pages/admin/AdminSupport'))
+const AdminSettings = lazy(() => import('@/pages/admin/AdminSettings'))
 
 function PageTransition({ children }: { children: React.ReactNode }) {
   return (
@@ -62,7 +63,10 @@ function AppRoutes() {
     <AnimatePresence mode="wait">
       <Suspense fallback={
         <div className="min-h-screen bg-background-light dark:bg-background-dark flex items-center justify-center">
-          <div className="w-8 h-8 border-2 border-secondary border-t-transparent rounded-full animate-spin" />
+          <div className="flex flex-col items-center gap-3">
+            <div className="w-8 h-8 border-2 border-secondary border-t-transparent rounded-full animate-spin" />
+            <p className="font-accent text-xs text-text-secondary">Loading...</p>
+          </div>
         </div>
       }>
         <Routes location={location} key={location.pathname}>
@@ -119,8 +123,21 @@ function AppRoutes() {
 }
 
 export default function App() {
+  const googleClientId = import.meta.env.VITE_GOOGLE_CLIENT_ID
+  const { restoreSession } = useStore()
+
+  useEffect(() => {
+    restoreSession()
+  }, [])
+
+  useEffect(() => {
+    if (!googleClientId) {
+      console.warn('VITE_GOOGLE_CLIENT_ID not set - Google OAuth login will not work')
+    }
+  }, [googleClientId])
+
   return (
-    <GoogleOAuthProvider clientId={import.meta.env.VITE_GOOGLE_CLIENT_ID || ''}>
+    <GoogleOAuthProvider clientId={googleClientId || ''}>
       <AppRoutes />
       <Toaster
         position="top-right"

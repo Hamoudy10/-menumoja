@@ -158,6 +158,10 @@ export const useStore = create<AppState>((set) => ({
       const data = await authApi.loginWithGoogle(credential)
       const accessToken = data.tokens?.accessToken || data.accessToken
       const refreshToken = data.tokens?.refreshToken || data.refreshToken
+      const userEmail = data.user?.email || data.email || ''
+      if (userEmail) {
+        localStorage.setItem('google_email', userEmail)
+      }
       localStorage.setItem('accessToken', accessToken)
       localStorage.setItem('refreshToken', refreshToken)
       set({
@@ -182,10 +186,9 @@ export const useStore = create<AppState>((set) => ({
         localStorage.setItem('accessToken', data.tokens.accessToken)
         localStorage.setItem('refreshToken', data.tokens.refreshToken)
         set({
-          isAuthenticated: true,
-          userRole: data.user?.role || 'owner',
           accessToken: data.tokens.accessToken,
           refreshToken: data.tokens.refreshToken,
+          userRole: data.user?.role || 'owner',
           restaurant: data.restaurant || null,
         })
       }
@@ -201,6 +204,7 @@ export const useStore = create<AppState>((set) => ({
   verifyOtp: async (userId, otp) => {
     try {
       await authApi.verifyOtp(userId, otp)
+      set({ isAuthenticated: true })
       toast.success('Phone verified successfully!')
     } catch (err: any) {
       const msg = err?.response?.data?.message || err?.message || 'Verification failed'
@@ -218,6 +222,7 @@ export const useStore = create<AppState>((set) => ({
     } finally {
       localStorage.removeItem('accessToken')
       localStorage.removeItem('refreshToken')
+      localStorage.removeItem('google_email')
       set({
         isAuthenticated: false,
         userRole: null,
@@ -439,17 +444,31 @@ export const useStore = create<AppState>((set) => ({
     }
   },
   toggleItemAvailability: async (itemId) => {
+    const prevState = useStore.getState().categories
+    let prevAvailable = true
+    for (const c of prevState) {
+      const found = c.items.find((i) => i.id === itemId)
+      if (found) { prevAvailable = found.available; break }
+    }
+    set((s) => ({
+      categories: s.categories.map((c) => ({
+        ...c,
+        items: c.items.map((i) =>
+          i.id === itemId ? { ...i, available: !i.available } : i,
+        ),
+      })),
+    }))
     try {
-      const res = await menuApi.toggleItemAvailability(itemId)
+      await menuApi.toggleItemAvailability(itemId)
+    } catch (err: any) {
       set((s) => ({
         categories: s.categories.map((c) => ({
           ...c,
           items: c.items.map((i) =>
-            i.id === itemId ? { ...i, available: res.item?.available ?? !i.available } : i,
+            i.id === itemId ? { ...i, available: prevAvailable } : i,
           ),
         })),
       }))
-    } catch (err: any) {
       toast.error(err?.response?.data?.message || 'Failed to toggle availability')
     }
   },
@@ -501,7 +520,19 @@ export const useStore = create<AppState>((set) => ({
     }
   },
   addOrder: (order: any) => {
-    set((s) => ({ orders: [order, ...s.orders] }))
+    if (!order || !order.id) return
+    const normalized = {
+      id: order.id,
+      tableNumber: order.tableNumber || order.table_number || 0,
+      items: order.items || [],
+      total: order.total || order.totalAmount || 0,
+      status: order.status || 'new',
+      paymentMethod: order.paymentMethod || order.payment_method || 'cash',
+      paymentStatus: order.paymentStatus || order.payment_status || 'pending',
+      specialInstructions: order.specialInstructions || order.special_instructions || '',
+      createdAt: order.createdAt || order.created_at || new Date().toISOString(),
+    }
+    set((s) => ({ orders: [normalized, ...s.orders] }))
   },
 
   tables: [],
@@ -682,6 +713,7 @@ export const useStore = create<AppState>((set) => ({
   },
   addAlert: (cameraId: string, alert: any) => set((s) => ({
     cameras: s.cameras.map((c) => c.id === cameraId ? { ...c, alerts: [alert, ...c.alerts] } : c),
+    alerts: [alert, ...s.alerts],
   })),
   fetchAlerts: async () => {
     try {
@@ -764,10 +796,10 @@ export const useStore = create<AppState>((set) => ({
 
   setCustomer: (customer) => set({ customer }),
   cart: [],
-  addToCart: (item) => set((s) => {
+  addToCart: (item, specialInstructions = '') => set((s) => {
     const existing = s.cart.find((c) => c.item.id === item.id)
-    if (existing) return { cart: s.cart.map((c) => c.item.id === item.id ? { ...c, quantity: c.quantity + 1 } : c) }
-    return { cart: [...s.cart, { item, quantity: 1, specialInstructions: '' }] }
+    if (existing) return { cart: s.cart.map((c) => c.item.id === item.id ? { ...c, quantity: c.quantity + 1, specialInstructions: specialInstructions || c.specialInstructions } : c) }
+    return { cart: [...s.cart, { item, quantity: 1, specialInstructions: specialInstructions || '' }] }
   }),
   removeFromCart: (itemId) => set((s) => ({ cart: s.cart.filter((c) => c.item.id !== itemId) })),
   updateCartQuantity: (itemId, quantity) => set((s) =>
