@@ -35,6 +35,7 @@ interface Config {
   whatsappToken: string;
   whatsappPhoneNumberId: string;
   googleMapsApiKey: string;
+  googleClientId: string;
   resendApiKey: string;
   sentryDsn: string;
 }
@@ -100,6 +101,7 @@ function loadConfig(): Config {
     whatsappToken: process.env.WHATSAPP_TOKEN || '',
     whatsappPhoneNumberId: process.env.WHATSAPP_PHONE_NUMBER_ID || '',
     googleMapsApiKey: process.env.GOOGLE_MAPS_API_KEY || '',
+    googleClientId: process.env.GOOGLE_CLIENT_ID || process.env.VITE_GOOGLE_CLIENT_ID || '',
     resendApiKey: process.env.RESEND_API_KEY || '',
     sentryDsn: process.env.SENTRY_DSN || '',
   };

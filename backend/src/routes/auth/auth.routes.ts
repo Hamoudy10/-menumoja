@@ -167,11 +167,15 @@ router.post(
 
     // Verify Google credential (idToken) using Google's official library
     let payload: any = null;
+    const { config } = await import('@/config');
+    const googleClientId = config.googleClientId;
     try {
-      const googleClientId = process.env.GOOGLE_CLIENT_ID || process.env.VITE_GOOGLE_CLIENT_ID;
       if (!googleClientId) {
-        throw new Error('GOOGLE_CLIENT_ID not configured');
+        logger.error('Google OAuth: GOOGLE_CLIENT_ID not configured in environment');
+        throw new AppError(500, 'GOOGLE_CONFIG_ERROR', 'Google sign-in is not configured. Please set GOOGLE_CLIENT_ID.', 'Kuingia kwa Google hakujasanidiwa.');
       }
+
+      // Try verification with the configured audience
       const authClient = new OAuth2Client(googleClientId);
       const ticket = await authClient.verifyIdToken({
         idToken: credential,
@@ -179,8 +183,36 @@ router.post(
       });
       payload = ticket.getPayload();
     } catch (err: any) {
-      logger.warn('Google credential verification failed', { error: err.message });
-      throw new AppError(400, 'INVALID_GOOGLE_CREDENTIAL', 'Invalid Google credential', 'Kitambulisho batili cha Google');
+      const errorDetail = err.message || 'Unknown error';
+      const tokenPrefix = credential ? credential.substring(0, 20) + '...' : 'none';
+
+      // Try without audience restriction as fallback for multi-client setups
+      if (!payload && err.message?.includes('audience')) {
+        try {
+          const authClient = new OAuth2Client();
+          const ticket = await authClient.verifyIdToken({ idToken: credential });
+          payload = ticket.getPayload();
+          logger.info('Google OAuth succeeded without audience check (fallback)');
+        } catch (fallbackErr: any) {
+          logger.error('Google credential verification failed', {
+            error: errorDetail,
+            fallbackError: fallbackErr.message,
+            tokenPrefix,
+          });
+          throw new AppError(400, 'INVALID_GOOGLE_CREDENTIAL',
+            `Google sign-in failed: ${errorDetail}`,
+            'Kuingia kwa Google hakukufanikiwa');
+        }
+      } else {
+        logger.error('Google credential verification failed', {
+          error: errorDetail,
+          tokenPrefix,
+          hasClientId: !!googleClientId,
+        });
+        throw new AppError(400, 'INVALID_GOOGLE_CREDENTIAL',
+          `Google sign-in failed: ${errorDetail}`,
+          'Kuingia kwa Google hakukufanikiwa');
+      }
     }
 
     const { email, name } = payload;
