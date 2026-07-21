@@ -280,7 +280,7 @@ export const useStore = create<AppState>((set) => ({
       const data = await menuApi.fetchCategories()
       const cats = (data.categories || data || []).map((c: any) => ({
         ...c,
-        items: (c.items || []).map((raw: any) => ({
+        items: (c.menuItems || c.items || []).map((raw: any) => ({
           id: raw.id,
           name: raw.name || '',
           price: raw.price || 0,
