@@ -22,9 +22,13 @@ const defaultItem = (categoryId: string, order: number): Partial<MenuItem> => ({
 
 export default function MenuManager() {
   const { t } = useTranslation()
-  const { categories, addCategory, updateCategory, removeCategory, addItem, updateItem, removeItem } = useStore()
+  const { categories, fetchCategories, addCategory, updateCategory, removeCategory, addItem, updateItem, removeItem } = useStore()
   const [viewMode, setViewMode] = useState<'grid' | 'list'>('grid')
   const [selectedCat, setSelectedCat] = useState('')
+
+  useEffect(() => {
+    fetchCategories()
+  }, [])
 
   useEffect(() => {
     if (categories.length > 0 && !selectedCat) {
@@ -188,20 +192,47 @@ export default function MenuManager() {
             }}>
               {categoriesOrder.map((cat) => (
                 <Reorder.Item key={cat.id} value={cat} as="div">
-                  <motion.button
-                    onClick={() => setSelectedCat(cat.id)}
-                    whileTap={{ scale: 0.98 }}
-                    className={`flex w-full items-center gap-2 rounded-xl px-3 py-2 text-sm font-accent font-medium transition-colors ${
+                  <div
+                    className={`flex w-full items-center gap-1 rounded-xl px-3 py-2 text-sm font-accent font-medium transition-colors ${
                       selectedCat === cat.id
                         ? 'bg-secondary text-white'
                         : 'text-text-secondary dark:text-white/60 hover:bg-black/5 dark:hover:bg-white/10'
                     }`}
                   >
                     <GripVertical className="h-3.5 w-3.5 shrink-0 opacity-40" />
-                    <Tag className="h-3.5 w-3.5 shrink-0" />
-                    <span className="truncate flex-1 text-left">{cat.name}</span>
-                    <Badge size="sm" variant="default">{(cat.items || []).length}</Badge>
-                  </motion.button>
+                    <button onClick={() => setSelectedCat(cat.id)} className="flex items-center gap-2 flex-1 min-w-0 text-left">
+                      <Tag className="h-3.5 w-3.5 shrink-0" />
+                      <span className="truncate">{cat.name}</span>
+                      <Badge size="sm" variant="default">{(cat.items || []).length}</Badge>
+                    </button>
+                    {selectedCat === cat.id && (
+                      <div className="flex items-center gap-0.5 shrink-0">
+                        <button
+                          onClick={(e) => {
+                            e.stopPropagation()
+                            const newName = prompt('Category name:', cat.name)
+                            if (newName && newName.trim() && newName !== cat.name) {
+                              updateCategory(cat.id, { name: newName.trim() })
+                            }
+                          }}
+                          className="p-1 rounded-lg hover:bg-white/20 transition-colors"
+                        >
+                          <Edit3 className="h-3 w-3" />
+                        </button>
+                        <button
+                          onClick={(e) => {
+                            e.stopPropagation()
+                            if (confirm(`Delete category "${cat.name}"?`)) {
+                              removeCategory(cat.id)
+                            }
+                          }}
+                          className="p-1 rounded-lg hover:bg-white/20 transition-colors"
+                        >
+                          <Trash2 className="h-3 w-3" />
+                        </button>
+                      </div>
+                    )}
+                  </div>
                 </Reorder.Item>
               ))}
             </Reorder.Group>

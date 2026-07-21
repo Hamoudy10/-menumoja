@@ -35,6 +35,9 @@ router.get(
       orderBy: { sortOrder: 'asc' },
       include: {
         _count: { select: { menuItems: true } },
+        menuItems: {
+          orderBy: { sortOrder: 'asc' },
+        },
       },
     });
 
