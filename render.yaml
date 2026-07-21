@@ -3,7 +3,7 @@ services:
     name: menumoja-backend
     env: docker
     dockerfilePath: backend/Dockerfile
-    repo: https://github.com/YOUR_USERNAME/menu-moja
+    repo: https://github.com/Hamoudy10/-menumoja
     branch: main
     healthCheckPath: /api/v1/health
     envVars:
