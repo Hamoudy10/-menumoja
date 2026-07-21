@@ -119,7 +119,7 @@ export const createCategorySchema = z
     description: z.string().max(500).optional(),
     displayOrder: z.number().int().min(0).optional(),
     isActive: z.boolean().default(true),
-    image: z.string().url('Invalid image URL').optional(),
+    image: z.string().optional(),
   })
   .strict();
 
@@ -129,7 +129,7 @@ export const createItemSchema = z
     description: z.string().max(2000).optional(),
     price: z.number().min(0, 'Price must be at least 0'),
     categoryId: z.string().uuid('Invalid category ID'),
-    image: z.string().url('Invalid image URL').optional(),
+    image: z.string().optional(),
     isAvailable: z.boolean().default(true),
     isPopular: z.boolean().default(false),
     preparationTime: z.number().int().min(0).optional(),
