@@ -1,4 +1,5 @@
 import { Router } from 'express';
+import { v4 as uuidv4 } from 'uuid';
 import { z } from 'zod';
 import { prisma } from '@/config/database';
 import { authenticate, optionalAuth, enforceRestaurantScope, validate, validateQuery, validateParams, generalLimiter, auditLog, asyncHandler } from '@/middleware';
@@ -51,9 +52,10 @@ const cancelOrderSchema = z.object({
 }).strict();
 
 const customerCreateOrderSchema = z.object({
-  restaurantId: z.string().uuid('Invalid restaurant ID'),
+  restaurantId: z.string().uuid('Invalid restaurant ID').optional(),
+  restaurantSlug: z.string().optional(),
   tableId: z.string().uuid('Invalid table ID').optional(),
-  sessionId: z.string().min(1, 'Session ID is required'),
+  sessionId: z.string().optional(),
   items: z.array(z.object({
     menuItemId: z.string().uuid('Invalid menu item ID'),
     quantity: z.number().int().min(1, 'Quantity must be at least 1'),
@@ -61,7 +63,7 @@ const customerCreateOrderSchema = z.object({
   })).min(1, 'At least one item is required'),
   specialNotes: z.string().max(1000).optional(),
   paymentMethod: z.enum(['mpesa', 'cash', 'card']).default('cash'),
-}).strict();
+});
 
 const TRANSITION_MAP: Record<string, string[]> = {
   PENDING: ['CONFIRMED', 'CANCELLED'],
@@ -86,7 +88,21 @@ router.post('/public/create',
   optionalAuth,
   validate(customerCreateOrderSchema),
   asyncHandler(async (req, res) => {
-    const { restaurantId, tableId, sessionId, items, specialNotes, paymentMethod } = req.body;
+    let { restaurantId, restaurantSlug, tableId, sessionId, items, specialNotes, paymentMethod } = req.body;
+
+    if (!restaurantId && restaurantSlug) {
+      const slugRestaurant = await prisma.restaurant.findUnique({
+        where: { slug: restaurantSlug },
+        select: { id: true },
+      });
+      if (slugRestaurant) restaurantId = slugRestaurant.id;
+    }
+
+    if (!restaurantId) {
+      throw new AppError(400, 'RESTAURANT_REQUIRED', 'Restaurant ID or slug is required', 'Kitambulisho cha mgahawa kinahitajika');
+    }
+
+    sessionId = sessionId || uuidv4();
 
     const restaurant = await prisma.restaurant.findUnique({
       where: { id: restaurantId },
