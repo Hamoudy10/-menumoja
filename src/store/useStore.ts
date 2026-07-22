@@ -510,9 +510,10 @@ export const useStore = create<AppState>((set) => ({
   placeOrder: async (data) => {
     try {
       const res = await ordersApi.placeOrder(data)
-      set((s) => ({ orders: [res.order || res, ...s.orders] }))
+      const order = res.order || (res.orderId ? { id: res.orderId, orderNumber: res.orderNumber, ...res } : res)
+      set((s) => ({ orders: [order, ...s.orders] }))
       toast.success('Order placed!')
-      return res.order || res
+      return order
     } catch (err: any) {
       toast.error(err?.response?.data?.message || 'Failed to place order')
       throw err
