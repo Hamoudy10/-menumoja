@@ -155,19 +155,27 @@ export default function MenuView() {
                     layout
                     className="bg-white rounded-2xl p-4 border border-gray-100 shadow-soft"
                   >
-                    <div className="flex items-start justify-between gap-3">
+                    <div className="flex gap-3">
+                      {item.photoUrl && (
+                        <div className="w-20 h-20 shrink-0 rounded-xl overflow-hidden bg-gray-100">
+                          <img src={item.photoUrl} alt={item.name} className="w-full h-full object-cover" onError={(e) => { (e.target as HTMLImageElement).style.display = 'none' }} />
+                        </div>
+                      )}
                       <div className="flex-1 min-w-0">
                         <div className="flex items-center gap-1.5 flex-wrap">
                           <h3 className="font-semibold text-primary text-sm">{item.name}</h3>
-                          {item.isPopular && <Badge variant="success" size="sm">Popular</Badge>}
+                          {item.isFeatured && <Badge variant="success" size="sm">Popular</Badge>}
                           {item.isNew && <Badge variant="info" size="sm">New</Badge>}
                         </div>
                         <p className="text-xs text-text-secondary mt-1 line-clamp-2">{item.description}</p>
-                        <div className="flex items-center gap-2 mt-2">
-                          {(item.dietaryTags || []).map((tag: string) => (
-                            <span key={tag} className="text-[9px] px-1.5 py-0.5 rounded-full bg-gray-100 text-text-secondary font-medium">{tag}</span>
-                          ))}
-                        </div>
+                        {item.dietary && (
+                          <div className="flex items-center gap-2 mt-2">
+                            {item.dietary.isHalal && <span className="text-[9px] px-1.5 py-0.5 rounded-full bg-gray-100 text-text-secondary font-medium">Halal</span>}
+                            {item.dietary.isVegetarian && <span className="text-[9px] px-1.5 py-0.5 rounded-full bg-gray-100 text-text-secondary font-medium">Vegetarian</span>}
+                            {item.dietary.isVegan && <span className="text-[9px] px-1.5 py-0.5 rounded-full bg-gray-100 text-text-secondary font-medium">Vegan</span>}
+                            {item.dietary.isGlutenFree && <span className="text-[9px] px-1.5 py-0.5 rounded-full bg-gray-100 text-text-secondary font-medium">Gluten-Free</span>}
+                          </div>
+                        )}
                         <p className="text-sm font-bold text-secondary mt-2">KES {item.price}</p>
                       </div>
                     </div>
