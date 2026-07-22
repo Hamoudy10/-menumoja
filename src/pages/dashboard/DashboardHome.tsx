@@ -110,10 +110,10 @@ export default function DashboardHome() {
               <div key={order.id} className="flex items-center justify-between py-2 border-b border-gray-50 dark:border-white/5 last:border-0">
                 <div>
                   <p className="text-sm font-medium text-text-primary dark:text-white">Table {order.tableNumber}</p>
-                  <p className="text-xs text-text-secondary dark:text-white/50">{order.items.map(i => i.name).join(', ')}</p>
+                  <p className="text-xs text-text-secondary dark:text-white/50">{(order.items || []).map((i: any) => i.name).join(', ')}</p>
                 </div>
                 <div className="text-right">
-                  <p className="text-sm font-semibold text-secondary">KES {order.total.toLocaleString()}</p>
+                  <p className="text-sm font-semibold text-secondary">KES {(order.total || 0).toLocaleString()}</p>
                   <span className={`text-[10px] px-2 py-0.5 rounded-full font-medium ${
                     order.status === 'new' ? 'bg-blue-100 text-blue-600 dark:bg-blue-900/30 dark:text-blue-400' :
                     order.status === 'preparing' ? 'bg-amber-100 text-amber-600 dark:bg-amber-900/30 dark:text-amber-400' :
