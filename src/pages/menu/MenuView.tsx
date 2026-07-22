@@ -30,9 +30,11 @@ export default function MenuView() {
         const data = await menuApi.getPublicMenu(restaurantSlug)
         if (cancelled) return
         const restaurant = data.restaurant || data
-        const cats = data.categories || data.items
-          ? [{ id: 'all', name: 'All', items: data.items || [] }]
-          : []
+        const cats = (data.categories || []).map((cat: any) => ({
+          id: cat.id,
+          name: cat.name,
+          items: cat.items || [],
+        }))
 
         setRestaurantInfo(restaurant)
         setMenuCategories(cats)
