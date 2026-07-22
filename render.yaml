@@ -15,7 +15,11 @@ services:
         value: https://menumoja.vercel.app
       - key: API_URL
         value: https://menumoja-backend.onrender.com
-      # Set these as "Secret Files" or "Environment Variables" in Render dashboard:
+      - key: REDIS_URL
+        fromService:
+          type: redis
+          name: menumoja-redis
+          property: connectionString
       - key: DATABASE_URL
         sync: false
       - key: JWT_ACCESS_SECRET
@@ -26,3 +30,8 @@ services:
         sync: false
       - key: DEEPSEEK_API_KEY
         sync: false
+
+  - type: redis
+    name: menumoja-redis
+    plan: free
+    maxmemoryPolicy: noeviction

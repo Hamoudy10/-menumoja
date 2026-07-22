@@ -32,7 +32,7 @@ const nullRedis: RedisLike = {
 
 let redis: RedisLike = nullRedis;
 
-if (config.redisUrl && !config.redisUrl.includes('localhost')) {
+if (config.redisUrl) {
   try {
     const IORedis = require('ioredis');
     const client = new IORedis(config.redisUrl, {
