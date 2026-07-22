@@ -249,7 +249,7 @@ export default function SettingsPage() {
     setBatchCount('10')
   }
 
-  const ActiveSection = () => {
+  const renderActiveSection = () => {
     switch (section) {
       case 'profile':
         return (
@@ -804,7 +804,7 @@ export default function SettingsPage() {
             <h2 className="font-heading text-lg font-bold text-text-primary dark:text-white mb-4 capitalize">
               {t(settingsSections.find((s) => s.id === section)?.labelKey || '')}
             </h2>
-            <ActiveSection />
+            {renderActiveSection()}
           </div>
         </div>
       </div>
