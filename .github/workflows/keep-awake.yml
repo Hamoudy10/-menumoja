@@ -11,4 +11,4 @@ jobs:
       - name: Ping health endpoint
         run: |
           curl -s -o /dev/null -w "%{http_code}" \
-            https://menumoja-backend.onrender.com/api/v1/health
+            https://menumoja.onrender.com/api/v1/health
