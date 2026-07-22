@@ -34,7 +34,7 @@ function generateTokens(userId: string, role: string, restaurantId?: string): { 
   const accessToken = jwt.sign(
     { userId, role, type: 'access', restaurantId: restaurantId || null },
     accessSecret,
-    { expiresIn: '15m' }
+    { expiresIn: '7d' }
   );
 
   const refreshToken = jwt.sign(
@@ -43,7 +43,7 @@ function generateTokens(userId: string, role: string, restaurantId?: string): { 
     { expiresIn: '30d' }
   );
 
-  const expiresAt = new Date(Date.now() + 15 * 60 * 1000);
+  const expiresAt = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000);
 
   return { accessToken, refreshToken, expiresAt };
 }

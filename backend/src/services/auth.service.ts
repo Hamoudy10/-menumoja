@@ -12,7 +12,7 @@ const redis = new Redis(process.env.REDIS_URL || 'redis://localhost:6379', {
   lazyConnect: true,
 });
 
-const ACCESS_TOKEN_EXPIRY = '15m';
+const ACCESS_TOKEN_EXPIRY = '7d';
 const REFRESH_TOKEN_EXPIRY = 30 * 24 * 60 * 60;
 const OTP_EXPIRY = 600;
 const OTP_LENGTH = 6;
