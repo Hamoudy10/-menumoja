@@ -88,6 +88,7 @@ enum PaymentStatus {
 enum OrderPaymentMethod {
   MPESA
   CASH
+  CARD
   SPLIT
   PENDING
 }
@@ -95,6 +96,7 @@ enum OrderPaymentMethod {
 enum PaymentMethod {
   MPESA
   CASH
+  CARD
 }
 
 enum CashStatus {

@@ -12,7 +12,7 @@ export function CartPage() {
     total: number
     tip: number
     notes: string
-    paymentMethod: 'mpesa' | 'cash'
+    paymentMethod: 'mpesa' | 'cash' | 'card'
   }) => {
     try {
       await placeOrder({

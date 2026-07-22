@@ -60,7 +60,7 @@ const customerCreateOrderSchema = z.object({
     specialInstructions: z.string().max(500).optional(),
   })).min(1, 'At least one item is required'),
   specialNotes: z.string().max(1000).optional(),
-  paymentMethod: z.enum(['mpesa', 'cash']).default('cash'),
+  paymentMethod: z.enum(['mpesa', 'cash', 'card']).default('cash'),
 }).strict();
 
 const TRANSITION_MAP: Record<string, string[]> = {
@@ -171,7 +171,7 @@ router.post('/public/create',
         sessionId,
         status: 'PENDING',
         paymentStatus: 'UNPAID',
-        paymentMethod: paymentMethod === 'mpesa' ? 'MPESA' : 'CASH',
+        paymentMethod: paymentMethod === 'mpesa' ? 'MPESA' : paymentMethod === 'card' ? 'CARD' : 'CASH',
         subtotal: totals.subtotal,
         serviceCharge: totals.serviceCharge,
         taxAmount: totals.tax,
@@ -1007,7 +1007,7 @@ function createPaymentService() {
           orderId: data.orderId,
           restaurantId: ord?.restaurantId || '',
           amount: data.amount,
-          paymentMethod: data.method === 'mpesa' ? 'MPESA' : 'CASH',
+          paymentMethod: data.method === 'mpesa' ? 'MPESA' : data.method === 'card' ? 'CARD' : 'CASH',
           status: data.status as any,
           mpesaCheckoutRequestId: data.checkoutRequestId,
           mpesaPhone: data.phone,

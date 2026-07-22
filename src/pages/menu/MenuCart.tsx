@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import { motion } from 'framer-motion'
 import { useParams, useNavigate } from 'react-router-dom'
-import { ShoppingCart, Trash2, Minus, Plus, ArrowLeft, CreditCard, Smartphone, Loader2 } from 'lucide-react'
+import { ShoppingCart, Trash2, Minus, Plus, ArrowLeft, CreditCard, Smartphone, Banknote, Loader2 } from 'lucide-react'
 import { useStore } from '@/store/useStore'
 import { Button } from '@/components/ui/Button'
 import { showSuccessToast } from '@/components/ui/Toast'
@@ -14,7 +14,7 @@ export default function MenuCart() {
 
   const total = cart.reduce((s, i) => s + i.item.price * i.quantity, 0)
 
-  const handlePlaceOrder = async (method: 'mpesa' | 'cash') => {
+  const handlePlaceOrder = async (method: 'mpesa' | 'cash' | 'card') => {
     if (cart.length === 0 || placing) return
     setPlacing(true)
     try {
@@ -140,8 +140,18 @@ export default function MenuCart() {
                 size="lg"
                 fullWidth
                 disabled={placing}
-                onClick={() => handlePlaceOrder('cash')}
+                onClick={() => handlePlaceOrder('card')}
                 icon={<CreditCard className="w-5 h-5" />}
+              >
+                Pay with Card
+              </Button>
+              <Button
+                variant="outline"
+                size="lg"
+                fullWidth
+                disabled={placing}
+                onClick={() => handlePlaceOrder('cash')}
+                icon={<Banknote className="w-5 h-5" />}
               >
                 Pay with Cash
               </Button>

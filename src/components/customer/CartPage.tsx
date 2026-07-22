@@ -2,7 +2,7 @@
 
 import { useState } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
-import { Minus, Plus, X, ShoppingBag, ArrowLeft, Smartphone, Banknote, Check, Sparkles } from 'lucide-react'
+import { Minus, Plus, X, ShoppingBag, ArrowLeft, Smartphone, Banknote, CreditCard, Check, Sparkles } from 'lucide-react'
 import { useStore } from '@/store/useStore'
 import { Button } from '@/components/ui/Button'
 
@@ -25,7 +25,7 @@ interface CartPageProps {
     total: number
     tip: number
     notes: string
-    paymentMethod: 'mpesa' | 'cash'
+    paymentMethod: 'mpesa' | 'cash' | 'card'
   }) => void
 }
 
@@ -34,7 +34,7 @@ export function CartPage({ onBack, onPlaceOrder }: CartPageProps) {
   const [tipPercent, setTipPercent] = useState<number | 'custom'>(0)
   const [customTip, setCustomTip] = useState('')
   const [notes, setNotes] = useState('')
-  const [paymentMethod, setPaymentMethod] = useState<'mpesa' | 'cash' | null>(null)
+  const [paymentMethod, setPaymentMethod] = useState<'mpesa' | 'cash' | 'card' | null>(null)
   const [placing, setPlacing] = useState(false)
   const [placed, setPlaced] = useState(false)
 
@@ -320,7 +320,7 @@ export function CartPage({ onBack, onPlaceOrder }: CartPageProps) {
 
             <div className="mt-4">
               <h3 className="mb-2 font-accent text-xs font-semibold uppercase tracking-wider text-text-secondary">Payment</h3>
-              <div className="grid grid-cols-2 gap-3">
+              <div className="grid grid-cols-3 gap-3">
                 <motion.button
                   whileTap={{ scale: 0.97 }}
                   onClick={() => setPaymentMethod('mpesa')}
@@ -333,6 +333,20 @@ export function CartPage({ onBack, onPlaceOrder }: CartPageProps) {
                   <Smartphone className={`h-8 w-8 ${paymentMethod === 'mpesa' ? 'text-white' : 'text-secondary'}`} />
                   <span className="font-accent text-sm font-bold">M-Pesa</span>
                   <span className="text-[11px] opacity-70">{t('mpesa')}</span>
+                </motion.button>
+
+                <motion.button
+                  whileTap={{ scale: 0.97 }}
+                  onClick={() => setPaymentMethod('card')}
+                  className={`flex flex-col items-center gap-2 rounded-2xl p-4 text-center transition-all ${
+                    paymentMethod === 'card'
+                      ? 'bg-secondary text-white shadow-warm'
+                      : 'bg-white text-text-secondary shadow-soft'
+                  }`}
+                >
+                  <CreditCard className={`h-8 w-8 ${paymentMethod === 'card' ? 'text-white' : 'text-blue-500'}`} />
+                  <span className="font-accent text-sm font-bold">Card</span>
+                  <span className="text-[11px] opacity-70">Pay at counter</span>
                 </motion.button>
 
                 <motion.button
