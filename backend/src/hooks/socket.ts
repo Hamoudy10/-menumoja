@@ -81,7 +81,7 @@ export function initSocket(httpServer: HTTPServer): SocketIOServer {
 
   if (config.nodeEnv !== 'test' && config.redisUrl) {
     setupRedisAdapter().catch((err) => {
-      logger.warn('Redis adapter setup failed, running without multi-instance support', { error: err.message });
+      logger.info('Redis adapter not available — running without multi-instance support');
     });
   }
 
@@ -176,7 +176,7 @@ async function setupRedisAdapter(): Promise<void> {
     try {
       createAdapter = (await new Function('return import("@socket.io/redis-adapter")')()).createAdapter;
     } catch {
-      logger.warn('Redis adapter not available, skipping');
+      logger.info('Redis adapter not available — running without multi-instance support');
       return;
     }
 
@@ -186,7 +186,7 @@ async function setupRedisAdapter(): Promise<void> {
     io.adapter(createAdapter(pubClient, subClient));
     logger.info('Redis adapter attached to Socket.io');
   } catch (error: any) {
-    logger.warn('Redis adapter setup failed, running without multi-instance support', { error: error?.message });
+    logger.info('Redis adapter not available — running without multi-instance support');
   }
 }
 
