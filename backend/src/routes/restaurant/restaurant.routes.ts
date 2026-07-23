@@ -392,10 +392,14 @@ router.get(
       where: { restaurantId },
       orderBy: { createdAt: 'desc' },
       include: {
+        shifts: {
+          where: { isActive: true },
+          take: 1,
+          select: { id: true },
+        },
         _count: {
           select: {
             assignedOrders: true,
-            shifts: { where: { isActive: true } },
           },
         },
       },
@@ -405,11 +409,11 @@ router.get(
       id: s.id,
       fullName: s.fullName,
       phone: s.phone,
-      role: s.role.toLowerCase(),
+      role: typeof s.role === 'string' ? s.role.toLowerCase() : 'waiter',
       isActive: s.isActive,
       lastLogin: s.lastLogin,
       createdAt: s.createdAt,
-      activeShift: s._count.shifts > 0,
+      activeShift: s.shifts.length > 0,
       activeOrders: s._count.assignedOrders,
     }));
 
