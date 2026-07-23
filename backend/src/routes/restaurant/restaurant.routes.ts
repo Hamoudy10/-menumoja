@@ -86,10 +86,23 @@ router.put(
       })();
     }
 
+    const { brandColor, fontStyle, ...restaurantData } = data;
+
     const restaurant = await prisma.restaurant.update({
       where: { id: restaurantId },
-      data,
+      data: restaurantData,
     });
+
+    if (brandColor !== undefined || fontStyle !== undefined) {
+      const settingsUpdate: any = {};
+      if (brandColor !== undefined) settingsUpdate.primaryColor = brandColor;
+      if (fontStyle !== undefined) settingsUpdate.fontFamily = fontStyle;
+      await prisma.restaurantSettings.upsert({
+        where: { restaurantId },
+        create: { restaurantId, ...settingsUpdate },
+        update: settingsUpdate,
+      });
+    }
 
     logger.info('Restaurant updated', { restaurantId, userId });
 

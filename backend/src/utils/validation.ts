@@ -88,6 +88,8 @@ export const createRestaurantSchema = z
     longitude: z.number().min(-180).max(180).optional(),
     currency: z.enum(['KES', 'USD']).default('KES'),
     timezone: z.string().default('Africa/Nairobi'),
+    brandColor: z.string().optional(),
+    fontStyle: z.string().optional(),
   })
   .strict();
 
@@ -108,6 +110,22 @@ export const updateSettingsSchema = z
     closingTime: z.string().regex(/^\d{2}:\d{2}$/, 'Use HH:mm format').optional(),
     allowTableReservations: z.boolean().optional(),
     receiptFooter: z.string().max(500).optional(),
+    primaryColor: z.string().optional(),
+    secondaryColor: z.string().optional(),
+    fontFamily: z.string().optional(),
+    layoutStyle: z.enum(['GRID', 'LIST']).optional(),
+    welcomeMessage: z.string().optional(),
+    welcomeMessageSw: z.string().optional(),
+    showPrices: z.boolean().optional(),
+    allowOrdering: z.boolean().optional(),
+    allowCashPayment: z.boolean().optional(),
+    allowMpesaPayment: z.boolean().optional(),
+    tipEnabled: z.boolean().optional(),
+    tipPercentages: z.array(z.number()).optional(),
+    serviceChargePercent: z.number().optional(),
+    taxPercent: z.number().optional(),
+    announcement: z.string().optional(),
+    announcementActive: z.boolean().optional(),
   })
   .strict();
 
