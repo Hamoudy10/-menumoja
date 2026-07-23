@@ -54,7 +54,7 @@ export interface Order {
   items: OrderItem[]
   total: number
   status: 'new' | 'preparing' | 'ready' | 'served'
-  paymentMethod: 'mpesa' | 'cash'
+  paymentMethod: 'mpesa' | 'cash' | 'card'
   paymentStatus: 'pending' | 'confirmed' | 'failed'
   specialInstructions: string
   createdAt: string
