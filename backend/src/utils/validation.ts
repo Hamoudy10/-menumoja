@@ -405,12 +405,6 @@ export const createTableSchema = z.object({
   tableNumber: z.number().int().min(1),
   label: z.string().min(1).max(50),
   capacity: z.number().int().min(1).optional(),
-  area: z.string().optional(),
-  shape: z.enum(['ROUND', 'SQUARE', 'RECTANGLE']).optional(),
-  positionX: z.number().int().optional(),
-  positionY: z.number().int().optional(),
-  width: z.number().int().optional(),
-  height: z.number().int().optional(),
 }).strict();
 
 export const updateTableSchema = createTableSchema.partial().strict();
