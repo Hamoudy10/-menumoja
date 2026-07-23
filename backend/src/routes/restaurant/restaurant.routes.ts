@@ -417,7 +417,7 @@ router.post(
   validate(createStaffSchema),
   asyncHandler(async (req, res) => {
     const restaurantId = (req as any).restaurantId;
-    const { name, email, phone, role, pin, employeeNumber, nationalId, kraPin, nhifNumber, nssfNumber, dateOfBirth, address, emergencyName, emergencyPhone, emergencyRelation, nextOfKin, nextOfKinPhone, nextOfKinRelation, bankName, bankBranch, bankAccount, monthlySalary, hourlyRate, leaveDays, startDate, notes } = req.body;
+    const { name, email, phone, role, pin } = req.body;
 
     const existing = await prisma.staff.findFirst({
       where: { restaurantId, OR: [{ phone }, { fullName: name }] },
@@ -440,31 +440,9 @@ router.post(
       data: {
         restaurantId,
         fullName: name,
-        phone: phone || '',
-        email,
+        phone,
         pinHash,
         role: (roleMap[role] || 'WAITER') as any,
-        employeeNumber,
-        nationalId,
-        kraPin,
-        nhifNumber,
-        nssfNumber,
-        dateOfBirth: dateOfBirth ? new Date(dateOfBirth) : undefined,
-        address,
-        emergencyName,
-        emergencyPhone,
-        emergencyRelation,
-        nextOfKin,
-        nextOfKinPhone,
-        nextOfKinRelation,
-        bankName,
-        bankBranch,
-        bankAccount,
-        monthlySalary: monthlySalary !== undefined ? monthlySalary : undefined,
-        hourlyRate: hourlyRate !== undefined ? hourlyRate : undefined,
-        leaveDays: leaveDays !== undefined ? leaveDays : 21,
-        startDate: startDate ? new Date(startDate) : undefined,
-        notes,
       },
     });
 
@@ -498,33 +476,11 @@ router.put(
       manager: 'MANAGER', cashier: 'CASHIER', waiter: 'WAITER', kitchen: 'KITCHEN',
     };
     const updateData: any = {};
-    if (data.name !== undefined) updateData.fullName = data.name;
-    if (data.phone !== undefined) updateData.phone = data.phone;
-    if (data.email !== undefined) updateData.email = data.email;
-    if (data.role !== undefined) updateData.role = roleMap[data.role] || staff.role;
+    if (data.name) updateData.fullName = data.name;
+    if (data.phone) updateData.phone = data.phone;
+    if (data.role) updateData.role = roleMap[data.role] || staff.role;
     if (data.isActive !== undefined) updateData.isActive = data.isActive;
-    if (data.pin !== undefined) updateData.pinHash = await hashPassword(data.pin);
-    if (data.employeeNumber !== undefined) updateData.employeeNumber = data.employeeNumber;
-    if (data.nationalId !== undefined) updateData.nationalId = data.nationalId;
-    if (data.kraPin !== undefined) updateData.kraPin = data.kraPin;
-    if (data.nhifNumber !== undefined) updateData.nhifNumber = data.nhifNumber;
-    if (data.nssfNumber !== undefined) updateData.nssfNumber = data.nssfNumber;
-    if (data.dateOfBirth !== undefined) updateData.dateOfBirth = new Date(data.dateOfBirth);
-    if (data.address !== undefined) updateData.address = data.address;
-    if (data.emergencyName !== undefined) updateData.emergencyName = data.emergencyName;
-    if (data.emergencyPhone !== undefined) updateData.emergencyPhone = data.emergencyPhone;
-    if (data.emergencyRelation !== undefined) updateData.emergencyRelation = data.emergencyRelation;
-    if (data.nextOfKin !== undefined) updateData.nextOfKin = data.nextOfKin;
-    if (data.nextOfKinPhone !== undefined) updateData.nextOfKinPhone = data.nextOfKinPhone;
-    if (data.nextOfKinRelation !== undefined) updateData.nextOfKinRelation = data.nextOfKinRelation;
-    if (data.bankName !== undefined) updateData.bankName = data.bankName;
-    if (data.bankBranch !== undefined) updateData.bankBranch = data.bankBranch;
-    if (data.bankAccount !== undefined) updateData.bankAccount = data.bankAccount;
-    if (data.monthlySalary !== undefined) updateData.monthlySalary = data.monthlySalary;
-    if (data.hourlyRate !== undefined) updateData.hourlyRate = data.hourlyRate;
-    if (data.leaveDays !== undefined) updateData.leaveDays = data.leaveDays;
-    if (data.startDate !== undefined) updateData.startDate = new Date(data.startDate);
-    if (data.notes !== undefined) updateData.notes = data.notes;
+    if (data.pin) updateData.pinHash = await hashPassword(data.pin);
 
     const updated = await prisma.staff.update({
       where: { id: staffId },

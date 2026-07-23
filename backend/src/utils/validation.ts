@@ -271,27 +271,6 @@ export const createStaffSchema = z
       .string()
       .regex(/^\d{4,6}$/, 'PIN must be 4-6 digits')
       .optional(),
-    employeeNumber: z.string().optional(),
-    nationalId: z.string().optional(),
-    kraPin: z.string().optional(),
-    nhifNumber: z.string().optional(),
-    nssfNumber: z.string().optional(),
-    dateOfBirth: z.string().optional(),
-    address: z.string().optional(),
-    emergencyName: z.string().optional(),
-    emergencyPhone: z.string().optional(),
-    emergencyRelation: z.string().optional(),
-    nextOfKin: z.string().optional(),
-    nextOfKinPhone: z.string().optional(),
-    nextOfKinRelation: z.string().optional(),
-    bankName: z.string().optional(),
-    bankBranch: z.string().optional(),
-    bankAccount: z.string().optional(),
-    monthlySalary: z.number().optional(),
-    hourlyRate: z.number().optional(),
-    leaveDays: z.number().int().optional(),
-    startDate: z.string().optional(),
-    notes: z.string().optional(),
   })
   .strict();
 
