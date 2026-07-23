@@ -106,7 +106,7 @@ function OrderHistory({ orders }: { orders: Order[] }) {
   const [filter, setFilter] = useState<Order['status'] | 'all'>('all')
 
   const filtered = orders.filter((o) => {
-    const matchSearch = o.id.toLowerCase().includes(search.toLowerCase()) || o.items.some((i) => i.name.toLowerCase().includes(search.toLowerCase()))
+    const matchSearch = o.id.toLowerCase().includes(search.toLowerCase()) || (o.items || []).some((i: any) => i.name.toLowerCase().includes(search.toLowerCase()))
     const matchFilter = filter === 'all' || o.status === filter
     return matchSearch && matchFilter
   })
@@ -151,7 +151,7 @@ function OrderHistory({ orders }: { orders: Order[] }) {
                 </span>
                 <div className="flex-1 min-w-0">
                   <p className="font-body text-sm text-text-primary dark:text-white truncate">
-                    {order.items.map((i) => `${i.quantity}x ${i.name}`).join(', ')}
+                    {(order.items || []).map((i: any) => `${i.quantity}x ${i.name}`).join(', ')}
                   </p>
                   <p className="font-accent text-xs text-text-secondary dark:text-white/50 mt-0.5">
                     {new Date(order.createdAt).toLocaleString()}
@@ -174,7 +174,7 @@ function OrderHistory({ orders }: { orders: Order[] }) {
                     className="overflow-hidden border-t border-white/10"
                   >
                     <div className="p-4 space-y-3">
-                      {order.items.map((item, i) => (
+                      {(order.items || []).map((item: any, i: any) => (
                         <div key={i} className="flex items-center justify-between text-sm">
                           <span className="font-body text-text-primary dark:text-white/80">{item.name}</span>
                           <span className="font-accent text-text-secondary dark:text-white/50">
@@ -279,7 +279,7 @@ function KitchenDisplay({ orders, updateOrderStatus }: { orders: Order[]; update
                 </div>
 
                 <div className="space-y-2 mb-4">
-                  {order.items.map((item, i) => (
+                  {(order.items || []).map((item: any, i: any) => (
                     <div key={i} className="flex items-center justify-between">
                       <span className="font-body text-lg text-text-primary dark:text-white">
                         {item.quantity}x {item.name}
