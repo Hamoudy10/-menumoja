@@ -261,17 +261,41 @@ export const recordCashSchema = z
 export const createStaffSchema = z
   .object({
     name: z.string().min(1, 'Staff name is required').max(100),
-    email: z.string().email('Invalid email').max(255),
+    email: z.string().email('Invalid email').max(255).optional().or(z.literal('')),
     phone: z
       .string()
-      .regex(phoneRegex, 'Phone must be in +254XXXXXXXXX format'),
+      .regex(phoneRegex, 'Phone must be in +254XXXXXXXXX format')
+      .or(z.literal('')),
     role: z.enum(['manager', 'cashier', 'waiter', 'kitchen']),
     pin: z
       .string()
       .regex(/^\d{4,6}$/, 'PIN must be 4-6 digits')
       .optional(),
+    employeeNumber: z.string().optional(),
+    nationalId: z.string().optional(),
+    kraPin: z.string().optional(),
+    nhifNumber: z.string().optional(),
+    nssfNumber: z.string().optional(),
+    dateOfBirth: z.string().optional(),
+    address: z.string().optional(),
+    emergencyName: z.string().optional(),
+    emergencyPhone: z.string().optional(),
+    emergencyRelation: z.string().optional(),
+    nextOfKin: z.string().optional(),
+    nextOfKinPhone: z.string().optional(),
+    nextOfKinRelation: z.string().optional(),
+    bankName: z.string().optional(),
+    bankBranch: z.string().optional(),
+    bankAccount: z.string().optional(),
+    monthlySalary: z.number().optional(),
+    hourlyRate: z.number().optional(),
+    leaveDays: z.number().int().optional(),
+    startDate: z.string().optional(),
+    notes: z.string().optional(),
   })
   .strict();
+
+export const updateStaffSchema = createStaffSchema.partial().strict();
 
 export const staffLoginSchema = z
   .object({
@@ -381,16 +405,15 @@ export const createTableSchema = z.object({
   tableNumber: z.number().int().min(1),
   label: z.string().min(1).max(50),
   capacity: z.number().int().min(1).optional(),
+  area: z.string().optional(),
+  shape: z.enum(['ROUND', 'SQUARE', 'RECTANGLE']).optional(),
+  positionX: z.number().int().optional(),
+  positionY: z.number().int().optional(),
+  width: z.number().int().optional(),
+  height: z.number().int().optional(),
 }).strict();
 
 export const updateTableSchema = createTableSchema.partial().strict();
-
-export const updateStaffSchema = z.object({
-  fullName: z.string().min(1).max(100).optional(),
-  phone: z.string().regex(/^(\+254|0)[17]\d{8}$/).optional(),
-  role: z.enum(['WAITER', 'CASHIER', 'KITCHEN', 'MANAGER']).optional(),
-  isActive: z.boolean().optional(),
-}).strict();
 
 export const openShiftSchema = z.object({
   cashierId: z.string().uuid(),

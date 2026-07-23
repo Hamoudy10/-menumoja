@@ -515,22 +515,44 @@ model QrScan {
 }
 
 model Staff {
-  id           String    @id @default(uuid()) @db.Uuid
-  restaurantId String    @map("restaurant_id") @db.Uuid
-  fullName     String    @map("full_name")
-  phone        String
-  pinHash      String    @map("pin_hash")
-  role         StaffRole
-  isActive     Boolean   @default(true) @map("is_active")
-  lastLogin    DateTime? @map("last_login")
-  createdAt    DateTime  @default(now()) @map("created_at")
-  updatedAt    DateTime  @updatedAt @map("updated_at")
+  id                  String          @id @default(uuid()) @db.Uuid
+  restaurantId        String          @map("restaurant_id") @db.Uuid
+  employeeNumber      String?         @map("employee_number")
+  fullName            String          @map("full_name")
+  phone               String
+  email               String?
+  nationalId          String?         @map("national_id")
+  kraPin              String?         @map("kra_pin")
+  nhifNumber          String?         @map("nhif_number")
+  nssfNumber          String?         @map("nssf_number")
+  dateOfBirth         DateTime?       @map("date_of_birth")
+  address             String?
+  emergencyName       String?         @map("emergency_name")
+  emergencyPhone      String?         @map("emergency_phone")
+  emergencyRelation   String?         @map("emergency_relation")
+  nextOfKin           String?         @map("next_of_kin")
+  nextOfKinPhone      String?         @map("next_of_kin_phone")
+  nextOfKinRelation   String?         @map("next_of_kin_relation")
+  bankName            String?         @map("bank_name")
+  bankBranch          String?         @map("bank_branch")
+  bankAccount         String?         @map("bank_account")
+  monthlySalary       Decimal?        @map("monthly_salary") @db.Decimal(10, 2)
+  hourlyRate          Decimal?        @map("hourly_rate") @db.Decimal(10, 2)
+  leaveDays           Int?            @default(21) @map("leave_days")
+  startDate           DateTime?       @map("start_date")
+  notes               String?         @db.Text
+  pinHash             String          @map("pin_hash")
+  role                StaffRole
+  isActive            Boolean         @default(true) @map("is_active")
+  lastLogin           DateTime?       @map("last_login")
+  createdAt           DateTime        @default(now()) @map("created_at")
+  updatedAt           DateTime        @updatedAt @map("updated_at")
 
-  restaurant     Restaurant      @relation(fields: [restaurantId], references: [id], onDelete: Cascade)
-  shifts         StaffShift[]
-  assignedOrders Order[]         @relation("WaiterOrders")
-  cashierPayments Payment[]      @relation("CashierPayments")
-  reconciliations CashReconciliation[]
+  restaurant          Restaurant      @relation(fields: [restaurantId], references: [id], onDelete: Cascade)
+  shifts              StaffShift[]
+  assignedOrders      Order[]         @relation("WaiterOrders")
+  cashierPayments     Payment[]       @relation("CashierPayments")
+  reconciliations     CashReconciliation[]
 
   @@index([restaurantId])
   @@map("staff")
@@ -554,6 +576,12 @@ model StaffShift {
   @@map("staff_shifts")
 }
 
+enum TableShape {
+  ROUND
+  SQUARE
+  RECTANGLE
+}
+
 model RestaurantTable {
   id               String       @id @default(uuid()) @db.Uuid
   restaurantId     String       @map("restaurant_id") @db.Uuid
@@ -561,6 +589,12 @@ model RestaurantTable {
   label            String
   capacity         Int?
   status           TableStatus  @default(FREE)
+  area             String?      @map("area")
+  shape            TableShape   @default(ROUND) @map("shape")
+  positionX        Int          @default(0) @map("position_x")
+  positionY        Int          @default(0) @map("position_y")
+  width            Int          @default(2) @map("width")
+  height           Int          @default(2) @map("height")
   currentSessionId String?      @map("current_session_id")
   qrCodeId         String?      @map("qr_code_id") @db.Uuid
   createdAt        DateTime     @default(now()) @map("created_at")
