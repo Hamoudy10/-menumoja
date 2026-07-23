@@ -576,12 +576,6 @@ model StaffShift {
   @@map("staff_shifts")
 }
 
-enum TableShape {
-  ROUND
-  SQUARE
-  RECTANGLE
-}
-
 model RestaurantTable {
   id               String       @id @default(uuid()) @db.Uuid
   restaurantId     String       @map("restaurant_id") @db.Uuid
@@ -590,7 +584,7 @@ model RestaurantTable {
   capacity         Int?
   status           TableStatus  @default(FREE)
   area             String?      @map("area")
-  shape            TableShape   @default(ROUND) @map("shape")
+  shape            String?      @default("ROUND") @map("shape")
   positionX        Int          @default(0) @map("position_x")
   positionY        Int          @default(0) @map("position_y")
   width            Int          @default(2) @map("width")
