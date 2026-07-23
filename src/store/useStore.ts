@@ -479,7 +479,19 @@ export const useStore = create<AppState>((set) => ({
     set({ loadingOrders: true })
     try {
       const data = await ordersApi.fetchOrders(params)
-      set({ orders: data.orders || data })
+      const rawOrders = data.orders || data
+      const normalized = Array.isArray(rawOrders) ? rawOrders.map((o: any) => ({
+        id: o.id,
+        orderNumber: o.orderNumber,
+        tableNumber: o.tableNumber ?? o.table_number,
+        status: o.status || 'new',
+        paymentStatus: o.paymentStatus,
+        paymentMethod: o.paymentMethod,
+        total: o.total ?? o.totalAmount ?? 0,
+        items: o.items || [],
+        createdAt: o.createdAt,
+      })) : []
+      set({ orders: normalized })
     } catch (err: any) {
       toast.error(err?.response?.data?.message || 'Failed to load orders')
     } finally {
@@ -489,7 +501,16 @@ export const useStore = create<AppState>((set) => ({
   fetchLiveOrders: async () => {
     try {
       const data = await ordersApi.fetchLiveOrders()
-      set({ liveOrders: data.orders || data })
+      const rawOrders = data.orders || data
+      const normalized = Array.isArray(rawOrders) ? rawOrders.map((o: any) => ({
+        id: o.id,
+        tableNumber: o.tableNumber ?? o.table_number,
+        status: o.status || 'new',
+        total: o.total ?? o.totalAmount ?? 0,
+        items: o.items || [],
+        createdAt: o.createdAt,
+      })) : []
+      set({ liveOrders: normalized })
     } catch (err: any) {
       toast.error(err?.response?.data?.message || 'Failed to load live orders')
     }
