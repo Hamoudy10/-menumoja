@@ -391,18 +391,6 @@ router.get(
     const staff = await prisma.staff.findMany({
       where: { restaurantId },
       orderBy: { createdAt: 'desc' },
-      include: {
-        shifts: {
-          where: { isActive: true },
-          take: 1,
-          select: { id: true },
-        },
-        _count: {
-          select: {
-            assignedOrders: true,
-          },
-        },
-      },
     });
 
     const mapped = staff.map((s) => ({
@@ -413,8 +401,6 @@ router.get(
       isActive: s.isActive,
       lastLogin: s.lastLogin,
       createdAt: s.createdAt,
-      activeShift: s.shifts.length > 0,
-      activeOrders: s._count.assignedOrders,
     }));
 
     res.json({
