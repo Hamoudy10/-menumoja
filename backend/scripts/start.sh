@@ -1,8 +1,8 @@
 #!/bin/sh
-set -e
+set -eo pipefail
 
 echo "=== Syncing database schema ==="
-npx prisma db push --accept-data-loss 2>&1 | tail -5
+npx prisma db push --accept-data-loss 2>&1
 
 echo "=== Checking if seed needed ==="
 node -e "
