@@ -116,7 +116,7 @@ export default function SettingsPage() {
         location: restaurant.location || '',
         description: restaurant.description || '',
       })
-      setBrandColor(restaurant.brandColor || '#FF6B35')
+      setBrandColor(restaurant.brandColor || restaurant.settings?.primaryColor || '#FF6B35')
       setFontStyle(restaurant.fontStyle || 'modern')
     }
   }, [restaurant])

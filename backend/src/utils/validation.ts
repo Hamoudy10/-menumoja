@@ -75,8 +75,9 @@ export const createRestaurantSchema = z
       .optional(),
     phone: z
       .string()
-      .regex(phoneRegex, 'Phone must be in +254XXXXXXXXX format'),
-    email: z.string().email('Invalid email').max(255).optional(),
+      .regex(phoneRegex, 'Phone must be in +254XXXXXXXXX format')
+      .or(z.literal('')),
+    email: z.string().email('Invalid email').max(255).optional().or(z.literal('')),
     address: z.string().max(500).optional(),
     city: z.string().max(100).optional(),
     county: z

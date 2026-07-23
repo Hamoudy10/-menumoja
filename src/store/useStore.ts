@@ -768,7 +768,11 @@ export const useStore = create<AppState>((set) => ({
   updateRestaurant: async (data) => {
     try {
       const res = await restaurantApi.updateRestaurant(data)
-      set({ restaurant: { ...useStore.getState().restaurant!, ...(res.restaurant || res), ...data } })
+      const merged = { ...useStore.getState().restaurant!, ...(res.restaurant || res), ...data }
+      if (merged.settings) {
+        merged.brandColor = merged.brandColor || merged.settings.primaryColor || '#FF6B35'
+      }
+      set({ restaurant: merged })
       toast.success('Settings saved')
     } catch (err: any) {
       toast.error(err?.response?.data?.message || 'Failed to save settings')
