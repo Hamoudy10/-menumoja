@@ -162,7 +162,7 @@ function OrderHistory({ orders }: { orders: Order[] }) {
                 } size="sm">
                   {order.status}
                 </Badge>
-                <span className="font-accent text-sm font-bold text-secondary">KES {((order.total || order.totalAmount || 0) as number).toLocaleString()}</span>
+                <span className="font-accent text-sm font-bold text-secondary">KES {(order.total || 0).toLocaleString()}</span>
                 {expanded === order.id ? <ChevronUp className="h-4 w-4 text-text-secondary" /> : <ChevronDown className="h-4 w-4 text-text-secondary" />}
               </button>
               <AnimatePresence>

@@ -482,14 +482,15 @@ export const useStore = create<AppState>((set) => ({
       const rawOrders = data.orders || data
       const normalized = Array.isArray(rawOrders) ? rawOrders.map((o: any) => ({
         id: o.id,
-        orderNumber: o.orderNumber,
-        tableNumber: o.tableNumber ?? o.table_number,
-        status: o.status || 'new',
-        paymentStatus: o.paymentStatus,
-        paymentMethod: o.paymentMethod,
-        total: o.total ?? o.totalAmount ?? 0,
+        tableNumber: o.tableNumber ?? o.table_number ?? 0,
         items: o.items || [],
-        createdAt: o.createdAt,
+        total: (o.total ?? o.totalAmount ?? 0) as number,
+        status: (o.status || 'new') as 'new' | 'preparing' | 'ready' | 'served',
+        paymentMethod: (o.paymentMethod || 'cash') as 'mpesa' | 'cash' | 'card',
+        paymentStatus: (o.paymentStatus || 'pending') as 'pending' | 'confirmed' | 'failed',
+        specialInstructions: o.specialInstructions || o.specialNotes || '',
+        createdAt: o.createdAt || new Date().toISOString(),
+        orderNumber: o.orderNumber,
       })) : []
       set({ orders: normalized })
     } catch (err: any) {
@@ -504,11 +505,14 @@ export const useStore = create<AppState>((set) => ({
       const rawOrders = data.orders || data
       const normalized = Array.isArray(rawOrders) ? rawOrders.map((o: any) => ({
         id: o.id,
-        tableNumber: o.tableNumber ?? o.table_number,
-        status: o.status || 'new',
-        total: o.total ?? o.totalAmount ?? 0,
+        tableNumber: o.tableNumber ?? o.table_number ?? 0,
         items: o.items || [],
-        createdAt: o.createdAt,
+        total: (o.total ?? o.totalAmount ?? 0) as number,
+        status: (o.status || 'new') as 'new' | 'preparing' | 'ready' | 'served',
+        paymentMethod: (o.paymentMethod || 'cash') as 'mpesa' | 'cash' | 'card',
+        paymentStatus: (o.paymentStatus || 'pending') as 'pending' | 'confirmed' | 'failed',
+        specialInstructions: o.specialInstructions || o.specialNotes || '',
+        createdAt: o.createdAt || new Date().toISOString(),
       })) : []
       set({ liveOrders: normalized })
     } catch (err: any) {
