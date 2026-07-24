@@ -4,7 +4,7 @@ import { useForm } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { z } from 'zod'
 import { GoogleLogin } from '@react-oauth/google'
-import { ChefHat, Mail, Lock, Eye, EyeOff, ArrowRight } from 'lucide-react'
+import { ChefHat, Mail, Lock, Eye, EyeOff, ArrowRight, ArrowLeft } from 'lucide-react'
 import { Button } from '@/components/ui/Button'
 import { useStore } from '@/store/useStore'
 import { useNavigate } from 'react-router-dom'
@@ -104,6 +104,9 @@ export default function LoginPage() {
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
           >
+            <a href="/" className="inline-flex items-center gap-1 text-xs text-text-secondary hover:text-secondary transition-colors mb-6">
+              <ArrowLeft className="w-3 h-3" /> Back to Home
+            </a>
             <div className="text-center mb-8">
               <motion.div
                 initial={{ scale: 0 }}
