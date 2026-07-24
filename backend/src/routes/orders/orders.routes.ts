@@ -408,14 +408,6 @@ router.get('/live',
         items: {
           select: { id: true, itemName: true, quantity: true, itemPrice: true, subtotal: true, specialInstructions: true },
         },
-      },
-        items: {
-          select: {
-            id: true,
-            itemName: true,
-            quantity: true,
-          },
-        },
         waiter: { select: { id: true, fullName: true } },
       },
     });
