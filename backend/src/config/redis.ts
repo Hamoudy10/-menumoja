@@ -32,7 +32,7 @@ const nullRedis: RedisLike = {
 
 let redis: RedisLike = nullRedis;
 
-if (config.redisUrl) {
+if (config.redisUrl && !config.redisUrl.includes('localhost')) {
   try {
     const IORedis = require('ioredis');
     const client = new IORedis(config.redisUrl, {
@@ -57,6 +57,7 @@ if (config.redisUrl) {
     const origIncr = client.incr.bind(client);
     const origExpire = client.expire.bind(client);
     const origExists = client.exists.bind(client);
+    const origKeys = client.keys.bind(client);
 
     client.get = async (key: string) => { try { return await origGet(key); } catch { return null; } };
     client.set = async (key: string, value: any, ...args: any[]) => { try { return await origSet(key, value, ...args); } catch { return; } };
@@ -66,6 +67,7 @@ if (config.redisUrl) {
     client.incr = async (key: string) => { try { return await origIncr(key); } catch { return 1; } };
     client.expire = async (key: string, seconds: number) => { try { return await origExpire(key, seconds); } catch { return 0; } };
     client.exists = async (...keys: string[]) => { try { return await origExists(...keys); } catch { return 0; } };
+    client.keys = async (pattern: string) => { try { return await origKeys(pattern); } catch { return []; } };
 
     redis = client;
   } catch {
