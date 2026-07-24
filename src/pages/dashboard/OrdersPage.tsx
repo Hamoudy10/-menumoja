@@ -64,7 +64,7 @@ export default function OrdersPage() {
 function LiveOrdersView({ orders, updateOrderStatus }: { orders: Order[]; updateOrderStatus: (id: string, status: Order['status']) => void }) {
   const columns: Order['status'][] = ['new', 'preparing', 'ready', 'served']
   const columnLabels = {
-    new: { label: 'New', icon: Clock, color: 'border-t-blue-500 text-blue-500' },
+    new: { label: 'New / Pending', icon: Clock, color: 'border-t-blue-500 text-blue-500' },
     preparing: { label: 'Preparing', icon: CookingPot, color: 'border-t-amber-500 text-amber-500' },
     ready: { label: 'Ready', icon: CheckCircle2, color: 'border-t-green-500 text-green-500' },
     served: { label: 'Served', icon: UtensilsCrossed, color: 'border-t-gray-500 text-gray-500' },
@@ -74,7 +74,10 @@ function LiveOrdersView({ orders, updateOrderStatus }: { orders: Order[]; update
     <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
       {columns.map((status) => {
         const cfg = columnLabels[status]
-        const colOrders = orders.filter((o) => o.status === status)
+        const colOrders = orders.filter((o) => {
+          const s = o.status?.toLowerCase?.() || o.status
+          return s === status || (status === 'new' && (s === 'pending' || s === 'confirmed'))
+        })
         return (
           <div key={status} className={`rounded-2xl bg-white dark:bg-primary-light border border-white/10 ${cfg.color.split(' ')[0]}`}>
             <div className="flex items-center gap-2 p-4 border-b border-white/10">

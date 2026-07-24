@@ -485,7 +485,7 @@ export const useStore = create<AppState>((set) => ({
         tableNumber: o.tableNumber ?? o.table_number ?? 0,
         items: o.items || [],
         total: (o.total ?? o.totalAmount ?? 0) as number,
-        status: (o.status || 'new') as 'new' | 'preparing' | 'ready' | 'served',
+        status: o.status === 'PENDING' ? 'new' : o.status === 'CONFIRMED' ? 'preparing' : (o.status || 'new') as 'new' | 'preparing' | 'ready' | 'served',
         paymentMethod: (o.paymentMethod || 'cash') as 'mpesa' | 'cash' | 'card',
         paymentStatus: (o.paymentStatus || 'pending') as 'pending' | 'confirmed' | 'failed',
         specialInstructions: o.specialInstructions || o.specialNotes || '',
