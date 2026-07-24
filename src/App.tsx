@@ -38,6 +38,8 @@ const SurveillancePage = lazy(() => import('@/pages/dashboard/SurveillancePage')
 const MarketingPage = lazy(() => import('@/pages/dashboard/MarketingPage'))
 const SettingsPage = lazy(() => import('@/pages/dashboard/SettingsPage'))
 const HelpPage = lazy(() => import('@/pages/dashboard/HelpPage'))
+const StaffLoginPage = lazy(() => import('@/pages/StaffLoginPage'))
+const KitchenDisplay = lazy(() => import('@/pages/dashboard/KitchenDisplay'))
 
 const AdminOverview = lazy(() => import('@/pages/admin/AdminOverview'))
 const AdminRestaurants = lazy(() => import('@/pages/admin/AdminRestaurants'))
@@ -89,6 +91,8 @@ function AppRoutes() {
           <Route path="/onboarding/ai-setup" element={<PageTransition><OnboardingAiSetup /></PageTransition>} />
           <Route path="/onboarding/qr" element={<PageTransition><OnboardingQR /></PageTransition>} />
           <Route path="/onboarding/marketing" element={<PageTransition><OnboardingMarketing /></PageTransition>} />
+
+          <Route path="/staff/login" element={<PageTransition><StaffLoginPage /></PageTransition>} />
 
           <Route path="/dashboard" element={
             <ProtectedRoute requiredRole="owner">
