@@ -30,7 +30,7 @@ export function OrderCard({ order, onStatusChange }: OrderCardProps) {
     >
       <div className="flex items-center justify-between">
         <span className="font-accent text-xs font-bold text-text-primary dark:text-white">
-          Table {order.tableNumber}
+          {order.tableNumber > 0 ? `Table ${order.tableNumber}` : 'Takeaway'}
         </span>
         <span className={`flex items-center gap-1 rounded-full px-2 py-0.5 text-[10px] font-medium ${config.color}`}>
           <StatusIcon className="h-3 w-3" />

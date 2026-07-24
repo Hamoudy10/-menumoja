@@ -483,7 +483,7 @@ export const useStore = create<AppState>((set) => ({
       const normalized = Array.isArray(rawOrders) ? rawOrders.map((o: any) => ({
         id: o.id,
         tableNumber: o.tableNumber ?? o.table_number ?? 0,
-        items: o.items || [],
+        items: (o.items || []).map((i: any) => ({ name: i.name || i.itemName || '', price: i.price || i.itemPrice || 0, quantity: i.quantity || 1 })),
         total: (o.total ?? o.totalAmount ?? 0) as number,
         status: o.status === 'PENDING' ? 'new' : o.status === 'CONFIRMED' ? 'preparing' : (o.status || 'new') as 'new' | 'preparing' | 'ready' | 'served',
         paymentMethod: (o.paymentMethod || 'cash') as 'mpesa' | 'cash' | 'card',
@@ -506,7 +506,7 @@ export const useStore = create<AppState>((set) => ({
       const normalized = Array.isArray(rawOrders) ? rawOrders.map((o: any) => ({
         id: o.id,
         tableNumber: o.tableNumber ?? o.table_number ?? 0,
-        items: o.items || [],
+        items: (o.items || []).map((i: any) => ({ name: i.name || i.itemName || '', price: i.price || i.itemPrice || 0, quantity: i.quantity || 1 })),
         total: (o.total ?? o.totalAmount ?? 0) as number,
         status: (o.status || 'new') as 'new' | 'preparing' | 'ready' | 'served',
         paymentMethod: (o.paymentMethod || 'cash') as 'mpesa' | 'cash' | 'card',
