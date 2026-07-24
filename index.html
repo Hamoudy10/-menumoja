@@ -25,11 +25,11 @@
     <div id="root"></div>
     <noscript>MenuMoja requires JavaScript to run. Please enable JavaScript in your browser.</noscript>
     <script>
-      if ('serviceWorker' in navigator) {
-        navigator.serviceWorker.getRegistrations().then(function(registrations) {
-          for (var i = 0; i < registrations.length; i++) {
-            registrations[i].unregister();
-          }
+      if ('serviceWorker' in navigator && !localStorage.getItem('sw_cleaned_v2')) {
+        navigator.serviceWorker.getRegistrations().then(function(r) {
+          r.forEach(function(s) { s.unregister(); });
+          localStorage.setItem('sw_cleaned_v2', '1');
+          window.location.reload();
         });
       }
     </script>
