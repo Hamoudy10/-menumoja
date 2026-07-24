@@ -26,7 +26,7 @@ export default function StaffLoginPage() {
       localStorage.setItem('staffName', data.staff?.fullName || 'Staff')
       localStorage.setItem('staffRestaurantSlug', slug)
       toast.success(`Welcome, ${data.staff?.fullName || 'Staff'}!`)
-      navigate('/staff/dashboard')
+      navigate('/staff/kitchen')
     } catch (err: any) {
       toast.error(err?.response?.data?.error?.message || 'Invalid PIN or slug')
     } finally {
