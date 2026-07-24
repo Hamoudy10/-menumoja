@@ -397,10 +397,12 @@ router.get(
       id: s.id,
       fullName: s.fullName,
       phone: s.phone,
+      email: s.email,
       role: typeof s.role === 'string' ? s.role.toLowerCase() : 'waiter',
       isActive: s.isActive,
       lastLogin: s.lastLogin,
       createdAt: s.createdAt,
+      employeeNumber: s.employeeNumber,
     }));
 
     res.json({

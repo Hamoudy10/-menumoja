@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import {
-  User, Palette, QrCode, Users, Bell, CreditCard, Globe, Crown, Trash2,
+  User, Palette, QrCode, Users, Bell, CreditCard, Globe, Crown, Trash2, Edit3,
   Plus, X, Shield, Moon, Sun, Save, Loader2, CheckCircle2, Download,
   Image, Palette as PaletteIcon, Type, Smartphone, Banknote,
   Phone, ArrowLeftRight, Dices,
@@ -48,7 +48,7 @@ export default function SettingsPage() {
   const { t, i18n } = useTranslation()
   const {
     darkMode, toggleDarkMode, restaurant, updateRestaurant,
-    staff, addStaff, removeStaff, fetchStaff,
+    staff, addStaff, removeStaff, updateStaff, fetchStaff,
     language, setLanguage,
     qrCodes, fetchQrCodes, generateQrCode, generateBatchQrCodes, deleteQrCode,
     fetchNotifications,
@@ -58,6 +58,7 @@ export default function SettingsPage() {
 
   const [section, setSection] = useState('profile')
   const [showAddStaff, setShowAddStaff] = useState(false)
+  const [editingStaffId, setEditingStaffId] = useState<string | null>(null)
   const [newStaff, setNewStaff] = useState({
     name: '', phone: '', role: 'waiter' as 'waiter' | 'cashier' | 'kitchen' | 'manager', pin: '', email: '',
     employeeNumber: '', nationalId: '', kraPin: '', nhifNumber: '', nssfNumber: '',
@@ -183,18 +184,29 @@ export default function SettingsPage() {
     } catch { showErrorToast('Failed to save payment settings') } finally { setSaving(false) }
   }
 
-  const handleAddStaff = async () => {
+  const handleSaveStaff = async () => {
     if (!newStaff.name || !newStaff.phone || !newStaff.pin) return
     try {
       const payload: any = { ...newStaff, active: true }
       if (payload.monthlySalary) payload.monthlySalary = parseFloat(payload.monthlySalary)
       if (payload.hourlyRate) payload.hourlyRate = parseFloat(payload.hourlyRate)
       if (payload.leaveDays) payload.leaveDays = parseInt(payload.leaveDays)
-      await addStaff(payload)
-      setNewStaff({ name: '', phone: '', role: 'waiter', pin: '', email: '', employeeNumber: '', nationalId: '', kraPin: '', nhifNumber: '', nssfNumber: '', dateOfBirth: '', address: '', emergencyName: '', emergencyPhone: '', emergencyRelation: '', nextOfKin: '', nextOfKinPhone: '', nextOfKinRelation: '', bankName: '', bankBranch: '', bankAccount: '', monthlySalary: '', hourlyRate: '', leaveDays: '', startDate: '', notes: '' })
+      if (editingStaffId) {
+        await updateStaff(editingStaffId, payload)
+        showSuccessToast('Staff updated')
+      } else {
+        await addStaff(payload)
+        showSuccessToast('Staff added')
+      }
+      resetStaffForm()
       setShowAddStaff(false)
-      showSuccessToast('Staff added')
+      setEditingStaffId(null)
     } catch {}
+  }
+
+  const resetStaffForm = () => {
+    setNewStaff({ name: '', phone: '', role: 'waiter', pin: '', email: '', employeeNumber: '', nationalId: '', kraPin: '', nhifNumber: '', nssfNumber: '', dateOfBirth: '', address: '', emergencyName: '', emergencyPhone: '', emergencyRelation: '', nextOfKin: '', nextOfKinPhone: '', nextOfKinRelation: '', bankName: '', bankBranch: '', bankAccount: '', monthlySalary: '', hourlyRate: '', leaveDays: '', startDate: '', notes: '' })
+  }
   }
 
   const handleSaveNotifications = async () => {
@@ -605,10 +617,31 @@ export default function SettingsPage() {
                         </Badge>
                       </td>
                       <td className="px-2 py-3 text-right">
-                        <button onClick={async () => { try { await removeStaff(member.id); showSuccessToast('Staff removed') } catch {} }}
-                          className="p-1.5 rounded-lg hover:bg-red-100 dark:hover:bg-red-900/30 text-text-secondary hover:text-red-500 transition-colors">
-                          <Trash2 className="h-3.5 w-3.5" />
-                        </button>
+                        <div className="flex items-center gap-1 justify-end">
+                          <button onClick={() => {
+                            setEditingStaffId(member.id)
+                            setNewStaff({
+                              name: member.fullName || member.name || '',
+                              phone: member.phone || '',
+                              role: member.role || 'waiter',
+                              pin: '', email: member.email || '',
+                              employeeNumber: member.employeeNumber || '',
+                              nationalId: '', kraPin: '', nhifNumber: '', nssfNumber: '',
+                              dateOfBirth: '', address: '', emergencyName: '', emergencyPhone: '', emergencyRelation: '',
+                              nextOfKin: '', nextOfKinPhone: '', nextOfKinRelation: '',
+                              bankName: '', bankBranch: '', bankAccount: '',
+                              monthlySalary: '', hourlyRate: '', leaveDays: '', startDate: '', notes: '',
+                            })
+                            setShowAddStaff(true)
+                          }}
+                            className="p-1.5 rounded-lg hover:bg-blue-100 dark:hover:bg-blue-900/30 text-text-secondary hover:text-blue-500 transition-colors">
+                            <Edit3 className="h-3.5 w-3.5" />
+                          </button>
+                          <button onClick={async () => { if (!confirm('Remove this staff member?')) return; try { await removeStaff(member.id); showSuccessToast('Staff removed') } catch {} }}
+                            className="p-1.5 rounded-lg hover:bg-red-100 dark:hover:bg-red-900/30 text-text-secondary hover:text-red-500 transition-colors">
+                            <Trash2 className="h-3.5 w-3.5" />
+                          </button>
+                        </div>
                       </td>
                     </tr>
                   ))}
@@ -693,13 +726,13 @@ export default function SettingsPage() {
                     </div>
 
                     <div className="flex gap-2 pt-2 border-t border-white/10">
-                      <Button size="sm" onClick={handleAddStaff}><Plus className="h-3.5 w-3.5" /> {t('staff.addStaff')}</Button>
+                      <Button size="sm" onClick={handleSaveStaff}><Save className="h-3.5 w-3.5" /> {editingStaffId ? 'Update Staff' : t('staff.addStaff')}</Button>
                       <Button variant="ghost" size="sm" onClick={() => setShowAddStaff(false)}>{t('app.cancel')}</Button>
                     </div>
                   </div>
                 </motion.div>
               ) : (
-                <Button onClick={() => setShowAddStaff(true)}><Plus className="h-4 w-4" /> {t('staff.addStaff')}</Button>
+                <Button onClick={() => { setEditingStaffId(null); resetStaffForm(); setShowAddStaff(true) }}><Plus className="h-4 w-4" /> {t('staff.addStaff')}</Button>
               )}
             </AnimatePresence>
           </div>

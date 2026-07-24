@@ -660,6 +660,16 @@ export const useStore = create<AppState>((set) => ({
       throw err
     }
   },
+  updateStaff: async (id, data) => {
+    try {
+      const res = await staffApi.updateStaff(id, data)
+      set((s) => ({ staff: s.staff.map((m) => m.id === id ? { ...m, ...(res.staff || res), ...data } : m) }))
+      toast.success('Staff updated')
+    } catch (err: any) {
+      toast.error(err?.response?.data?.message || 'Failed to update staff')
+      throw err
+    }
+  },
 
   posts: [],
   fetchPosts: async () => {
