@@ -93,6 +93,11 @@ function AppRoutes() {
           <Route path="/onboarding/marketing" element={<PageTransition><OnboardingMarketing /></PageTransition>} />
 
           <Route path="/staff/login" element={<PageTransition><StaffLoginPage /></PageTransition>} />
+          <Route path="/staff/kitchen" element={
+            <ProtectedRoute requiredRole="staff">
+              <KitchenDisplay />
+            </ProtectedRoute>
+          } />
 
           <Route path="/dashboard" element={
             <ProtectedRoute requiredRole="owner">
