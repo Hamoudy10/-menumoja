@@ -256,7 +256,8 @@ export const recordCashSchema = z
   .object({
     orderId: z.string().uuid('Invalid order ID'),
     amount: z.number().min(1, 'Amount must be at least 1'),
-    amountTendered: z.number().min(1, 'Amount tendered must be at least 1'),
+    amountTendered: z.number().min(0, 'Amount tendered must be at least 0'),
+    discount: z.number().min(0).optional(),
     notes: z.string().max(500).optional(),
   })
   .strict()

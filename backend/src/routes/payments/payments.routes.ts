@@ -272,7 +272,7 @@ router.post('/cash/record',
   validate(recordCashSchema),
   asyncHandler(async (req, res) => {
     const restaurantId = (req as any).restaurantId;
-    const { orderId, amount, amountTendered, notes } = req.body;
+    const { orderId, amount, amountTendered, discount, notes } = req.body;
 
     const order = await prisma.order.findFirst({
       where: { id: orderId, restaurantId },
@@ -293,10 +293,11 @@ router.post('/cash/record',
       throw new ValidationError('Order is already paid', 'Agizo tayari limelipwa');
     }
 
-    if (Number(order.totalAmount) !== amount) {
+    const effectiveTotal = Number(order.totalAmount) - (discount || 0);
+    if (amount > effectiveTotal) {
       throw new ValidationError(
-        `Payment amount ${formatKES(amount)} does not match order total ${formatKES(Number(order.totalAmount))}`,
-        `Kiasi cha malipo ${formatKES(amount)} hakilingani na jumla ya agizo ${formatKES(Number(order.totalAmount))}`
+        `Payment amount ${formatKES(amount)} exceeds order total ${formatKES(effectiveTotal)}`,
+        `Kiasi cha malipo ${formatKES(amount)} kinazidi jumla ya agizo ${formatKES(effectiveTotal)}`
       );
     }
 

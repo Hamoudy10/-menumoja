@@ -107,6 +107,7 @@ export default function CashierDashboard() {
           orderId: selectedOrder.id,
           amount: orderTotal,
           amountTendered: parseFloat(cashReceived),
+          discount: parseFloat(discount) || 0,
         })
       } else if (paymentMethod === 'card') {
         await paymentsApi.recordCardPayment(selectedOrder.id, orderTotal)
