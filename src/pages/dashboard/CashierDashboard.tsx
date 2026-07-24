@@ -126,9 +126,9 @@ export default function CashierDashboard() {
 
   const orderTotal = useMemo(() => {
     if (!selectedOrder) return 0
-    const subtotal = selectedOrder.items.reduce((s: number, i: any) => s + i.price * i.quantity, 0)
+    const baseTotal = selectedOrder.total || selectedOrder.totalAmount || 0
     const disc = parseFloat(discount) || 0
-    return Math.max(0, subtotal - disc)
+    return Math.max(0, baseTotal - disc)
   }, [selectedOrder, discount])
 
   const change = useMemo(() => {
@@ -162,7 +162,7 @@ export default function CashierDashboard() {
         items: selectedOrder.items,
         subtotal: selectedOrder.items.reduce((s: number, i: any) => s + i.price * i.quantity, 0),
         discount: parseFloat(discount) || 0,
-        total: orderTotal,
+        total: selectedOrder.total || orderTotal,
         method: paymentMethod,
         cashReceived: parseFloat(cashReceived) || 0,
         change,
