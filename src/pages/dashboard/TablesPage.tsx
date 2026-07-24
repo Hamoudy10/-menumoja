@@ -18,7 +18,7 @@ export default function TablesPage() {
   const [loading, setLoading] = useState(true)
   const [showForm, setShowForm] = useState(false)
   const [editTable, setEditTable] = useState<any>(null)
-  const [form, setForm] = useState({ tableNumber: '', label: '', capacity: '4', shape: 'ROUND' })
+  const [form, setForm] = useState({ tableNumber: '', label: '', capacity: '4', area: '', shape: 'ROUND' })
 
   useEffect(() => { fetchTables().finally(() => setLoading(false)) }, [])
 
@@ -30,18 +30,20 @@ export default function TablesPage() {
           tableNumber: parseInt(form.tableNumber),
           label: form.label,
           capacity: parseInt(form.capacity) || 4,
+          area: form.area || undefined,
         })
       } else {
         await tablesApi.createTable({
           tableNumber: parseInt(form.tableNumber),
           label: form.label,
           capacity: parseInt(form.capacity) || 4,
+          area: form.area || undefined,
         })
       }
       showSuccessToast(editTable ? 'Table updated' : 'Table created')
       setShowForm(false)
       setEditTable(null)
-      setForm({ tableNumber: '', label: '', capacity: '4', shape: 'ROUND' })
+      setForm({ tableNumber: '', label: '', capacity: '4', area: '', shape: 'ROUND' })
       fetchTables()
     } catch { showErrorToast('Failed to save table') }
   }
