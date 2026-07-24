@@ -403,6 +403,16 @@ router.get(
       lastLogin: s.lastLogin,
       createdAt: s.createdAt,
       employeeNumber: s.employeeNumber,
+      nationalId: s.nationalId,
+      kraPin: s.kraPin,
+      nhifNumber: s.nhifNumber,
+      nssfNumber: s.nssfNumber,
+      emergencyName: s.emergencyName,
+      emergencyPhone: s.emergencyPhone,
+      bankName: s.bankName,
+      bankAccount: s.bankAccount,
+      monthlySalary: s.monthlySalary ? Number(s.monthlySalary) : undefined,
+      leaveDays: s.leaveDays,
     }));
 
     res.json({

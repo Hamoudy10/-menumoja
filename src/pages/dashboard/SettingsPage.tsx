@@ -187,7 +187,11 @@ export default function SettingsPage() {
   const handleAddStaff = async () => {
     if (!newStaff.name || !newStaff.phone || !newStaff.pin) return
     try {
-      const payload: any = { ...newStaff, active: true }
+      const payload: any = {}
+      for (const [k, v] of Object.entries(newStaff)) {
+        if (v !== '' && v !== null && v !== undefined) payload[k] = v
+      }
+      payload.active = true
       if (payload.monthlySalary) payload.monthlySalary = parseFloat(payload.monthlySalary)
       if (payload.hourlyRate) payload.hourlyRate = parseFloat(payload.hourlyRate)
       if (payload.leaveDays) payload.leaveDays = parseInt(payload.leaveDays)
