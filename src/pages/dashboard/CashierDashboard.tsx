@@ -24,6 +24,7 @@ export default function CashierDashboard() {
   const [filterTable, setFilterTable] = useState('')
   const [selectedOrder, setSelectedOrder] = useState<any>(null)
   const [cashReceived, setCashReceived] = useState('')
+  const [mpesaPhone, setMpesaPhone] = useState('')
   const [processing, setProcessing] = useState(false)
   const [activeTab, setActiveTab] = useState<'pending' | 'paid'>('pending')
   const [paymentMethod, setPaymentMethod] = useState<'cash' | 'card' | 'mpesa'>('cash')
@@ -150,10 +151,13 @@ export default function CashierDashboard() {
         })
       } else if (paymentMethod === 'card') {
         await paymentsApi.recordCardPayment(selectedOrder.id, orderTotal)
-      } else {
-        showErrorToast('M-Pesa: use the customer phone prompt')
+      } else if (paymentMethod === 'mpesa') {
+        if (!mpesaPhone) { showErrorToast('Enter customer phone number'); return }
+        await paymentsApi.initiateMpesa(selectedOrder.id, mpesaPhone)
+        showSuccessToast('M-Pesa STK Push sent to customer phone')
+        setMpesaPhone('')
+        fetchOrders()
         return
-      }
       const receiptNo = genReceiptNo()
       const receipt = {
         receiptNo,
@@ -483,6 +487,11 @@ export default function CashierDashboard() {
                     </div>
                   </div>
 
+                  {paymentMethod === 'mpesa' && (
+                    <Input label="Customer Phone" value={mpesaPhone} onChange={(e) => setMpesaPhone(e.target.value)}
+                      placeholder="+2547XX XXX XXX" icon={<Smartphone className="h-4 w-4" />} />
+                  )}
+
                   {paymentMethod === 'cash' && (
                     <div>
                       <Input label="Cash Received" type="number" value={cashReceived}
@@ -500,10 +509,13 @@ export default function CashierDashboard() {
 
                 <div className="p-4 border-t border-white/10">
                   <Button fullWidth size="lg" loading={processing}
-                    disabled={paymentMethod === 'cash' && (!cashReceived || parseFloat(cashReceived) < orderTotal)}
+                    disabled={
+                      (paymentMethod === 'cash' && (!cashReceived || parseFloat(cashReceived) < orderTotal)) ||
+                      (paymentMethod === 'mpesa' && !mpesaPhone)
+                    }
                     onClick={handlePayment}
                     icon={<CheckCircle className="h-5 w-5" />}>
-                    Process Payment · {formatKES(orderTotal)}
+                    {paymentMethod === 'mpesa' ? 'Send STK Push' : `Process Payment · ${formatKES(orderTotal)}`}
                   </Button>
                 </div>
               </motion.div>
