@@ -74,6 +74,7 @@ interface AppState {
   fetchStaff: () => Promise<void>
   addStaff: (data: any) => Promise<void>
   removeStaff: (id: string) => Promise<void>
+  updateStaff: (id: string, data: any) => Promise<void>
 
   posts: any[]
   fetchPosts: () => Promise<void>
@@ -660,7 +661,7 @@ export const useStore = create<AppState>((set) => ({
       throw err
     }
   },
-  updateStaff: async (id, data) => {
+  updateStaff: async (id: string, data: any) => {
     try {
       const res = await staffApi.updateStaff(id, data)
       set((s) => ({ staff: s.staff.map((m) => m.id === id ? { ...m, ...(res.staff || res), ...data } : m) }))
