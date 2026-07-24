@@ -34,3 +34,6 @@ export const closeShift = (shiftId: string, actualCash: number) =>
 
 export const getShifts = () =>
   api.get('/payments/cash/shifts').then(unwrap)
+
+export const recordCardPayment = (orderId: string, amount: number) =>
+  api.post('/payments/card/record', { orderId, amount }).then(unwrap)
