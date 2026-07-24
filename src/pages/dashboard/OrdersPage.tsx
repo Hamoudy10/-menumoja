@@ -63,39 +63,54 @@ export default function OrdersPage() {
 
 function LiveOrdersView({ orders, updateOrderStatus }: { orders: Order[]; updateOrderStatus: (id: string, status: Order['status']) => void }) {
   const columns: Order['status'][] = ['new', 'preparing', 'ready', 'served']
-  const columnLabels = {
-    new: { label: 'New / Pending', icon: Clock, color: 'border-t-blue-500 text-blue-500' },
-    preparing: { label: 'Preparing', icon: CookingPot, color: 'border-t-amber-500 text-amber-500' },
-    ready: { label: 'Ready', icon: CheckCircle2, color: 'border-t-green-500 text-green-500' },
-    served: { label: 'Served', icon: UtensilsCrossed, color: 'border-t-gray-500 text-gray-500' },
+  const [showAll, setShowAll] = useState<Record<string, boolean>>({})
+  const MAX_VISIBLE = 12
+
+  const columnLabels: Record<string, { label: string; icon: any; color: string; bg: string }> = {
+    new: { label: 'New / Pending', icon: Clock, color: 'text-blue-500', bg: 'bg-blue-50 dark:bg-blue-900/20' },
+    preparing: { label: 'Preparing', icon: CookingPot, color: 'text-amber-500', bg: 'bg-amber-50 dark:bg-amber-900/20' },
+    ready: { label: 'Ready', icon: CheckCircle2, color: 'text-green-500', bg: 'bg-green-50 dark:bg-green-900/20' },
+    served: { label: 'Served', icon: UtensilsCrossed, color: 'text-gray-400', bg: 'bg-gray-50 dark:bg-gray-800' },
   }
 
   return (
-    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+    <div className={`grid gap-4 ${
+      columns.length === 4 ? 'grid-cols-1 sm:grid-cols-2 lg:grid-cols-4' : 'grid-cols-1 sm:grid-cols-2'
+    }`}>
       {columns.map((status) => {
         const cfg = columnLabels[status]
         const colOrders = orders.filter((o) => {
-          const s = o.status?.toLowerCase?.() || o.status
+          const s = (o.status?.toLowerCase?.() || o.status || '')
           return s === status || (status === 'new' && (s === 'pending' || s === 'confirmed'))
         })
+        const visible = showAll[status] ? colOrders : colOrders.slice(0, MAX_VISIBLE)
+
         return (
-          <div key={status} className={`rounded-2xl bg-white dark:bg-primary-light border border-white/10 ${cfg.color.split(' ')[0]}`}>
-            <div className="flex items-center gap-2 p-4 border-b border-white/10">
-              <cfg.icon className="h-4 w-4" />
-              <span className="font-accent text-sm font-bold text-text-primary dark:text-white">{cfg.label}</span>
+          <div key={status} className="rounded-2xl bg-white dark:bg-primary-light border border-white/10 overflow-hidden flex flex-col" style={{ maxHeight: 'calc(100vh - 200px)' }}>
+            <div className={`flex items-center gap-2 px-4 py-3 border-b border-white/10 ${cfg.bg}`}>
+              <cfg.icon className={`h-4 w-4 ${cfg.color}`} />
+              <span className="font-accent text-sm font-bold text-text-primary dark:text-white flex-1">{cfg.label}</span>
               <Badge size="sm" variant="default">{colOrders.length}</Badge>
             </div>
-            <div className="p-3 space-y-3 max-h-[600px] overflow-y-auto">
+            <div className="flex-1 overflow-y-auto p-2 space-y-2">
               <AnimatePresence>
                 {colOrders.length === 0 ? (
-                  <p className="text-center font-body text-sm text-text-secondary dark:text-white/40 py-8">No orders</p>
+                  <p className="text-center font-body text-xs text-text-secondary/50 py-8">No orders</p>
                 ) : (
-                  colOrders.map((order) => (
+                  visible.map((order) => (
                     <OrderCard key={order.id} order={order} onStatusChange={updateOrderStatus} />
                   ))
                 )}
               </AnimatePresence>
             </div>
+            {colOrders.length > MAX_VISIBLE && (
+              <button
+                onClick={() => setShowAll({ ...showAll, [status]: !showAll[status] })}
+                className="px-4 py-2 text-xs font-medium text-secondary hover:bg-secondary/5 border-t border-white/10 transition-colors"
+              >
+                {showAll[status] ? 'Show less' : `Show all ${colOrders.length} orders`}
+              </button>
+            )}
           </div>
         )
       })}
@@ -107,17 +122,24 @@ function OrderHistory({ orders }: { orders: Order[] }) {
   const [search, setSearch] = useState('')
   const [expanded, setExpanded] = useState<string | null>(null)
   const [filter, setFilter] = useState<Order['status'] | 'all'>('all')
+  const [tableSearch, setTableSearch] = useState('')
 
   const filtered = orders.filter((o) => {
-    const matchSearch = o.id.toLowerCase().includes(search.toLowerCase()) || (o.items || []).some((i: any) => i.name.toLowerCase().includes(search.toLowerCase()))
+    const matchSearch = o.id.toLowerCase().includes(search.toLowerCase()) || (o.items || []).some((i: any) => (i.name || i.itemName || '').toLowerCase().includes(search.toLowerCase()))
     const matchFilter = filter === 'all' || o.status === filter
-    return matchSearch && matchFilter
+    const matchTable = !tableSearch || String(o.tableNumber).includes(tableSearch)
+    return matchSearch && matchFilter && matchTable
   })
 
   return (
     <div>
-      <div className="flex items-center gap-3 mb-4">
-        <SearchBar placeholder="Search orders..." value={search} onChange={setSearch} className="flex-1 max-w-md" />
+      <div className="flex items-center gap-3 mb-4 flex-wrap">
+        <SearchBar placeholder="Search by order ID or item name..." value={search} onChange={setSearch} className="flex-1 max-w-sm" />
+        <input
+          type="text" value={tableSearch} onChange={(e) => setTableSearch(e.target.value)}
+          placeholder="Filter by table #..."
+          className="w-28 rounded-xl border-2 border-gray-200 dark:border-white/20 bg-white dark:bg-white/5 px-3 py-2 text-xs font-body text-text-primary dark:text-white placeholder:text-text-secondary/50 focus:border-secondary focus:outline-none"
+        />
         <div className="flex gap-1 rounded-lg bg-black/5 dark:bg-white/10 p-1">
           {(['all', 'new', 'preparing', 'ready', 'served'] as const).map((f) => (
             <button
