@@ -89,6 +89,11 @@ export const createRestaurantSchema = z
     longitude: z.number().min(-180).max(180).optional(),
     currency: z.enum(['KES', 'USD']).default('KES'),
     timezone: z.string().default('Africa/Nairobi'),
+    kraPin: z.string().optional(),
+    businessRegNo: z.string().optional(),
+    vatRegNo: z.string().optional(),
+    businessType: z.string().optional(),
+    county: z.string().optional(),
     brandColor: z.string().optional(),
     fontStyle: z.string().optional(),
   })

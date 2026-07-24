@@ -254,7 +254,12 @@ model Restaurant {
   whatsapp           String?
   email              String?
   website            String?
-  currency           String             @default("KES")
+  kraPin             String?        @map("kra_pin")
+  businessRegNo      String?        @map("business_reg_no")
+  vatRegNo           String?        @map("vat_reg_no")
+  businessType       String?        @default("Restaurant") @map("business_type")
+  county             String?        @default("Mombasa")
+  currency           String         @default("KES")
   isHalalCertified   Boolean            @default(false) @map("is_halal_certified")
   dietaryOptions     String[]           @map("dietary_options")
   isActive           Boolean            @default(true) @map("is_active")

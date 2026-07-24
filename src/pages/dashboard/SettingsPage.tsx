@@ -69,6 +69,7 @@ export default function SettingsPage() {
   const [saving, setSaving] = useState(false)
   const [profile, setProfile] = useState({
     name: '', ownerName: '', email: '', phone: '', cuisine: '', location: '', description: '',
+    kraPin: '', businessRegNo: '', vatRegNo: '', businessType: '', county: 'Mombasa',
   })
   const [brandColor, setBrandColor] = useState('#FF6B35')
   const [colorPickerInput, setColorPickerInput] = useState('#FF6B35')
@@ -124,6 +125,11 @@ export default function SettingsPage() {
         cuisine: restaurant.cuisine || '',
         location: restaurant.location || '',
         description: restaurant.description || '',
+        kraPin: restaurant.kraPin || '',
+        businessRegNo: restaurant.businessRegNo || '',
+        vatRegNo: restaurant.vatRegNo || '',
+        businessType: restaurant.businessType || 'Restaurant',
+        county: restaurant.county || restaurant.city || 'Mombasa',
       })
       setBrandColor(restaurant.brandColor || restaurant.settings?.primaryColor || '#FF6B35')
       setFontStyle(restaurant.fontStyle || 'modern')
@@ -307,6 +313,16 @@ export default function SettingsPage() {
               <Input label={t('settings.phone')} value={profile.phone} onChange={(e) => setProfile({ ...profile, phone: e.target.value })} />
               <Input label={t('settings.cuisine')} value={profile.cuisine} onChange={(e) => setProfile({ ...profile, cuisine: e.target.value })} placeholder="e.g., Swahili, Seafood" />
               <Input label={t('settings.location')} value={profile.location} onChange={(e) => setProfile({ ...profile, location: e.target.value })} placeholder="e.g., Nyali, Mombasa" />
+            </div>
+            <div className="border-t border-white/10 pt-3 mt-2">
+              <h4 className="font-accent text-sm font-semibold text-text-primary dark:text-white/90 mb-3">Legal & Compliance (ETR)</h4>
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                <Input label="KRA PIN" value={profile.kraPin} onChange={(e) => setProfile({ ...profile, kraPin: e.target.value })} placeholder="e.g., P051234567X" />
+                <Input label="Business Reg No." value={profile.businessRegNo} onChange={(e) => setProfile({ ...profile, businessRegNo: e.target.value })} placeholder="e.g., CPR/2024/12345" />
+                <Input label="VAT Reg No." value={profile.vatRegNo} onChange={(e) => setProfile({ ...profile, vatRegNo: e.target.value })} placeholder="e.g., VAT-123456" />
+                <Input label="Business Type" value={profile.businessType} onChange={(e) => setProfile({ ...profile, businessType: e.target.value })} placeholder="Restaurant, Cafe, Bar" />
+                <Input label="County" value={profile.county} onChange={(e) => setProfile({ ...profile, county: e.target.value })} placeholder="e.g., Mombasa" />
+              </div>
             </div>
             <div>
               <label className="mb-2 block font-accent text-sm font-medium text-text-primary dark:text-white/90">{t('settings.description')}</label>
