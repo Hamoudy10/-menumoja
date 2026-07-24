@@ -787,10 +787,20 @@ router.post('/cash/open-shift',
     const restaurantId = (req as any).restaurantId;
     const cashierId = req.user?.userId || req.body.cashierId;
 
-    const cashier = await prisma.staff.findFirst({
+    let cashier = await prisma.staff.findFirst({
       where: { id: cashierId, restaurantId, isActive: true },
       select: { id: true, fullName: true },
     });
+
+    if (!cashier) {
+      const owner = await prisma.owner.findFirst({
+        where: { id: cashierId },
+        select: { id: true, fullName: true },
+      });
+      if (owner) {
+        cashier = { id: owner.id, fullName: owner.fullName };
+      }
+    }
 
     if (!cashier) {
       throw new NotFoundError('Cashier not found in this restaurant', 'Mweka hazina hajakupatikana katika mgahawa huu');
