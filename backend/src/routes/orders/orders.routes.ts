@@ -404,6 +404,11 @@ router.get('/live',
         createdAt: true,
         updatedAt: true,
         estimatedPrepMinutes: true,
+        specialNotes: true,
+        items: {
+          select: { id: true, itemName: true, quantity: true, itemPrice: true, subtotal: true, specialInstructions: true },
+        },
+      },
         items: {
           select: {
             id: true,
