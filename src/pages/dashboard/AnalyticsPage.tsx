@@ -93,16 +93,18 @@ export default function AnalyticsPage() {
       if (paymentData) {
         const mpesaPct = paymentData.revenueMpesa && paymentData.totalRevenue
           ? Math.round((paymentData.revenueMpesa / paymentData.totalRevenue) * 100)
-          : 72
-        setPaymentSplit([
-          { name: 'M-Pesa', value: mpesaPct, color: '#3B82F6' },
-          { name: 'Cash', value: 100 - mpesaPct, color: '#FF6B35' },
-        ])
+          : 0
+        const cashPct = 100 - mpesaPct
+        if (mpesaPct > 0 || cashPct > 0) {
+          setPaymentSplit([
+            { name: 'M-Pesa', value: mpesaPct, color: '#3B82F6' },
+            { name: 'Cash', value: cashPct, color: '#FF6B35' },
+          ])
+        } else {
+          setPaymentSplit([])
+        }
       } else {
-        setPaymentSplit([
-          { name: 'M-Pesa', value: 72, color: '#3B82F6' },
-          { name: 'Cash', value: 28, color: '#FF6B35' },
-        ])
+        setPaymentSplit([])
       }
 
       if (paymentData?.devices) {
@@ -161,12 +163,12 @@ export default function AnalyticsPage() {
         <>
           <div className="grid grid-cols-2 lg:grid-cols-3 xl:grid-cols-6 gap-3">
             {[
-              { icon: DollarSign, label: 'Revenue', value: formatKES(overview?.totalRevenue), change: overview?.revenueChange ? `${overview.revenueChange > 0 ? '+' : ''}${overview.revenueChange}%` : '+12%', color: 'secondary' },
-              { icon: ShoppingBag, label: 'Orders', value: String(overview?.totalOrders || '347'), change: overview?.ordersChange ? `${overview.ordersChange > 0 ? '+' : ''}${overview.ordersChange}%` : '+8%', color: 'accent' },
-              { icon: TrendingUp, label: 'Avg Order', value: formatKES(overview?.averageOrderValue), change: '+3%', color: 'success' },
-              { icon: ScanLine, label: 'Scans', value: String(overview?.totalScans || '1,284'), change: '+23%', color: 'primary' },
-              { icon: Star, label: 'Top Item', value: topItems[0]?.name || 'Nyama Choma', change: `${topItems[0]?.orders || 142} orders`, color: 'accent' },
-              { icon: Clock, label: 'Busiest Hour', value: busiestHour, change: 'peak time', color: 'secondary' },
+              { icon: DollarSign, label: 'Revenue', value: formatKES(overview?.totalRevenue || 0), change: overview?.revenueChange != null ? `${overview.revenueChange > 0 ? '+' : ''}${overview.revenueChange}%` : '--', color: 'secondary' },
+              { icon: ShoppingBag, label: 'Orders', value: String(overview?.totalOrders ?? '--'), change: overview?.ordersChange != null ? `${overview.ordersChange > 0 ? '+' : ''}${overview.ordersChange}%` : '--', color: 'accent' },
+              { icon: TrendingUp, label: 'Avg Order', value: formatKES(overview?.averageOrderValue || 0), change: '--', color: 'success' },
+              { icon: ScanLine, label: 'Scans', value: String(overview?.totalScans ?? '--'), change: overview?.scansChange != null ? `${overview.scansChange > 0 ? '+' : ''}${overview.scansChange}%` : '--', color: 'primary' },
+              { icon: Star, label: 'Top Item', value: topItems[0]?.name || '--', change: topItems[0]?.orders ? `${topItems[0].orders} orders` : '--', color: 'accent' },
+              { icon: Clock, label: 'Busiest Hour', value: busiestHour || '--', change: '--', color: 'secondary' },
             ].map((metric, i) => (
               <AnimatedSection key={i}>
                 <div className="rounded-2xl bg-white dark:bg-primary-light border border-white/10 p-4">
