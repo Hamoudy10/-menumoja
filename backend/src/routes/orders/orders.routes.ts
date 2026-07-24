@@ -88,7 +88,7 @@ router.post('/public/create',
   optionalAuth,
   validate(customerCreateOrderSchema),
   asyncHandler(async (req, res) => {
-    let { restaurantId, restaurantSlug, tableId, sessionId, items, specialNotes, paymentMethod } = req.body;
+    let { restaurantId, restaurantSlug, tableId, tableNumber, sessionId, items, specialNotes, paymentMethod } = req.body;
 
     if (!restaurantId && restaurantSlug) {
       const slugRestaurant = await prisma.restaurant.findUnique({
@@ -169,6 +169,17 @@ router.post('/public/create',
         where: { id: tableId },
         data: { status: 'OCCUPIED', currentSessionId: sessionId },
       });
+    } else if (tableNumber && tableNumber > 0) {
+      tableNumberValue = tableNumber;
+      const table = await prisma.restaurantTable.findFirst({
+        where: { restaurantId, tableNumber },
+      });
+      if (table) {
+        await prisma.restaurantTable.update({
+          where: { id: table.id },
+          data: { status: 'OCCUPIED', currentSessionId: sessionId },
+        });
+      }
     }
 
     const orderNumber = generateOrderNumber(restaurantId);
