@@ -58,7 +58,7 @@ export default function SettingsPage() {
   const [section, setSection] = useState('profile')
   const [showAddStaff, setShowAddStaff] = useState(false)
   const [newStaff, setNewStaff] = useState({
-    name: '', phone: '', role: 'waiter' as const, pin: '', email: '',
+    name: '', phone: '', role: 'waiter' as 'waiter' | 'cashier' | 'kitchen' | 'manager', pin: '', email: '',
     employeeNumber: '', nationalId: '', kraPin: '', nhifNumber: '', nssfNumber: '',
     dateOfBirth: '', address: '', emergencyName: '', emergencyPhone: '', emergencyRelation: '',
     nextOfKin: '', nextOfKinPhone: '', nextOfKinRelation: '', bankName: '', bankBranch: '',
