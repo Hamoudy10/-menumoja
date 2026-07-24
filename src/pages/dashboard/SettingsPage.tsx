@@ -57,7 +57,13 @@ export default function SettingsPage() {
 
   const [section, setSection] = useState('profile')
   const [showAddStaff, setShowAddStaff] = useState(false)
-  const [newStaff, setNewStaff] = useState<{ name: string; phone: string; role: 'waiter' | 'cashier' | 'kitchen' | 'manager'; pin: string }>({ name: '', phone: '', role: 'waiter', pin: '' })
+  const [newStaff, setNewStaff] = useState({
+    name: '', phone: '', role: 'waiter' as const, pin: '', email: '',
+    employeeNumber: '', nationalId: '', kraPin: '', nhifNumber: '', nssfNumber: '',
+    dateOfBirth: '', address: '', emergencyName: '', emergencyPhone: '', emergencyRelation: '',
+    nextOfKin: '', nextOfKinPhone: '', nextOfKinRelation: '', bankName: '', bankBranch: '',
+    bankAccount: '', monthlySalary: '', hourlyRate: '', leaveDays: '', startDate: '', notes: '',
+  })
   const [saving, setSaving] = useState(false)
   const [profile, setProfile] = useState({
     name: '', ownerName: '', email: '', phone: '', cuisine: '', location: '', description: '',
@@ -178,8 +184,12 @@ export default function SettingsPage() {
   const handleAddStaff = async () => {
     if (!newStaff.name || !newStaff.phone || !newStaff.pin) return
     try {
-      await addStaff({ ...newStaff, active: true })
-      setNewStaff({ name: '', phone: '', role: 'waiter', pin: '' })
+      const payload: any = { ...newStaff, active: true }
+      if (payload.monthlySalary) payload.monthlySalary = parseFloat(payload.monthlySalary)
+      if (payload.hourlyRate) payload.hourlyRate = parseFloat(payload.hourlyRate)
+      if (payload.leaveDays) payload.leaveDays = parseInt(payload.leaveDays)
+      await addStaff(payload)
+      setNewStaff({ name: '', phone: '', role: 'waiter', pin: '', email: '', employeeNumber: '', nationalId: '', kraPin: '', nhifNumber: '', nssfNumber: '', dateOfBirth: '', address: '', emergencyName: '', emergencyPhone: '', emergencyRelation: '', nextOfKin: '', nextOfKinPhone: '', nextOfKinRelation: '', bankName: '', bankBranch: '', bankAccount: '', monthlySalary: '', hourlyRate: '', leaveDays: '', startDate: '', notes: '' })
       setShowAddStaff(false)
       showSuccessToast('Staff added')
     } catch {}
@@ -546,27 +556,32 @@ export default function SettingsPage() {
               <table className="w-full text-sm font-body">
                 <thead>
                   <tr className="border-b border-white/10">
-                    <th className="px-3 py-2 text-left font-accent text-xs text-text-secondary dark:text-white/50 uppercase">{t('staff.name')}</th>
-                    <th className="px-3 py-2 text-left font-accent text-xs text-text-secondary dark:text-white/50 uppercase">{t('staff.phone')}</th>
-                    <th className="px-3 py-2 text-left font-accent text-xs text-text-secondary dark:text-white/50 uppercase">{t('staff.role')}</th>
-                    <th className="px-3 py-2 text-left font-accent text-xs text-text-secondary dark:text-white/50 uppercase">{t('staff.status')}</th>
-                    <th className="px-3 py-2 text-right font-accent text-xs text-text-secondary dark:text-white/50 uppercase">{t('staff.actions')}</th>
+                    <th className="px-2 py-2 text-left font-accent text-xs text-text-secondary dark:text-white/50 uppercase w-[180px]">{t('staff.name')}</th>
+                    <th className="px-2 py-2 text-left font-accent text-xs text-text-secondary dark:text-white/50">{t('staff.phone')}</th>
+                    <th className="px-2 py-2 text-left font-accent text-xs text-text-secondary dark:text-white/50">{t('staff.role')}</th>
+                    <th className="px-2 py-2 text-left font-accent text-xs text-text-secondary dark:text-white/50">{t('staff.status')}</th>
+                    <th className="px-2 py-2 text-right font-accent text-xs text-text-secondary dark:text-white/50">{t('staff.actions')}</th>
                   </tr>
                 </thead>
                 <tbody>
-                  {staff.map((member) => (
+                  {staff.map((member: any) => (
                     <tr key={member.id} className="border-b border-white/5 hover:bg-black/5 dark:hover:bg-white/5 transition-colors">
-                      <td className="px-3 py-3 font-medium text-text-primary dark:text-white">{member.name}</td>
-                      <td className="px-3 py-3 text-text-secondary dark:text-white/60">{member.phone}</td>
-                      <td className="px-3 py-3">
+                      <td className="px-2 py-3 font-medium text-text-primary dark:text-white">
+                        <div className="truncate max-w-[170px]" title={member.fullName || member.name}>{member.fullName || member.name}</div>
+                        {member.employeeNumber && <span className="text-[10px] text-text-secondary/50 block truncate">#{member.employeeNumber}</span>}
+                      </td>
+                      <td className="px-2 py-3 text-text-secondary dark:text-white/60 text-xs">{member.phone}</td>
+                      <td className="px-2 py-3">
                         <Badge variant={member.role === 'manager' ? 'info' : member.role === 'kitchen' ? 'warning' : member.role === 'cashier' ? 'success' : 'default'} size="sm" className="capitalize">
                           {t(`staff.${member.role}`)}
                         </Badge>
                       </td>
-                      <td className="px-3 py-3">
-                        <Badge variant={member.active ? 'success' : 'danger'} size="sm">{member.active ? t('staff.active') : t('staff.inactive')}</Badge>
+                      <td className="px-2 py-3">
+                        <Badge variant={member.isActive !== false || member.active !== false ? 'success' : 'danger'} size="sm">
+                          {(member.isActive !== false || member.active !== false) ? t('staff.active') : t('staff.inactive')}
+                        </Badge>
                       </td>
-                      <td className="px-3 py-3 text-right">
+                      <td className="px-2 py-3 text-right">
                         <button onClick={async () => { try { await removeStaff(member.id); showSuccessToast('Staff removed') } catch {} }}
                           className="p-1.5 rounded-lg hover:bg-red-100 dark:hover:bg-red-900/30 text-text-secondary hover:text-red-500 transition-colors">
                           <Trash2 className="h-3.5 w-3.5" />
@@ -580,22 +595,81 @@ export default function SettingsPage() {
             <AnimatePresence>
               {showAddStaff ? (
                 <motion.div initial={{ opacity: 0, height: 0 }} animate={{ opacity: 1, height: 'auto' }} exit={{ opacity: 0, height: 0 }} className="overflow-hidden">
-                  <div className="rounded-xl border border-white/10 p-4 space-y-3">
-                    <Input label={t('staff.name')} value={newStaff.name} onChange={(e) => setNewStaff({ ...newStaff, name: e.target.value })} />
-                    <Input label={t('staff.phone')} value={newStaff.phone} onChange={(e) => setNewStaff({ ...newStaff, phone: e.target.value })} placeholder="+2547XX XXX XXX" />
-                    <Input label={t('staff.pin')} value={newStaff.pin} onChange={(e) => setNewStaff({ ...newStaff, pin: e.target.value })} maxLength={4} />
-                    <div>
-                      <label className="mb-2 block font-accent text-sm font-medium text-text-primary dark:text-white/90">{t('staff.role')}</label>
-                      <div className="flex gap-2">
-                        {(['waiter', 'cashier', 'kitchen', 'manager'] as const).map((role) => (
-                          <button key={role} onClick={() => setNewStaff({ ...newStaff, role })}
-                            className={`rounded-lg px-3 py-1.5 text-xs font-accent font-medium capitalize transition-colors ${
-                              newStaff.role === role ? 'bg-secondary text-white' : 'bg-black/5 dark:bg-white/10 text-text-secondary dark:text-white/60'
-                            }`}>{t(`staff.${role}`)}</button>
-                        ))}
-                      </div>
+                  <div className="rounded-xl border border-white/10 p-4 space-y-4">
+                    <h4 className="font-heading font-bold text-sm">Personal Information</h4>
+                    <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                      <Input label="Full Name *" value={newStaff.name} onChange={(e) => setNewStaff({ ...newStaff, name: e.target.value })} />
+                      <Input label="Phone *" value={newStaff.phone} onChange={(e) => setNewStaff({ ...newStaff, phone: e.target.value })} placeholder="+2547XX XXX XXX" />
+                      <Input label="Email" value={newStaff.email} onChange={(e) => setNewStaff({ ...newStaff, email: e.target.value })} type="email" />
                     </div>
-                    <div className="flex gap-2">
+                    <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                      <Input label="National ID" value={newStaff.nationalId} onChange={(e) => setNewStaff({ ...newStaff, nationalId: e.target.value })} />
+                      <Input label="KRA PIN" value={newStaff.kraPin} onChange={(e) => setNewStaff({ ...newStaff, kraPin: e.target.value })} />
+                      <Input label="Date of Birth" value={newStaff.dateOfBirth} onChange={(e) => setNewStaff({ ...newStaff, dateOfBirth: e.target.value })} type="date" />
+                    </div>
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                      <Input label="Address" value={newStaff.address} onChange={(e) => setNewStaff({ ...newStaff, address: e.target.value })} />
+                    </div>
+
+                    <h4 className="font-heading font-bold text-sm">Employment Details</h4>
+                    <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                      <Input label="Employee #" value={newStaff.employeeNumber} onChange={(e) => setNewStaff({ ...newStaff, employeeNumber: e.target.value })} />
+                      <Input label="Start Date" value={newStaff.startDate} onChange={(e) => setNewStaff({ ...newStaff, startDate: e.target.value })} type="date" />
+                      <Input label="Leave Days" value={newStaff.leaveDays} onChange={(e) => setNewStaff({ ...newStaff, leaveDays: e.target.value })} type="number" />
+                    </div>
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                      <div>
+                        <label className="mb-2 block font-accent text-sm font-medium text-text-primary dark:text-white/90">Role</label>
+                        <div className="flex gap-2 flex-wrap">
+                          {(['waiter', 'cashier', 'kitchen', 'manager'] as const).map((role) => (
+                            <button key={role} onClick={() => setNewStaff({ ...newStaff, role })}
+                              className={`rounded-lg px-3 py-1.5 text-xs font-medium capitalize transition-colors ${newStaff.role === role ? 'bg-secondary text-white' : 'bg-black/5 dark:bg-white/10 text-text-secondary dark:text-white/60'}`}>{t(`staff.${role}`)}</button>
+                          ))}
+                        </div>
+                      </div>
+                      <Input label="PIN *" value={newStaff.pin} onChange={(e) => setNewStaff({ ...newStaff, pin: e.target.value })} maxLength={6} placeholder="4-6 digits" />
+                    </div>
+
+                    <h4 className="font-heading font-bold text-sm">NHIF / NSSF</h4>
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                      <Input label="NHIF Number" value={newStaff.nhifNumber} onChange={(e) => setNewStaff({ ...newStaff, nhifNumber: e.target.value })} />
+                      <Input label="NSSF Number" value={newStaff.nssfNumber} onChange={(e) => setNewStaff({ ...newStaff, nssfNumber: e.target.value })} />
+                    </div>
+
+                    <h4 className="font-heading font-bold text-sm">Salary Details</h4>
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                      <Input label="Monthly Salary (KES)" value={newStaff.monthlySalary} onChange={(e) => setNewStaff({ ...newStaff, monthlySalary: e.target.value })} type="number" />
+                      <Input label="Hourly Rate (KES)" value={newStaff.hourlyRate} onChange={(e) => setNewStaff({ ...newStaff, hourlyRate: e.target.value })} type="number" />
+                    </div>
+
+                    <h4 className="font-heading font-bold text-sm">Banking</h4>
+                    <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                      <Input label="Bank Name" value={newStaff.bankName} onChange={(e) => setNewStaff({ ...newStaff, bankName: e.target.value })} placeholder="e.g. Equity" />
+                      <Input label="Branch" value={newStaff.bankBranch} onChange={(e) => setNewStaff({ ...newStaff, bankBranch: e.target.value })} />
+                      <Input label="Account Number" value={newStaff.bankAccount} onChange={(e) => setNewStaff({ ...newStaff, bankAccount: e.target.value })} />
+                    </div>
+
+                    <h4 className="font-heading font-bold text-sm">Emergency Contact</h4>
+                    <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                      <Input label="Name" value={newStaff.emergencyName} onChange={(e) => setNewStaff({ ...newStaff, emergencyName: e.target.value })} />
+                      <Input label="Phone" value={newStaff.emergencyPhone} onChange={(e) => setNewStaff({ ...newStaff, emergencyPhone: e.target.value })} />
+                      <Input label="Relationship" value={newStaff.emergencyRelation} onChange={(e) => setNewStaff({ ...newStaff, emergencyRelation: e.target.value })} />
+                    </div>
+
+                    <h4 className="font-heading font-bold text-sm">Next of Kin</h4>
+                    <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                      <Input label="Name" value={newStaff.nextOfKin} onChange={(e) => setNewStaff({ ...newStaff, nextOfKin: e.target.value })} />
+                      <Input label="Phone" value={newStaff.nextOfKinPhone} onChange={(e) => setNewStaff({ ...newStaff, nextOfKinPhone: e.target.value })} />
+                      <Input label="Relationship" value={newStaff.nextOfKinRelation} onChange={(e) => setNewStaff({ ...newStaff, nextOfKinRelation: e.target.value })} />
+                    </div>
+
+                    <div>
+                      <label className="mb-2 block font-accent text-sm font-medium text-text-primary dark:text-white/90">Additional Notes</label>
+                      <textarea value={newStaff.notes} onChange={(e) => setNewStaff({ ...newStaff, notes: e.target.value })}
+                        className="w-full rounded-xl border-2 border-gray-200 dark:border-white/20 bg-white dark:bg-white/5 px-4 py-2 font-body text-sm text-text-primary dark:text-white placeholder:text-text-secondary/50 resize-none focus:border-secondary focus:outline-none" rows={2} />
+                    </div>
+
+                    <div className="flex gap-2 pt-2 border-t border-white/10">
                       <Button size="sm" onClick={handleAddStaff}><Plus className="h-3.5 w-3.5" /> {t('staff.addStaff')}</Button>
                       <Button variant="ghost" size="sm" onClick={() => setShowAddStaff(false)}>{t('app.cancel')}</Button>
                     </div>

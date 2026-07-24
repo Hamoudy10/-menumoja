@@ -109,7 +109,7 @@ export default function DashboardHome() {
             {orders.slice(0, 5).map((order) => (
               <div key={order.id} className="flex items-center justify-between py-2 border-b border-gray-50 dark:border-white/5 last:border-0">
                 <div>
-                  <p className="text-sm font-medium text-text-primary dark:text-white">Table {order.tableNumber}</p>
+                  <p className="text-sm font-medium text-text-primary dark:text-white">{order.tableNumber > 0 ? `Table ${order.tableNumber}` : 'General'}</p>
                   <p className="text-xs text-text-secondary dark:text-white/50">{(order.items || []).map((i: any) => i.name).join(', ')}</p>
                 </div>
                 <div className="text-right">

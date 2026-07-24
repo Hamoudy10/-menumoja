@@ -147,7 +147,7 @@ function OrderHistory({ orders }: { orders: Order[] }) {
                 className="flex w-full items-center gap-4 p-4 hover:bg-black/5 dark:hover:bg-white/5 transition-colors"
               >
                 <span className="font-heading text-lg font-bold text-text-primary dark:text-white min-w-[4rem]">
-                  {order.tableNumber != null ? `T${order.tableNumber.toString().padStart(2, '0')}` : 'T—'}
+                  {order.tableNumber != null && order.tableNumber > 0 ? `T${order.tableNumber.toString().padStart(2, '0')}` : 'T—'}
                 </span>
                 <div className="flex-1 min-w-0">
                   <p className="font-body text-sm text-text-primary dark:text-white truncate">
@@ -267,7 +267,7 @@ function KitchenDisplay({ orders, updateOrderStatus }: { orders: Order[]; update
               >
                 <div className="flex items-center justify-between mb-3">
                   <span className="font-heading text-3xl font-bold text-text-primary dark:text-white">
-                    {order.tableNumber != null ? `T${order.tableNumber.toString().padStart(2, '0')}` : 'T—'}
+                    {order.tableNumber != null && order.tableNumber > 0 ? `T${order.tableNumber.toString().padStart(2, '0')}` : 'T—'}
                   </span>
                   <div className={`flex items-center gap-1.5 font-accent text-lg font-bold tabular-nums ${
                     isOverdue ? 'text-red-500' : 'text-text-secondary dark:text-white/60'
