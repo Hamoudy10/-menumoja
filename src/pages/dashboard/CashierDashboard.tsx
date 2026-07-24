@@ -161,7 +161,6 @@ export default function CashierDashboard() {
         fetchOrders()
         return
       }
-      if (paymentMethod !== 'mpesa') {
       const receiptNo = genReceiptNo()
       const receipt = {
         receiptNo,
@@ -184,7 +183,6 @@ export default function CashierDashboard() {
       setCashReceived('')
       setDiscount('')
       fetchOrders()
-      }
     } catch { showErrorToast('Payment failed') }
     finally { setProcessing(false) }
   }
