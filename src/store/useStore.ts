@@ -593,7 +593,7 @@ export const useStore = create<AppState>((set) => ({
         id: p.id,
         tableNumber: p.order?.tableNumber ?? p.tableNumber ?? 0,
         amount: p.amount || 0,
-        method: p.paymentMethod === 'MPESA' ? 'mpesa' : p.paymentMethod === 'CARD' ? 'card' : 'cash',
+        method: p.paymentMethod === 'MPESA' ? 'mpesa' as const : p.paymentMethod === 'CARD' ? 'card' as const : 'cash' as const,
         status: p.status === 'PAID' ? 'confirmed' : p.status === 'PENDING' ? 'pending' : 'failed',
         reference: p.mpesaReceiptNumber || p.mpesaTransactionId || `Order #${p.order?.orderNumber || ''}`,
         createdAt: p.createdAt || p.processedAt || new Date().toISOString(),

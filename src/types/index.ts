@@ -110,7 +110,7 @@ export interface Transaction {
   id: string
   tableNumber: number
   amount: number
-  method: 'mpesa' | 'cash'
+  method: 'mpesa' | 'cash' | 'card'
   status: 'confirmed' | 'pending' | 'failed'
   reference: string
   createdAt: string

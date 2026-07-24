@@ -146,10 +146,10 @@ export default function CashierDashboard() {
                   </div>
                   {activeTab === 'pending' && (
                     <div className="flex gap-2 mt-3 pt-3 border-t border-white/10">
-                      <Button size="sm" variant="primary" onClick={(e) => { e.stopPropagation(); handleCashPayment(); setCashAmount(String(order.total)) }}>
+                      <Button size="sm" variant="primary" onClick={() => { handleCashPayment(); setCashAmount(String(order.total)) }}>
                         <Banknote className="h-3 w-3" /> Cash
                       </Button>
-                      <Button size="sm" variant="outline" onClick={(e) => { e.stopPropagation(); handleCardPayment(order) }}>
+                      <Button size="sm" variant="outline" onClick={() => handleCardPayment(order)}>
                         <CreditCard className="h-3 w-3" /> Card
                       </Button>
                       {order.paymentMethod === 'MPESA' && (
