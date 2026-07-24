@@ -19,6 +19,13 @@ export interface Restaurant {
   plan: 'starter' | 'business' | 'premium'
   isHalal: boolean
   rating: number
+  address?: string
+  city?: string
+  county?: string
+  kraPin?: string
+  businessRegNo?: string
+  vatRegNo?: string
+  businessType?: string
   settings?: {
     primaryColor?: string
     secondaryColor?: string
