@@ -29,14 +29,15 @@ export default function PaymentsPage() {
   const totals = useMemo(() => {
     const mpesaTotal = transactions.filter((t) => t.method === 'mpesa' && t.status === 'confirmed').reduce((s, t) => s + t.amount, 0)
     const cashTotal = transactions.filter((t) => t.method === 'cash' && t.status === 'confirmed').reduce((s, t) => s + t.amount, 0)
+    const cardTotal = transactions.filter((t) => t.method === 'card' && t.status === 'confirmed').reduce((s, t) => s + t.amount, 0)
     const pending = transactions.filter((t) => t.status === 'pending').reduce((s, t) => s + t.amount, 0)
-    return { total: mpesaTotal + cashTotal, mpesaTotal, cashTotal, pending }
+    return { total: mpesaTotal + cashTotal + cardTotal, mpesaTotal, cashTotal, cardTotal, pending }
   }, [transactions])
 
   const hourlyData = useMemo(() => {
-    const hours: Record<number, { mpesa: number; cash: number }> = {}
+    const hours: Record<number, { mpesa: number; cash: number; card: number }> = {}
     for (let h = 7; h <= 23; h++) {
-      hours[h] = { mpesa: 0, cash: 0 }
+      hours[h] = { mpesa: 0, cash: 0, card: 0 }
     }
     transactions.filter((t) => t.status === 'confirmed').forEach((t) => {
       const h = new Date(t.createdAt).getHours()
