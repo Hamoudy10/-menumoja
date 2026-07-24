@@ -34,7 +34,7 @@ export default function CashierDashboard() {
   const fetchOrders = async () => {
     try {
       const [ordersRes, summaryRes] = await Promise.all([
-        ordersApi.fetchOrders({ perPage: 200 }),
+        ordersApi.fetchOrders({ perPage: 100 }),
         paymentsApi.fetchTodaySummary(),
       ])
       const raw = Array.isArray(ordersRes) ? ordersRes : ordersRes?.orders || ordersRes || []
