@@ -526,21 +526,22 @@ router.post(
       throw new AppError(403, 'RESTAURANT_SUSPENDED', 'This restaurant account is suspended', 'Akaunti ya mgahawa huu imesimamishwa');
     }
 
-    const staff = await prisma.staff.findFirst({
+    const staffMembers = await prisma.staff.findMany({
       where: { restaurantId: restaurant.id, isActive: true },
     });
 
-    if (!staff) {
-      throw new AppError(401, 'INVALID_STAFF_PIN', 'Invalid restaurant or PIN', 'Mgahawa au PIN si sahihi');
+    let matchedStaff = null;
+    for (const s of staffMembers) {
+      const valid = await comparePassword(pin, s.pinHash);
+      if (valid) { matchedStaff = s; break; }
     }
 
-    const isValidPin = await comparePassword(pin, staff.pinHash);
-    if (!isValidPin) {
-      throw new AppError(401, 'INVALID_STAFF_PIN', 'Invalid restaurant or PIN', 'Mgahawa au PIN si sahihi');
+    if (!matchedStaff) {
+      throw new AppError(401, 'INVALID_STAFF_PIN', 'Invalid PIN', 'PIN si sahihi');
     }
 
     await prisma.staff.update({
-      where: { id: staff.id },
+      where: { id: matchedStaff.id },
       data: { lastLogin: new Date() },
     });
 
@@ -552,16 +553,16 @@ router.post(
       OWNER: 'owner',
     };
 
-    const tokens = generateTokens(staff.id, roleMap[staff.role] || 'staff', restaurant.id);
-    await storeRefreshToken(staff.id, tokens.refreshToken);
+    const tokens = generateTokens(matchedStaff.id, roleMap[matchedStaff.role] || 'staff', restaurant.id);
+    await storeRefreshToken(matchedStaff.id, tokens.refreshToken);
 
     res.json({
       success: true,
       data: {
         staff: {
-          id: staff.id,
-          fullName: staff.fullName,
-          role: roleMap[staff.role] || 'staff',
+          id: matchedStaff.id,
+          fullName: matchedStaff.fullName,
+          role: roleMap[matchedStaff.role] || 'staff',
           restaurantId: restaurant.id,
         },
         tokens,

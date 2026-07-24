@@ -25,3 +25,6 @@ export const refreshToken = (token: string) =>
 
 export const forgotPassword = (phone: string) =>
   api.post('/auth/forgot-password', { phone }).then(unwrap)
+
+export const staffLogin = (pin: string, restaurantSlug: string) =>
+  api.post('/auth/staff/login', { pin, restaurantSlug }).then(unwrap)
