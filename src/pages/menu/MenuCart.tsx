@@ -35,6 +35,7 @@ export default function MenuCart() {
         specialInstructions: '',
       })
       clearCart()
+      sessionStorage.setItem(`activeOrder_${restaurantSlug}`, JSON.stringify({ id: order.id, orderNumber: order.orderNumber, tableNumber: tableFromUrl ? parseInt(tableFromUrl) : 0, time: Date.now() }))
       showSuccessToast('Order placed successfully!')
       navigate(`/menu/${restaurantSlug}/order/${order.id}`)
     } catch {

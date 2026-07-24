@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react'
 import { motion } from 'framer-motion'
 import { useParams, useNavigate } from 'react-router-dom'
-import { ShoppingCart, Plus, Minus, ChefHat, MapPin, Star, Search, Loader2 } from 'lucide-react'
+import { ShoppingCart, Plus, Minus, ChefHat, MapPin, Star, Search, Loader2, CheckCircle } from 'lucide-react'
 import { useStore } from '@/store/useStore'
 import { Button } from '@/components/ui/Button'
 import { Badge } from '@/components/ui/Badge'
@@ -18,6 +18,9 @@ export default function MenuView() {
   const [menuCategories, setMenuCategories] = useState<any[]>([])
 
   const cartCount = cart.reduce((s, i) => s + i.quantity, 0)
+
+  const activeOrder = JSON.parse(sessionStorage.getItem(`activeOrder_${restaurantSlug}`) || 'null')
+  const showTrackOrder = activeOrder && (Date.now() - activeOrder.time < 7200000)
 
   useEffect(() => {
     if (!restaurantSlug) return
@@ -110,9 +113,19 @@ export default function MenuView() {
                 <p className="text-[10px] text-text-secondary">Digital Menu</p>
               </div>
             </div>
-            <button
-              onClick={() => navigate(`/menu/${restaurantSlug}/cart${location.search}`)}
-              className="relative w-10 h-10 rounded-xl bg-secondary/10 flex items-center justify-center"
+            <div className="flex items-center gap-2">
+              {showTrackOrder && (
+                <button
+                  onClick={() => navigate(`/menu/${restaurantSlug}/order/${activeOrder.id}`)}
+                  className="flex items-center gap-1 px-3 py-2 rounded-xl bg-success/10 text-success text-xs font-medium hover:bg-success/20 transition-colors"
+                >
+                  <CheckCircle className="w-4 h-4" />
+                  <span className="hidden sm:inline">Track Order</span>
+                </button>
+              )}
+              <button
+                onClick={() => navigate(`/menu/${restaurantSlug}/cart${location.search}`)}
+                className="relative w-10 h-10 rounded-xl bg-secondary/10 flex items-center justify-center"
             >
               <ShoppingCart className="w-5 h-5 text-secondary" />
               {cartCount > 0 && (
