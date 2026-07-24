@@ -1,6 +1,10 @@
-import { useState, useEffect } from 'react'
-import { motion } from 'framer-motion'
-import { CreditCard, Banknote, Search, CheckCircle, Calculator, Clock, Smartphone } from 'lucide-react'
+import { useState, useEffect, useMemo } from 'react'
+import { motion, AnimatePresence } from 'framer-motion'
+import {
+  Search, CreditCard, Banknote, Smartphone, CheckCircle, Clock,
+  Receipt, Calculator, ShoppingBag, X, ChevronDown, ChevronUp,
+  Coffee, UtensilsCrossed, ArrowRight, Loader2, Hash, User, Printer
+} from 'lucide-react'
 import { Button } from '@/components/ui/Button'
 import { Input } from '@/components/ui/Input'
 import { Badge } from '@/components/ui/Badge'
@@ -8,190 +12,391 @@ import { showSuccessToast, showErrorToast } from '@/components/ui/Toast'
 import * as ordersApi from '@/api/orders'
 import * as paymentsApi from '@/api/payments'
 
+const ITEMS_PER_PAGE = 15
+
 export default function CashierDashboard() {
   const [orders, setOrders] = useState<any[]>([])
+  const [allOrders, setAllOrders] = useState<any[]>([])
   const [loading, setLoading] = useState(true)
   const [search, setSearch] = useState('')
+  const [filterTable, setFilterTable] = useState('')
   const [selectedOrder, setSelectedOrder] = useState<any>(null)
-  const [cashAmount, setCashAmount] = useState('')
+  const [cashReceived, setCashReceived] = useState('')
   const [processing, setProcessing] = useState(false)
   const [activeTab, setActiveTab] = useState<'pending' | 'paid'>('pending')
+  const [paymentMethod, setPaymentMethod] = useState<'cash' | 'card' | 'mpesa'>('cash')
+  const [discount, setDiscount] = useState('')
+  const [showReceipt, setShowReceipt] = useState(false)
+  const [lastPayment, setLastPayment] = useState<any>(null)
+  const [page, setPage] = useState(1)
+  const [stats, setStats] = useState({ todayTotal: 0, ordersCount: 0, pendingCount: 0 })
 
   const fetchOrders = async () => {
     try {
-      const data = await ordersApi.fetchOrders({ paymentStatus: 'UNPAID' })
-      const allOrders = Array.isArray(data) ? data : data.orders || data || []
-      const normalized = allOrders.map((o: any) => ({
+      const [ordersRes, summaryRes] = await Promise.all([
+        ordersApi.fetchOrders({ perPage: 200 }),
+        paymentsApi.fetchTodaySummary(),
+      ])
+      const raw = Array.isArray(ordersRes) ? ordersRes : ordersRes?.orders || ordersRes || []
+      const normalized = raw.map((o: any) => ({
         ...o,
-        total: o.total ?? o.totalAmount ?? 0,
-        items: o.items || [],
+        total: Number(o.total ?? o.totalAmount ?? 0),
+        items: (o.items || []).map((i: any) => ({
+          ...i,
+          name: i.name || i.itemName || 'Item',
+          price: Number(i.price || i.itemPrice || 0),
+          quantity: i.quantity || 1,
+        })),
         tableNumber: o.tableNumber ?? 0,
+        paymentMethod: o.paymentMethod || 'CASH',
+        paymentStatus: o.paymentStatus || 'UNPAID',
+        createdAt: o.createdAt || new Date().toISOString(),
+        orderNumber: o.orderNumber || o.id?.slice(0, 8).toUpperCase(),
       }))
+      setAllOrders(normalized)
       setOrders(normalized.filter((o: any) => {
         if (activeTab === 'pending') return o.paymentStatus !== 'PAID'
         return o.paymentStatus === 'PAID'
       }))
+      if (summaryRes) setStats({
+        todayTotal: summaryRes.totalRevenue || summaryRes.total || 0,
+        ordersCount: summaryRes.totalOrders || summaryRes.orderCount || 0,
+        pendingCount: normalized.filter((o: any) => o.paymentStatus !== 'PAID').length,
+      })
     } catch { showErrorToast('Failed to load orders') }
     finally { setLoading(false) }
   }
 
   useEffect(() => { fetchOrders() }, [activeTab])
-  useEffect(() => { const interval = setInterval(fetchOrders, 15000); return () => clearInterval(interval) }, [activeTab])
+  useEffect(() => { const interval = setInterval(fetchOrders, 30000); return () => clearInterval(interval) }, [activeTab])
 
-  const handleCashPayment = async () => {
-    if (!selectedOrder || !cashAmount) return
+  const filtered = useMemo(() => {
+    return orders.filter((o: any) => {
+      const q = search.toLowerCase()
+      const matchSearch = !q || o.orderNumber?.toLowerCase().includes(q) || o.id.toLowerCase().includes(q) ||
+        o.items.some((i: any) => i.name.toLowerCase().includes(q))
+      const matchTable = !filterTable || String(o.tableNumber) === filterTable
+      return matchSearch && matchTable
+    })
+  }, [orders, search, filterTable])
+
+  const paginated = filtered.slice(0, page * ITEMS_PER_PAGE)
+  const hasMore = paginated.length < filtered.length
+
+  const orderTotal = useMemo(() => {
+    if (!selectedOrder) return 0
+    const subtotal = selectedOrder.items.reduce((s: number, i: any) => s + i.price * i.quantity, 0)
+    const disc = parseFloat(discount) || 0
+    return Math.max(0, subtotal - disc)
+  }, [selectedOrder, discount])
+
+  const change = useMemo(() => {
+    if (!cashReceived) return 0
+    return Math.max(0, parseFloat(cashReceived) - orderTotal)
+  }, [cashReceived, orderTotal])
+
+  const handlePayment = async () => {
+    if (!selectedOrder) return
     setProcessing(true)
     try {
-      const tendered = parseFloat(cashAmount)
-      const total = selectedOrder.total
-      if (tendered < total) { showErrorToast('Amount tendered less than total'); return }
-      await paymentsApi.recordCashPayment({
-        orderId: selectedOrder.id,
-        amount: total,
-        amountTendered: tendered,
-      })
-      const change = tendered - total
-      showSuccessToast(`Payment recorded! Change: KES ${change.toLocaleString()}`)
+      if (paymentMethod === 'cash') {
+        if (parseFloat(cashReceived) < orderTotal) { showErrorToast('Insufficient amount'); return }
+        await paymentsApi.recordCashPayment({
+          orderId: selectedOrder.id,
+          amount: orderTotal,
+          amountTendered: parseFloat(cashReceived),
+        })
+      } else if (paymentMethod === 'card') {
+        await paymentsApi.recordCardPayment(selectedOrder.id, orderTotal)
+      } else {
+        showErrorToast('M-Pesa: use the customer phone prompt')
+        return
+      }
+      const receipt = {
+        orderNumber: selectedOrder.orderNumber,
+        table: selectedOrder.tableNumber,
+        items: selectedOrder.items,
+        subtotal: selectedOrder.items.reduce((s: number, i: any) => s + i.price * i.quantity, 0),
+        discount: parseFloat(discount) || 0,
+        total: orderTotal,
+        method: paymentMethod,
+        cashReceived: parseFloat(cashReceived) || 0,
+        change,
+        time: new Date().toLocaleTimeString(),
+      }
+      setLastPayment(receipt)
+      setShowReceipt(true)
+      showSuccessToast(`Payment recorded!${paymentMethod === 'cash' ? ` Change: KES ${change.toLocaleString()}` : ''}`)
       setSelectedOrder(null)
-      setCashAmount('')
+      setCashReceived('')
+      setDiscount('')
       fetchOrders()
-    } catch { showErrorToast('Failed to record payment') }
+    } catch { showErrorToast('Payment failed') }
     finally { setProcessing(false) }
   }
 
-  const handleCardPayment = async (order: any) => {
-    setProcessing(true)
-    try {
-      await paymentsApi.recordCardPayment(order.id, order.total)
-      showSuccessToast('Card payment recorded!')
-      fetchOrders()
-    } catch { showErrorToast('Failed to record card payment') }
-    finally { setProcessing(false) }
+  const formatKES = (v: number) => `KES ${v.toLocaleString('en-KE')}`
+  const timeAgo = (d: string) => {
+    const mins = Math.floor((Date.now() - new Date(d).getTime()) / 60000)
+    if (mins < 1) return 'Just now'
+    if (mins < 60) return `${mins}m ago`
+    return `${Math.floor(mins / 60)}h ${mins % 60}m ago`
   }
-
-  const filtered = orders.filter((o: any) => {
-    const q = search.toLowerCase()
-    return o.id.toLowerCase().includes(q) ||
-      String(o.tableNumber).includes(q) ||
-      (o.items || []).some((i: any) => (i.name || i.itemName || '').toLowerCase().includes(q))
-  })
 
   return (
-    <div className="min-h-screen bg-background-light dark:bg-background-dark p-4 md:p-6">
-      <div className="max-w-4xl mx-auto">
-        <div className="flex items-center justify-between mb-6">
-          <div>
-            <h1 className="font-heading text-2xl font-bold text-text-primary dark:text-white">Cashier Terminal</h1>
-            <p className="text-xs text-text-secondary">
-              {selectedOrder ? 'Processing payment...' : 'Select an order to process payment'}
-            </p>
-          </div>
-          <div className="flex items-center gap-2">
-            <button onClick={fetchOrders} className="p-2 rounded-xl hover:bg-black/5 dark:hover:bg-white/10">
-              <Clock className="h-4 w-4 text-text-secondary" />
-            </button>
-          </div>
-        </div>
-
-        <div className="flex gap-2 mb-4">
-          {(['pending', 'paid'] as const).map((tab) => (
-            <button key={tab} onClick={() => setActiveTab(tab)}
-              className={`px-4 py-2 rounded-xl text-sm font-medium transition-colors ${activeTab === tab ? 'bg-secondary text-white' : 'bg-black/5 dark:bg-white/10 text-text-secondary'}`}>
-              {tab === 'pending' ? 'Unpaid Orders' : 'Paid Today'}
-            </button>
-          ))}
-        </div>
-
-        <div className="grid lg:grid-cols-3 gap-6">
-          <div className="lg:col-span-2 space-y-3">
-            <Input placeholder="Search by table # or item..." value={search} onChange={(e) => setSearch(e.target.value)}
-              icon={<Search className="h-4 w-4" />} />
-
-            {loading ? (
-              <div className="flex justify-center py-12">
-                <div className="w-8 h-8 border-2 border-secondary border-t-transparent rounded-full animate-spin" />
+    <div className="min-h-screen bg-background-light dark:bg-background-dark">
+      <div className="flex h-screen overflow-hidden">
+        {/* LEFT: Order List */}
+        <div className="flex-1 flex flex-col min-w-0 border-r border-white/10">
+          <header className="shrink-0 bg-white dark:bg-primary-light border-b border-white/10 px-4 py-3">
+            <div className="flex items-center justify-between mb-3">
+              <div>
+                <h1 className="font-heading text-lg font-bold text-text-primary dark:text-white">POS Terminal</h1>
+                <div className="flex items-center gap-2 text-xs text-text-secondary mt-0.5">
+                  <span className="flex items-center gap-1"><ShoppingBag className="w-3 h-3" /> {stats.ordersCount} orders</span>
+                  <span>·</span>
+                  <span className="flex items-center gap-1"><Receipt className="w-3 h-3" /> {formatKES(stats.todayTotal)}</span>
+                  <span>·</span>
+                  <Badge size="sm" variant={stats.pendingCount > 0 ? 'warning' : 'default'}>{stats.pendingCount} pending</Badge>
+                </div>
               </div>
-            ) : filtered.length === 0 ? (
-              <div className="text-center py-12 text-text-secondary/50">
+              <button onClick={fetchOrders} className="p-2 rounded-xl hover:bg-black/5">
+                <Clock className="h-4 w-4 text-text-secondary" />
+              </button>
+            </div>
+            <div className="flex gap-2">
+              <Input placeholder="Search order # or item..." value={search} onChange={(e) => { setSearch(e.target.value); setPage(1) }}
+                icon={<Search className="h-4 w-4" />} containerClassName="flex-1" />
+              <Input placeholder="Table #" value={filterTable} onChange={(e) => { setFilterTable(e.target.value); setPage(1) }}
+                icon={<Hash className="h-4 w-4" />} containerClassName="w-28" />
+            </div>
+            <div className="flex gap-2 mt-2">
+              {(['pending', 'paid'] as const).map((tab) => (
+                <button key={tab} onClick={() => { setActiveTab(tab); setPage(1); setSelectedOrder(null) }}
+                  className={`px-4 py-1.5 rounded-xl text-xs font-medium transition-colors ${
+                    activeTab === tab ? 'bg-secondary text-white' : 'bg-black/5 dark:bg-white/10 text-text-secondary'
+                  }`}>
+                  {tab === 'pending' ? 'Unpaid' : 'Paid Today'}
+                </button>
+              ))}
+            </div>
+          </header>
+
+          <div className="flex-1 overflow-y-auto">
+            {loading ? (
+              <div className="flex justify-center py-20"><Loader2 className="h-8 w-8 animate-spin text-secondary" /></div>
+            ) : paginated.length === 0 ? (
+              <div className="text-center py-20 text-text-secondary/50">
+                <Coffee className="h-12 w-12 mx-auto mb-3 opacity-20" />
                 <p className="font-accent text-sm">All caught up!</p>
-                <p className="text-xs mt-1">No {activeTab === 'pending' ? 'unpaid' : 'paid'} orders</p>
               </div>
             ) : (
-              filtered.map((order: any) => (
-                <motion.div key={order.id} layout initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }}
-                  onClick={() => activeTab === 'pending' && setSelectedOrder(selectedOrder?.id === order.id ? null : order)}
-                  className={`rounded-2xl p-4 border transition-all cursor-pointer ${
-                    selectedOrder?.id === order.id ? 'border-secondary bg-secondary/5' : 'border-white/10 bg-white dark:bg-primary-light hover:bg-black/5'
-                  }`}>
-                  <div className="flex items-center justify-between mb-2">
-                    <div className="flex items-center gap-2">
-                      <span className="font-heading font-bold text-text-primary dark:text-white">
-                        {order.tableNumber > 0 ? `Table ${order.tableNumber}` : 'Takeaway'}
-                      </span>
-                      <Badge size="sm" variant={order.paymentMethod === 'MPESA' ? 'info' : order.paymentMethod === 'CARD' ? 'warning' : 'default'}>
-                        {order.paymentMethod || 'CASH'}
-                      </Badge>
-                    </div>
-                    <span className="font-bold text-secondary text-lg">KES {order.total?.toLocaleString() || 0}</span>
-                  </div>
-                  <div className="space-y-1">
-                    {(order.items || []).slice(0, 4).map((item: any, i: number) => (
-                      <div key={i} className="flex justify-between text-xs text-text-secondary">
-                        <span>{item.quantity || 1}x {item.name || item.itemName || 'Item'}</span>
+              <>
+                <div className="divide-y divide-white/5">
+                  {paginated.map((order: any) => {
+                    const isSelected = selectedOrder?.id === order.id
+                    const itemCount = order.items.reduce((s: number, i: any) => s + i.quantity, 0)
+                    const subtotal = order.items.reduce((s: number, i: any) => s + i.price * i.quantity, 0)
+                    return (
+                      <motion.div key={order.id} layout initial={{ opacity: 0 }}
+                        animate={{ opacity: 1 }}
+                        onClick={() => setSelectedOrder(isSelected ? null : order)}
+                        className={`cursor-pointer transition-colors hover:bg-black/5 dark:hover:bg-white/5 ${
+                          isSelected ? 'bg-secondary/10 dark:bg-secondary/5 border-l-4 border-secondary' : 'border-l-4 border-transparent'
+                        }`}>
+                        <div className="px-4 py-3">
+                          <div className="flex items-start justify-between mb-1">
+                            <div>
+                              <div className="flex items-center gap-2">
+                                <span className="font-mono text-sm font-bold text-text-primary dark:text-white">
+                                  #{order.orderNumber || order.id.slice(0, 6)}
+                                </span>
+                                <Badge size="sm" variant={order.paymentMethod === 'MPESA' ? 'info' : order.paymentMethod === 'CARD' ? 'warning' : 'default'}>
+                                  {order.paymentMethod}
+                                </Badge>
+                              </div>
+                              <div className="flex items-center gap-2 text-xs text-text-secondary mt-0.5">
+                                <span>{order.tableNumber > 0 ? `Table ${order.tableNumber}` : 'Takeaway'}</span>
+                                <span>·</span>
+                                <Clock className="w-3 h-3" /> {timeAgo(order.createdAt)}
+                                <span>·</span>
+                                <span>{itemCount} item{itemCount !== 1 ? 's' : ''}</span>
+                              </div>
+                            </div>
+                            <span className="text-base font-bold text-secondary">{formatKES(order.total)}</span>
+                          </div>
+                          <div className="flex flex-wrap gap-1 mt-1">
+                            {order.items.slice(0, 4).map((item: any, i: number) => (
+                              <span key={i} className="text-[10px] px-2 py-0.5 rounded-full bg-black/5 dark:bg-white/10 text-text-secondary">
+                                {item.quantity}x {item.name}
+                              </span>
+                            ))}
+                            {order.items.length > 4 && (
+                              <span className="text-[10px] text-text-secondary/50">+{order.items.length - 4} more</span>
+                            )}
+                          </div>
+                        </div>
+                      </motion.div>
+                    )
+                  })}
+                </div>
+                {hasMore && (
+                  <button onClick={() => setPage(p => p + 1)}
+                    className="w-full py-3 text-xs text-secondary hover:bg-secondary/5 font-medium transition-colors border-t border-white/10">
+                    <ChevronDown className="h-3 w-3 inline mr-1" /> Load More ({filtered.length - paginated.length} remaining)
+                  </button>
+                )}
+              </>
+            )}
+          </div>
+        </div>
+
+        {/* RIGHT: Payment Panel */}
+        <div className="w-96 shrink-0 bg-white dark:bg-primary-light flex flex-col">
+          <AnimatePresence mode="wait">
+            {showReceipt ? (
+              <motion.div key="receipt" initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0 }} className="flex-1 flex flex-col p-4">
+                <div className="text-center mb-4">
+                  <motion.div initial={{ scale: 0 }} animate={{ scale: 1 }} className="w-14 h-14 rounded-2xl bg-success/10 flex items-center justify-center mx-auto mb-3">
+                    <CheckCircle className="w-7 h-7 text-success" />
+                  </motion.div>
+                  <h3 className="font-heading font-bold text-success">Payment Successful!</h3>
+                  <p className="text-xs text-text-secondary mt-1">{lastPayment?.time}</p>
+                </div>
+                <div className="bg-black/5 dark:bg-white/5 rounded-xl p-4 space-y-2 text-sm flex-1">
+                  <div className="flex justify-between"><span className="text-text-secondary">Order</span><span className="font-bold">#{lastPayment?.orderNumber}</span></div>
+                  <div className="flex justify-between"><span className="text-text-secondary">Table</span><span>{lastPayment?.table > 0 ? `T${lastPayment.table}` : 'Takeaway'}</span></div>
+                  <div className="border-t border-white/10 pt-2 mt-2">
+                    {lastPayment?.items?.map((item: any, i: number) => (
+                      <div key={i} className="flex justify-between text-xs py-0.5">
+                        <span>{item.quantity}x {item.name}</span>
+                        <span>{formatKES(item.price * item.quantity)}</span>
                       </div>
                     ))}
-                    {(order.items || []).length > 4 && (
-                      <p className="text-xs text-text-secondary/50">+{(order.items || []).length - 4} more items</p>
+                  </div>
+                  <div className="border-t border-white/10 pt-2">
+                    <div className="flex justify-between text-xs"><span>Subtotal</span><span>{formatKES(lastPayment?.subtotal || 0)}</span></div>
+                    {lastPayment?.discount > 0 && <div className="flex justify-between text-xs text-success"><span>Discount</span><span>-{formatKES(lastPayment.discount)}</span></div>}
+                    <div className="flex justify-between font-bold text-base mt-1"><span>Total</span><span className="text-secondary">{formatKES(lastPayment?.total || 0)}</span></div>
+                  </div>
+                  <div className="border-t border-white/10 pt-2 text-xs space-y-1">
+                    <div className="flex justify-between"><span>Payment Method</span><span className="uppercase font-medium">{lastPayment?.method}</span></div>
+                    {lastPayment?.method === 'cash' && (
+                      <>
+                        <div className="flex justify-between"><span>Cash Received</span><span>{formatKES(lastPayment.cashReceived)}</span></div>
+                        <div className="flex justify-between text-success font-bold"><span>Change</span><span>{formatKES(lastPayment.change)}</span></div>
+                      </>
                     )}
                   </div>
-                  {activeTab === 'pending' && (
-                    <div className="flex gap-2 mt-3 pt-3 border-t border-white/10">
-                      <Button size="sm" variant="primary" onClick={() => { handleCashPayment(); setCashAmount(String(order.total)) }}>
-                        <Banknote className="h-3 w-3" /> Cash
-                      </Button>
-                      <Button size="sm" variant="outline" onClick={() => handleCardPayment(order)}>
-                        <CreditCard className="h-3 w-3" /> Card
-                      </Button>
-                      {order.paymentMethod === 'MPESA' && (
-                        <Button size="sm" variant="ghost" disabled>
-                          <Smartphone className="h-3 w-3" /> M-Pesa Pending
-                        </Button>
+                </div>
+                <div className="flex gap-2 mt-4">
+                  <Button variant="outline" fullWidth size="sm" onClick={() => setShowReceipt(false)}>Close</Button>
+                  <Button variant="primary" fullWidth size="sm" icon={<Printer className="h-4 w-4" />} onClick={() => window.print()}>Print</Button>
+                </div>
+              </motion.div>
+            ) : selectedOrder ? (
+              <motion.div key="payment" initial={{ opacity: 0, x: 20 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0 }} className="flex-1 flex flex-col">
+                <div className="flex items-center justify-between p-4 border-b border-white/10">
+                  <h3 className="font-heading font-bold text-text-primary dark:text-white">
+                    #{selectedOrder.orderNumber}
+                  </h3>
+                  <button onClick={() => setSelectedOrder(null)} className="p-1.5 rounded-lg hover:bg-black/5">
+                    <X className="h-4 w-4 text-text-secondary" />
+                  </button>
+                </div>
+
+                <div className="flex-1 overflow-y-auto p-4 space-y-4">
+                  <div className="flex items-center gap-2 text-xs text-text-secondary">
+                    <span>{selectedOrder.tableNumber > 0 ? `Table ${selectedOrder.tableNumber}` : 'Takeaway'}</span>
+                    <span>·</span>
+                    <span>{timeAgo(selectedOrder.createdAt)}</span>
+                  </div>
+
+                  <div className="space-y-2">
+                    {selectedOrder.items.map((item: any, i: number) => (
+                      <div key={i} className="flex items-center justify-between py-1.5 border-b border-white/5 last:border-0">
+                        <div className="flex items-center gap-2 min-w-0">
+                          <span className="w-7 h-7 rounded-lg bg-secondary/10 flex items-center justify-center text-xs font-bold text-secondary shrink-0">
+                            {item.quantity}
+                          </span>
+                          <span className="text-sm text-text-primary dark:text-white truncate">{item.name}</span>
+                        </div>
+                        <span className="text-sm font-medium text-text-primary dark:text-white/80 shrink-0 ml-2">
+                          {formatKES(item.price * item.quantity)}
+                        </span>
+                      </div>
+                    ))}
+                  </div>
+
+                  <div className="border-t border-white/10 pt-4 space-y-2">
+                    <div className="flex justify-between text-sm">
+                      <span className="text-text-secondary">Subtotal</span>
+                      <span className="font-medium">{formatKES(selectedOrder.items.reduce((s: number, i: any) => s + i.price * i.quantity, 0))}</span>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <span className="text-sm text-text-secondary">Discount</span>
+                      <Input value={discount} onChange={(e) => setDiscount(e.target.value)}
+                        placeholder="0" type="number" containerClassName="w-24" />
+                    </div>
+                    <div className="flex justify-between font-bold text-lg pt-2 border-t border-white/10">
+                      <span>Total Due</span>
+                      <span className="text-secondary">{formatKES(orderTotal)}</span>
+                    </div>
+                  </div>
+
+                  <div>
+                    <label className="text-xs font-medium text-text-secondary mb-1 block">Payment Method</label>
+                    <div className="grid grid-cols-3 gap-2">
+                      {([
+                        { id: 'cash', label: 'Cash', icon: Banknote, color: 'text-green-500' },
+                        { id: 'card', label: 'Card', icon: CreditCard, color: 'text-blue-500' },
+                        { id: 'mpesa', label: 'M-Pesa', icon: Smartphone, color: 'text-secondary' },
+                      ] as const).map((m) => (
+                        <button key={m.id} onClick={() => setPaymentMethod(m.id)}
+                          className={`flex flex-col items-center gap-1 rounded-xl p-3 text-xs font-medium transition-colors ${
+                            paymentMethod === m.id ? 'bg-secondary text-white' : 'bg-black/5 dark:bg-white/10 text-text-secondary'
+                          }`}>
+                          <m.icon className={`h-5 w-5 ${paymentMethod === m.id ? 'text-white' : m.color}`} />
+                          {m.label}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+
+                  {paymentMethod === 'cash' && (
+                    <div>
+                      <Input label="Cash Received" type="number" value={cashReceived}
+                        onChange={(e) => setCashReceived(e.target.value)}
+                        icon={<Banknote className="h-4 w-4" />} />
+                      {parseFloat(cashReceived) >= orderTotal && (
+                        <div className="mt-2 p-3 rounded-xl bg-success/10 text-success">
+                          <span className="text-xs">Change Due:</span>
+                          <span className="text-xl font-bold ml-2">{formatKES(change)}</span>
+                        </div>
                       )}
                     </div>
                   )}
-                </motion.div>
-              ))
-            )}
-          </div>
-
-          {activeTab === 'pending' && selectedOrder && (
-            <motion.div initial={{ opacity: 0, x: 20 }} animate={{ opacity: 1, x: 0 }}
-              className="bg-white dark:bg-primary-light rounded-2xl p-4 border border-secondary/30 space-y-4 sticky top-4 h-fit">
-              <h3 className="font-heading font-bold text-text-primary">Cash Payment</h3>
-              <div className="bg-secondary/5 rounded-xl p-3">
-                <p className="text-xs text-text-secondary">Total Due</p>
-                <p className="text-2xl font-bold text-secondary">KES {selectedOrder.total?.toLocaleString()}</p>
-              </div>
-              <Input label="Amount Tendered" type="number" value={cashAmount}
-                onChange={(e) => setCashAmount(e.target.value)}
-                icon={<Banknote className="h-4 w-4" />} />
-
-              {cashAmount && parseFloat(cashAmount) >= selectedOrder.total && (
-                <div className="bg-success/10 rounded-xl p-3">
-                  <p className="text-xs text-text-secondary">Change Due</p>
-                  <p className="text-xl font-bold text-success">
-                    KES {(parseFloat(cashAmount) - selectedOrder.total).toLocaleString()}
-                  </p>
                 </div>
-              )}
 
-              <Button fullWidth size="lg" loading={processing}
-                disabled={!cashAmount || parseFloat(cashAmount) < selectedOrder.total}
-                onClick={handleCashPayment}>
-                <CheckCircle className="h-4 w-4" /> Record Cash Payment
-              </Button>
-            </motion.div>
-          )}
+                <div className="p-4 border-t border-white/10">
+                  <Button fullWidth size="lg" loading={processing}
+                    disabled={paymentMethod === 'cash' && (!cashReceived || parseFloat(cashReceived) < orderTotal)}
+                    onClick={handlePayment}
+                    icon={<CheckCircle className="h-5 w-5" />}>
+                    Process Payment · {formatKES(orderTotal)}
+                  </Button>
+                </div>
+              </motion.div>
+            ) : (
+              <motion.div key="empty" initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="flex-1 flex items-center justify-center p-8">
+                <div className="text-center text-text-secondary/40">
+                  <Calculator className="h-16 w-16 mx-auto mb-4 opacity-20" />
+                  <p className="font-accent text-sm">Select an order</p>
+                  <p className="text-xs mt-1">Tap any order on the left to process payment</p>
+                </div>
+              </motion.div>
+            )}
+          </AnimatePresence>
         </div>
       </div>
     </div>
