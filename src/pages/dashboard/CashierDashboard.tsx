@@ -9,12 +9,14 @@ import { Button } from '@/components/ui/Button'
 import { Input } from '@/components/ui/Input'
 import { Badge } from '@/components/ui/Badge'
 import { showSuccessToast, showErrorToast } from '@/components/ui/Toast'
+import { useStore } from '@/store/useStore'
 import * as ordersApi from '@/api/orders'
 import * as paymentsApi from '@/api/payments'
 
 const ITEMS_PER_PAGE = 15
 
 export default function CashierDashboard() {
+  const { restaurant } = useStore()
   const [orders, setOrders] = useState<any[]>([])
   const [allOrders, setAllOrders] = useState<any[]>([])
   const [loading, setLoading] = useState(true)
@@ -112,7 +114,9 @@ export default function CashierDashboard() {
         showErrorToast('M-Pesa: use the customer phone prompt')
         return
       }
+      const receiptNo = genReceiptNo()
       const receipt = {
+        receiptNo,
         orderNumber: selectedOrder.orderNumber,
         table: selectedOrder.tableNumber,
         items: selectedOrder.items,
@@ -122,7 +126,8 @@ export default function CashierDashboard() {
         method: paymentMethod,
         cashReceived: parseFloat(cashReceived) || 0,
         change,
-        time: new Date().toLocaleTimeString(),
+        time: new Date().toLocaleString('en-KE', { hour12: true }),
+        date: new Date().toLocaleDateString('en-KE'),
       }
       setLastPayment(receipt)
       setShowReceipt(true)
@@ -141,6 +146,12 @@ export default function CashierDashboard() {
     if (mins < 1) return 'Just now'
     if (mins < 60) return `${mins}m ago`
     return `${Math.floor(mins / 60)}h ${mins % 60}m ago`
+  }
+  const genReceiptNo = () => {
+    const now = new Date()
+    const d = `${now.getFullYear()}${String(now.getMonth()+1).padStart(2,'0')}${String(now.getDate()).padStart(2,'0')}`
+    const t = `${String(now.getHours()).padStart(2,'0')}${String(now.getMinutes()).padStart(2,'0')}`
+    return `ETR-${d}-${t}${String(Math.floor(Math.random()*9000)+1000)}`
   }
 
   return (
@@ -255,43 +266,91 @@ export default function CashierDashboard() {
         <div className="w-96 shrink-0 bg-white dark:bg-primary-light flex flex-col">
           <AnimatePresence mode="wait">
             {showReceipt ? (
-              <motion.div key="receipt" initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0 }} className="flex-1 flex flex-col p-4">
-                <div className="text-center mb-4">
-                  <motion.div initial={{ scale: 0 }} animate={{ scale: 1 }} className="w-14 h-14 rounded-2xl bg-success/10 flex items-center justify-center mx-auto mb-3">
-                    <CheckCircle className="w-7 h-7 text-success" />
-                  </motion.div>
-                  <h3 className="font-heading font-bold text-success">Payment Successful!</h3>
-                  <p className="text-xs text-text-secondary mt-1">{lastPayment?.time}</p>
+              <motion.div key="receipt" initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0 }} className="flex-1 flex flex-col">
+                <div className="p-4 border-b border-white/10 flex items-center justify-between">
+                  <h3 className="font-heading font-bold text-text-primary">Receipt</h3>
+                  <div className="flex gap-1">
+                    <Button variant="ghost" size="sm" onClick={() => window.print()}><Printer className="h-4 w-4" /></Button>
+                    <button onClick={() => setShowReceipt(false)} className="p-1.5 rounded-lg hover:bg-black/5"><X className="h-4 w-4 text-text-secondary" /></button>
+                  </div>
                 </div>
-                <div className="bg-black/5 dark:bg-white/5 rounded-xl p-4 space-y-2 text-sm flex-1">
-                  <div className="flex justify-between"><span className="text-text-secondary">Order</span><span className="font-bold">#{lastPayment?.orderNumber}</span></div>
-                  <div className="flex justify-between"><span className="text-text-secondary">Table</span><span>{lastPayment?.table > 0 ? `T${lastPayment.table}` : 'Takeaway'}</span></div>
-                  <div className="border-t border-white/10 pt-2 mt-2">
-                    {lastPayment?.items?.map((item: any, i: number) => (
-                      <div key={i} className="flex justify-between text-xs py-0.5">
-                        <span>{item.quantity}x {item.name}</span>
-                        <span>{formatKES(item.price * item.quantity)}</span>
+                <div className="flex-1 overflow-y-auto p-4 font-mono text-xs leading-relaxed" id="etr-receipt">
+                  <div className="text-center border-b-2 border-dashed border-gray-300 dark:border-white/20 pb-3 mb-3">
+                    <h3 className="font-bold text-sm uppercase tracking-wider">{restaurant?.name || 'MenuMoja'}</h3>
+                    <p className="text-text-secondary mt-0.5">{restaurant?.address || ''}</p>
+                    <p className="text-text-secondary">PIN: {restaurant?.kraPin || 'P051234567X'}</p>
+                    <p className="text-text-secondary">Tel: {restaurant?.phone || ''}</p>
+                    <div className="mt-2 pt-2 border-t border-dashed border-gray-300 dark:border-white/20">
+                      <p className="font-bold">ETR RECEIPT</p>
+                      <p className="text-[10px] text-text-secondary">Serial: {lastPayment?.receiptNo}</p>
+                      <p className="text-[10px] text-text-secondary">Date: {lastPayment?.date}</p>
+                      <p className="text-[10px] text-text-secondary">Time: {lastPayment?.time}</p>
+                    </div>
+                  </div>
+                  <div className="space-y-1 mb-3">
+                    <div className="flex justify-between text-[10px] text-text-secondary">
+                      <span>Order:</span><span>#{lastPayment?.orderNumber}</span>
+                    </div>
+                    <div className="flex justify-between text-[10px] text-text-secondary">
+                      <span>Table:</span><span>{lastPayment?.table > 0 ? `T${lastPayment.table}` : 'Takeaway'}</span>
+                    </div>
+                    <div className="flex justify-between text-[10px] text-text-secondary">
+                      <span>Payment:</span><span className="uppercase">{lastPayment?.method}</span>
+                    </div>
+                  </div>
+                  <table className="w-full text-[11px] border-y border-dashed border-gray-300 dark:border-white/20">
+                    <thead>
+                      <tr className="text-text-secondary border-b border-gray-200 dark:border-white/10">
+                        <th className="text-left py-1 font-normal">Item</th>
+                        <th className="text-center py-1 w-8 font-normal">Qty</th>
+                        <th className="text-right py-1 w-20 font-normal">Amount</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {lastPayment?.items?.map((item: any, i: number) => (
+                        <tr key={i} className="border-b border-gray-100 dark:border-white/5 last:border-0">
+                          <td className="py-1 text-text-primary">{item.name}</td>
+                          <td className="py-1 text-center">{item.quantity}</td>
+                          <td className="py-1 text-right">{formatKES(item.price * item.quantity)}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                  <div className="border-b border-dashed border-gray-300 dark:border-white/20 pb-2 mt-2 space-y-1">
+                    <div className="flex justify-between text-[11px]">
+                      <span className="text-text-secondary">Subtotal</span>
+                      <span>{formatKES(lastPayment?.subtotal || 0)}</span>
+                    </div>
+                    {lastPayment?.discount > 0 && (
+                      <div className="flex justify-between text-[11px] text-success">
+                        <span>Discount</span>
+                        <span>-{formatKES(lastPayment.discount)}</span>
                       </div>
-                    ))}
-                  </div>
-                  <div className="border-t border-white/10 pt-2">
-                    <div className="flex justify-between text-xs"><span>Subtotal</span><span>{formatKES(lastPayment?.subtotal || 0)}</span></div>
-                    {lastPayment?.discount > 0 && <div className="flex justify-between text-xs text-success"><span>Discount</span><span>-{formatKES(lastPayment.discount)}</span></div>}
-                    <div className="flex justify-between font-bold text-base mt-1"><span>Total</span><span className="text-secondary">{formatKES(lastPayment?.total || 0)}</span></div>
-                  </div>
-                  <div className="border-t border-white/10 pt-2 text-xs space-y-1">
-                    <div className="flex justify-between"><span>Payment Method</span><span className="uppercase font-medium">{lastPayment?.method}</span></div>
-                    {lastPayment?.method === 'cash' && (
-                      <>
-                        <div className="flex justify-between"><span>Cash Received</span><span>{formatKES(lastPayment.cashReceived)}</span></div>
-                        <div className="flex justify-between text-success font-bold"><span>Change</span><span>{formatKES(lastPayment.change)}</span></div>
-                      </>
                     )}
+                    <div className="flex justify-between text-[11px] text-text-secondary">
+                      <span>VAT (16%)</span>
+                      <span>{formatKES(Math.round((lastPayment?.total || 0) * 0.16 / 1.16))}</span>
+                    </div>
+                    <div className="flex justify-between font-bold text-sm pt-1 border-t border-gray-200 dark:border-white/10">
+                      <span>TOTAL</span>
+                      <span>{formatKES(lastPayment?.total || 0)}</span>
+                    </div>
+                  </div>
+                  {lastPayment?.method === 'cash' && (
+                    <div className="border-b border-dashed border-gray-300 dark:border-white/20 pb-2 mt-2 space-y-1 text-[11px]">
+                      <div className="flex justify-between"><span className="text-text-secondary">Cash Received</span><span>{formatKES(lastPayment.cashReceived)}</span></div>
+                      <div className="flex justify-between font-bold text-success"><span>Change Due</span><span>{formatKES(lastPayment.change)}</span></div>
+                    </div>
+                  )}
+                  <div className="text-center mt-3 pt-3 border-t-2 border-dashed border-gray-300 dark:border-white/20">
+                    <p className="text-[10px] text-text-secondary">Goods once sold cannot be returned</p>
+                    <p className="text-[10px] text-text-secondary">Thank you for your business!</p>
+                    <p className="text-[9px] text-text-secondary mt-1">Served by: {localStorage.getItem('staffName') || 'Cashier'}</p>
+                    <p className="text-[9px] text-text-secondary font-bold mt-2">ETR PIN: {restaurant?.kraPin || 'P051234567X'}</p>
                   </div>
                 </div>
-                <div className="flex gap-2 mt-4">
-                  <Button variant="outline" fullWidth size="sm" onClick={() => setShowReceipt(false)}>Close</Button>
-                  <Button variant="primary" fullWidth size="sm" icon={<Printer className="h-4 w-4" />} onClick={() => window.print()}>Print</Button>
+                <div className="p-4 border-t border-white/10">
+                  <Button fullWidth size="sm" onClick={() => setShowReceipt(false)}>Close Receipt</Button>
                 </div>
               </motion.div>
             ) : selectedOrder ? (
