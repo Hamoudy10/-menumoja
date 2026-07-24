@@ -117,7 +117,7 @@ export default function KitchenDisplay() {
                 )}
 
                 <div className="flex gap-2">
-                  {(status === 'PENDING' || status === 'CONFIRMED') && (
+                  {(status === 'PENDING' || status === 'NEW' || status === 'CONFIRMED') && (
                     <Button size="sm" fullWidth onClick={() => handleStatusUpdate(order.id, 'preparing')}>
                       <Timer className="w-3.5 h-3.5" /> Start Preparing
                     </Button>

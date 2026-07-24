@@ -66,7 +66,7 @@ const customerCreateOrderSchema = z.object({
 });
 
 const TRANSITION_MAP: Record<string, string[]> = {
-  PENDING: ['CONFIRMED', 'CANCELLED'],
+  PENDING: ['CONFIRMED', 'PREPARING', 'CANCELLED'],
   CONFIRMED: ['PREPARING', 'CANCELLED'],
   PREPARING: ['READY'],
   READY: ['SERVED'],
