@@ -37,7 +37,7 @@ export default function DashboardSidebar({ onClose }: DashboardSidebarProps) {
               {restaurant?.name || 'MenuMoja'}
             </p>
             <p className="text-[10px] text-text-secondary dark:text-white/40 truncate">
-              {restaurant?.plan ? `${restaurant.plan.charAt(0).toUpperCase() + restaurant.plan.slice(1)} Plan` : 'Dashboard'}
+              {(() => { const p = restaurant?.plan as any; if (!p) return 'Dashboard'; const name = typeof p === 'string' ? p : p.name || ''; return name ? name.charAt(0).toUpperCase() + name.slice(1) + ' Plan' : 'Dashboard'; })()}
             </p>
           </div>
         </div>
