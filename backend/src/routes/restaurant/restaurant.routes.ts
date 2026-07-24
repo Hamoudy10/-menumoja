@@ -417,7 +417,7 @@ router.post(
   validate(createStaffSchema),
   asyncHandler(async (req, res) => {
     const restaurantId = (req as any).restaurantId;
-    const { name, email, phone, role, pin, employeeNumber, nationalId, kraPin, nhifNumber, nssfNumber, dateOfBirth, address, emergencyName, emergencyPhone, emergencyRelation, nextOfKin, nextOfKinPhone, nextOfKinRelation, bankName, bankBranch, bankAccount, monthlySalary, hourlyRate, leaveDays, startDate, notes } = req.body;
+    const { name, email, phone, role, pin, active, isActive, employeeNumber, nationalId, kraPin, nhifNumber, nssfNumber, dateOfBirth, address, emergencyName, emergencyPhone, emergencyRelation, nextOfKin, nextOfKinPhone, nextOfKinRelation, bankName, bankBranch, bankAccount, monthlySalary, hourlyRate, leaveDays, startDate, notes } = req.body;
 
     const existing = await prisma.staff.findFirst({
       where: { restaurantId, OR: [{ phone }, { fullName: name }] },
@@ -441,6 +441,7 @@ router.post(
         email,
         pinHash,
         role: (roleMap[role] || 'WAITER') as any,
+        isActive: isActive ?? active ?? true,
         employeeNumber,
         nationalId,
         kraPin,

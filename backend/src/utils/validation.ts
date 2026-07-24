@@ -292,8 +292,9 @@ export const createStaffSchema = z
     leaveDays: z.number().int().optional(),
     startDate: z.string().optional(),
     notes: z.string().optional(),
-  })
-  .strict();
+    isActive: z.boolean().optional(),
+    active: z.boolean().optional(),
+  });
 
 export const updateStaffSchema = createStaffSchema.partial().strict();
 
