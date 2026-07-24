@@ -184,7 +184,7 @@ export default function SettingsPage() {
     } catch { showErrorToast('Failed to save payment settings') } finally { setSaving(false) }
   }
 
-  const handleSaveStaff = async () => {
+  const handleAddStaff = async () => {
     if (!newStaff.name || !newStaff.phone || !newStaff.pin) return
     try {
       const payload: any = { ...newStaff, active: true }
@@ -198,15 +198,10 @@ export default function SettingsPage() {
         await addStaff(payload)
         showSuccessToast('Staff added')
       }
-      resetStaffForm()
+      setNewStaff({ name: '', phone: '', role: 'waiter', pin: '', email: '', employeeNumber: '', nationalId: '', kraPin: '', nhifNumber: '', nssfNumber: '', dateOfBirth: '', address: '', emergencyName: '', emergencyPhone: '', emergencyRelation: '', nextOfKin: '', nextOfKinPhone: '', nextOfKinRelation: '', bankName: '', bankBranch: '', bankAccount: '', monthlySalary: '', hourlyRate: '', leaveDays: '', startDate: '', notes: '' })
       setShowAddStaff(false)
       setEditingStaffId(null)
     } catch {}
-  }
-
-  const resetStaffForm = () => {
-    setNewStaff({ name: '', phone: '', role: 'waiter', pin: '', email: '', employeeNumber: '', nationalId: '', kraPin: '', nhifNumber: '', nssfNumber: '', dateOfBirth: '', address: '', emergencyName: '', emergencyPhone: '', emergencyRelation: '', nextOfKin: '', nextOfKinPhone: '', nextOfKinRelation: '', bankName: '', bankBranch: '', bankAccount: '', monthlySalary: '', hourlyRate: '', leaveDays: '', startDate: '', notes: '' })
-  }
   }
 
   const handleSaveNotifications = async () => {
@@ -616,32 +611,15 @@ export default function SettingsPage() {
                           {(member.isActive !== false || member.active !== false) ? t('staff.active') : t('staff.inactive')}
                         </Badge>
                       </td>
-                      <td className="px-2 py-3 text-right">
-                        <div className="flex items-center gap-1 justify-end">
-                          <button onClick={() => {
-                            setEditingStaffId(member.id)
-                            setNewStaff({
-                              name: member.fullName || member.name || '',
-                              phone: member.phone || '',
-                              role: member.role || 'waiter',
-                              pin: '', email: member.email || '',
-                              employeeNumber: member.employeeNumber || '',
-                              nationalId: '', kraPin: '', nhifNumber: '', nssfNumber: '',
-                              dateOfBirth: '', address: '', emergencyName: '', emergencyPhone: '', emergencyRelation: '',
-                              nextOfKin: '', nextOfKinPhone: '', nextOfKinRelation: '',
-                              bankName: '', bankBranch: '', bankAccount: '',
-                              monthlySalary: '', hourlyRate: '', leaveDays: '', startDate: '', notes: '',
-                            })
-                            setShowAddStaff(true)
-                          }}
-                            className="p-1.5 rounded-lg hover:bg-blue-100 dark:hover:bg-blue-900/30 text-text-secondary hover:text-blue-500 transition-colors">
-                            <Edit3 className="h-3.5 w-3.5" />
-                          </button>
-                          <button onClick={async () => { if (!confirm('Remove this staff member?')) return; try { await removeStaff(member.id); showSuccessToast('Staff removed') } catch {} }}
-                            className="p-1.5 rounded-lg hover:bg-red-100 dark:hover:bg-red-900/30 text-text-secondary hover:text-red-500 transition-colors">
-                            <Trash2 className="h-3.5 w-3.5" />
-                          </button>
-                        </div>
+                      <td className="px-2 py-3 text-right space-x-1">
+                        <button onClick={() => { setEditingStaffId(member.id); setNewStaff({ name: member.fullName || member.name || '', phone: member.phone || '', role: member.role || 'waiter', pin: '', email: member.email || '', employeeNumber: member.employeeNumber || '', nationalId: '', kraPin: '', nhifNumber: '', nssfNumber: '', dateOfBirth: '', address: '', emergencyName: '', emergencyPhone: '', emergencyRelation: '', nextOfKin: '', nextOfKinPhone: '', nextOfKinRelation: '', bankName: '', bankBranch: '', bankAccount: '', monthlySalary: '', hourlyRate: '', leaveDays: '', startDate: '', notes: '' }); setShowAddStaff(true) }}
+                          className="p-1.5 rounded-lg hover:bg-blue-100 dark:hover:bg-blue-900/30 text-text-secondary hover:text-blue-500 transition-colors">
+                          <Edit3 className="h-3.5 w-3.5" />
+                        </button>
+                        <button onClick={async () => { if (confirm('Remove this staff member?')) { try { await removeStaff(member.id); showSuccessToast('Staff removed') } catch {} } }}
+                          className="p-1.5 rounded-lg hover:bg-red-100 dark:hover:bg-red-900/30 text-text-secondary hover:text-red-500 transition-colors">
+                          <Trash2 className="h-3.5 w-3.5" />
+                        </button>
                       </td>
                     </tr>
                   ))}
@@ -726,13 +704,13 @@ export default function SettingsPage() {
                     </div>
 
                     <div className="flex gap-2 pt-2 border-t border-white/10">
-                      <Button size="sm" onClick={handleSaveStaff}><Save className="h-3.5 w-3.5" /> {editingStaffId ? 'Update Staff' : t('staff.addStaff')}</Button>
-                      <Button variant="ghost" size="sm" onClick={() => setShowAddStaff(false)}>{t('app.cancel')}</Button>
+                      <Button size="sm" onClick={handleAddStaff}><Save className="h-3.5 w-3.5" /> {editingStaffId ? 'Update Staff' : t('staff.addStaff')}</Button>
+                      <Button variant="ghost" size="sm" onClick={() => { setShowAddStaff(false); setEditingStaffId(null) }}>{t('app.cancel')}</Button>
                     </div>
                   </div>
                 </motion.div>
               ) : (
-                <Button onClick={() => { setEditingStaffId(null); resetStaffForm(); setShowAddStaff(true) }}><Plus className="h-4 w-4" /> {t('staff.addStaff')}</Button>
+                <Button onClick={() => { setEditingStaffId(null); setNewStaff({ name: '', phone: '', role: 'waiter', pin: '', email: '', employeeNumber: '', nationalId: '', kraPin: '', nhifNumber: '', nssfNumber: '', dateOfBirth: '', address: '', emergencyName: '', emergencyPhone: '', emergencyRelation: '', nextOfKin: '', nextOfKinPhone: '', nextOfKinRelation: '', bankName: '', bankBranch: '', bankAccount: '', monthlySalary: '', hourlyRate: '', leaveDays: '', startDate: '', notes: '' }); setShowAddStaff(true) }}><Plus className="h-4 w-4" /> {t('staff.addStaff')}</Button>
               )}
             </AnimatePresence>
           </div>
@@ -862,17 +840,18 @@ export default function SettingsPage() {
           </div>
         )
 
-      case 'subscription':
+      case 'subscription': {
+        const planName = (typeof restaurant?.plan === 'string' ? restaurant.plan : (restaurant?.plan as any)?.name || 'business').toLowerCase()
         return (
           <div className="space-y-4">
             <div className="rounded-2xl bg-gradient-to-br from-primary to-primary-light p-6 text-white">
               <Crown className="h-8 w-8 text-accent mb-3" />
-              <h3 className="font-heading text-xl font-bold">{restaurant?.plan === 'premium' || (restaurant?.plan as any)?.name === 'Premium' ? 'Premium Plan' : restaurant?.plan === 'starter' || (restaurant?.plan as any)?.name === 'Starter' ? 'Starter Plan' : 'Business Plan'}</h3>
-              <p className="font-body text-sm text-white/70 mt-1">{restaurant?.plan === 'premium' || (restaurant?.plan as any)?.name === 'Premium' ? 'KES 7,500/month' : restaurant?.plan === 'starter' || (restaurant?.plan as any)?.name === 'Starter' ? 'KES 1,500/month' : 'KES 3,500/month'}</p>
+              <h3 className="font-heading text-xl font-bold">{planName === 'premium' ? 'Premium Plan' : planName === 'starter' ? 'Starter Plan' : 'Business Plan'}</h3>
+              <p className="font-body text-sm text-white/70 mt-1">{planName === 'premium' ? 'KES 7,500/month' : planName === 'starter' ? 'KES 1,500/month' : 'KES 3,500/month'}</p>
               <div className="mt-4 space-y-2">
-                {(restaurant?.plan === 'starter' || (restaurant?.plan as any)?.name === 'Starter'
+                {(planName === 'starter'
                   ? ['unlimitedItems', 'qrCodes']
-                  : restaurant?.plan === 'premium' || (restaurant?.plan as any)?.name === 'Premium'
+                  : planName === 'premium'
                   ? ['unlimitedItems', 'aiMarketing', 'staffManagement', 'qrCodes', 'analytics', 'prioritySupport']
                   : ['unlimitedItems', 'aiMarketing', 'staffManagement', 'qrCodes', 'analytics']
                 ).map((feature) => (
@@ -888,6 +867,7 @@ export default function SettingsPage() {
             </Button>
           </div>
         )
+      }
 
       case 'delete':
         return (
