@@ -598,7 +598,7 @@ export const useStore = create<AppState>((set) => ({
         reference: p.mpesaReceiptNumber || p.mpesaTransactionId || `Order #${p.order?.orderNumber || ''}`,
         createdAt: p.createdAt || p.processedAt || new Date().toISOString(),
       })) : []
-      set({ transactions: normalized })
+      set({ transactions: normalized as any })
     } catch (err: any) {
       toast.error(err?.response?.data?.message || 'Failed to load payments')
     }

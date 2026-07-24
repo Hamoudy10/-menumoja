@@ -35,7 +35,7 @@ export default function PaymentsPage() {
   }, [transactions])
 
   const hourlyData = useMemo(() => {
-    const hours: Record<number, { mpesa: number; cash: number; card: number }> = {}
+    const hours: Record<number, any> = {}
     for (let h = 7; h <= 23; h++) {
       hours[h] = { mpesa: 0, cash: 0, card: 0 }
     }
