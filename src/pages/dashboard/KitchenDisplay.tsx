@@ -35,7 +35,10 @@ export default function KitchenDisplay() {
   }
 
   const allOrders = [...liveOrders, ...orders.filter((o: any) => !liveOrders.find((l: any) => l.id === o.id))]
-  const pendingOrders = allOrders.filter((o: any) => ['PENDING', 'CONFIRMED', 'PREPARING'].includes(o.status?.toUpperCase?.() || o.status))
+  const pendingOrders = allOrders.filter((o: any) => {
+    const s = (o.status || '').toUpperCase()
+    return ['PENDING', 'CONFIRMED', 'PREPARING', 'NEW'].includes(s)
+  })
 
   if (loading) {
     return (
