@@ -18,7 +18,7 @@ export default function TablesPage() {
   const [loading, setLoading] = useState(true)
   const [showForm, setShowForm] = useState(false)
   const [editTable, setEditTable] = useState<any>(null)
-  const [form, setForm] = useState({ tableNumber: '', label: '', capacity: '4', area: '', shape: 'ROUND' })
+  const [form, setForm] = useState({ tableNumber: '', label: '', capacity: '4', shape: 'ROUND' })
 
   useEffect(() => { fetchTables().finally(() => setLoading(false)) }, [])
 
@@ -30,20 +30,18 @@ export default function TablesPage() {
           tableNumber: parseInt(form.tableNumber),
           label: form.label,
           capacity: parseInt(form.capacity) || 4,
-          area: form.area || undefined,
         })
       } else {
         await tablesApi.createTable({
           tableNumber: parseInt(form.tableNumber),
           label: form.label,
           capacity: parseInt(form.capacity) || 4,
-          area: form.area || undefined,
         })
       }
       showSuccessToast(editTable ? 'Table updated' : 'Table created')
       setShowForm(false)
       setEditTable(null)
-      setForm({ tableNumber: '', label: '', capacity: '4', area: '', shape: 'ROUND' })
+      setForm({ tableNumber: '', label: '', capacity: '4', shape: 'ROUND' })
       fetchTables()
     } catch { showErrorToast('Failed to save table') }
   }
@@ -57,8 +55,6 @@ export default function TablesPage() {
     } catch { showErrorToast('Failed to delete table') }
   }
 
-  const areas = [...new Set(tables.map((t: any) => t.area).filter(Boolean))] as string[]
-
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between">
@@ -66,7 +62,7 @@ export default function TablesPage() {
           <h1 className="font-heading text-2xl font-bold text-text-primary dark:text-white">Tables</h1>
           <p className="font-body text-sm text-text-secondary dark:text-white/50">Manage your restaurant tables and seating areas</p>
         </div>
-        <Button onClick={() => { setEditTable(null); setForm({ tableNumber: '', label: '', capacity: '4', area: '', shape: 'ROUND' }); setShowForm(true) }}>
+        <Button onClick={() => { setEditTable(null); setForm({ tableNumber: '', label: '', capacity: '4', shape: 'ROUND' }); setShowForm(true) }}>
           <Plus className="h-4 w-4" /> Add Table
         </Button>
       </div>
@@ -75,20 +71,7 @@ export default function TablesPage() {
         <div className="flex items-center justify-center py-16">
           <div className="w-8 h-8 border-2 border-secondary border-t-transparent rounded-full animate-spin" />
         </div>
-      ) : areas.length > 0 && (
-        <div className="flex gap-2 flex-wrap">
-          <button onClick={() => setForm({ ...form, area: '' })}
-            className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-colors ${!form.area ? 'bg-secondary text-white' : 'bg-gray-100 text-text-secondary hover:bg-gray-200'}`}>
-            All Areas
-          </button>
-          {areas.map((area) => (
-            <button key={area} onClick={() => setForm({ ...form, area })}
-              className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-colors ${form.area === area ? 'bg-secondary text-white' : 'bg-gray-100 text-text-secondary hover:bg-gray-200'}`}>
-              {area}
-            </button>
-          ))}
-        </div>
-      )}
+      ) : null}
 
       {tables.length === 0 && !loading ? (
         <div className="text-center py-16">
@@ -99,9 +82,7 @@ export default function TablesPage() {
         </div>
       ) : (
         <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-4">
-          {tables
-            .filter((t: any) => !form.area || t.area === form.area)
-            .map((table: any) => {
+          {tables.map((table: any) => {
               const statusColors: Record<string, string> = {
                 FREE: 'border-success/30 bg-success/5',
                 OCCUPIED: 'border-secondary/30 bg-secondary/5',
@@ -126,7 +107,6 @@ export default function TablesPage() {
                       tableNumber: String(table.tableNumber),
                       label: table.label,
                       capacity: String(table.capacity || 4),
-                      area: table.area || '',
                       shape: table.shape || 'ROUND',
                     })
                     setShowForm(true)
@@ -139,7 +119,7 @@ export default function TablesPage() {
                     style={{ color: table.status === 'FREE' ? '#2ECC71' : table.status === 'OCCUPIED' ? '#FF6B35' : '#6B7280' }}>
                     {statusLabels[table.status] || table.status}
                   </p>
-                  {table.area && <p className="text-[9px] text-text-secondary/50 mt-1">{table.area}</p>}
+
                 </motion.div>
               )
             })}
@@ -162,7 +142,6 @@ export default function TablesPage() {
               <Input label="Table Number" type="number" value={form.tableNumber} onChange={(e) => setForm({ ...form, tableNumber: e.target.value })} />
               <Input label="Label / Name" value={form.label} onChange={(e) => setForm({ ...form, label: e.target.value })} placeholder="e.g. Window Table 1" />
               <Input label="Capacity" type="number" value={form.capacity} onChange={(e) => setForm({ ...form, capacity: e.target.value })} />
-              <Input label="Area / Section" value={form.area} onChange={(e) => setForm({ ...form, area: e.target.value })} placeholder="e.g. Main Hall, VIP, Outdoor" />
 
               <div>
                 <label className="mb-2 block font-accent text-sm font-medium text-text-primary dark:text-white/90">Table Shape</label>
