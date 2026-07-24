@@ -252,7 +252,7 @@ export const useStore = create<AppState>((set) => ({
     const refreshToken = localStorage.getItem('refreshToken')
     if (!accessToken || !refreshToken) return
     try {
-      set({ accessToken, refreshToken, isAuthenticated: true })
+      set({ accessToken, refreshToken, isAuthenticated: true, userRole: 'owner' })
       const data = await restaurantApi.fetchRestaurant()
       if (data) {
         set({
