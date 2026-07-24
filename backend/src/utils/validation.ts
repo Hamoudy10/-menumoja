@@ -245,7 +245,7 @@ export const initiateMpesaSchema = z
     phone: z
       .string()
       .regex(phoneRegex, 'Phone must be in +254XXXXXXXXX format'),
-    amount: z.number().min(1, 'Amount must be at least KES 1').max(150000, 'Amount exceeds M-Pesa maximum (KES 150,000)'),
+    amount: z.number().min(1, 'Amount must be at least KES 1').max(150000, 'Amount exceeds M-Pesa maximum (KES 150,000)').optional(),
     orderId: z.string().uuid('Invalid order ID'),
     accountReference: z.string().min(1).max(12).optional(),
     transactionDesc: z.string().max(100).optional(),
