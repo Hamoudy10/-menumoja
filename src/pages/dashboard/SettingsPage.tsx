@@ -52,6 +52,7 @@ export default function SettingsPage() {
     language, setLanguage,
     qrCodes, fetchQrCodes, generateQrCode, generateBatchQrCodes, deleteQrCode,
     fetchNotifications,
+    tables, fetchTables,
   } = useStore()
   const { theme, updateTheme } = useTheme()
 
@@ -109,6 +110,7 @@ export default function SettingsPage() {
   useEffect(() => {
     fetchStaff()
     fetchQrCodes()
+    fetchTables()
     const googleEmail = localStorage.getItem('google_email')
     if (googleEmail) setIsGoogleUser(true)
 
@@ -458,7 +460,28 @@ export default function SettingsPage() {
                 <motion.div initial={{ opacity: 0, height: 0 }} animate={{ opacity: 1, height: 'auto' }} exit={{ opacity: 0, height: 0 }} className="overflow-hidden">
                   <div className="rounded-xl border border-white/10 p-4 space-y-3">
                     <h4 className="font-accent text-sm font-bold text-text-primary dark:text-white">{t('qr.generateForTable')}</h4>
-                    <Input label={t('qr.tableNumber')} type="number" value={tableQRNumber} onChange={(e) => setTableQRNumber(e.target.value)} placeholder={t('qr.enterTableNumber')} />
+                    {tables.length > 0 ? (
+                      <div>
+                        <label className="mb-2 block font-accent text-sm font-medium text-text-primary dark:text-white/90">Select Table</label>
+                        <div className="grid grid-cols-2 gap-2 max-h-40 overflow-y-auto">
+                          {tables.map((tbl: any) => (
+                            <button
+                              key={tbl.id}
+                              onClick={() => { setTableQRNumber(String(tbl.tableNumber)); setTableQRLabel(tbl.label) }}
+                              className={`rounded-xl px-3 py-2 text-left text-xs font-medium transition-colors ${
+                                tableQRNumber === String(tbl.tableNumber) ? 'bg-secondary text-white' : 'bg-black/5 dark:bg-white/10 text-text-secondary hover:bg-black/10'
+                              }`}
+                            >
+                              <span className="block font-bold">T{tbl.tableNumber}</span>
+                              <span className="text-[10px] opacity-70 truncate">{tbl.label}</span>
+                            </button>
+                          ))}
+                        </div>
+                      </div>
+                    ) : (
+                      <p className="text-xs text-text-secondary/60 italic">No tables found. Create tables in the Tables page first.</p>
+                    )}
+                    <Input label={t('qr.tableNumber')} type="number" value={tableQRNumber} onChange={(e) => setTableQRNumber(e.target.value)} placeholder="Or enter number manually" />
                     <Input label={t('qr.tableLabel')} value={tableQRLabel} onChange={(e) => setTableQRLabel(e.target.value)} placeholder="e.g., Window Table" />
                     <div className="flex gap-2">
                       <Button size="sm" onClick={handleGenerateTableQR}><Plus className="h-3.5 w-3.5" /> Generate</Button>
