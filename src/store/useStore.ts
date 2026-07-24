@@ -588,7 +588,17 @@ export const useStore = create<AppState>((set) => ({
   fetchPayments: async (params) => {
     try {
       const data = await paymentsApi.fetchPayments(params)
-      set({ transactions: data.transactions || data })
+      const raw = data.transactions || data
+      const normalized = Array.isArray(raw) ? raw.map((p: any) => ({
+        id: p.id,
+        tableNumber: p.order?.tableNumber ?? p.tableNumber ?? 0,
+        amount: p.amount || 0,
+        method: p.paymentMethod === 'MPESA' ? 'mpesa' : p.paymentMethod === 'CARD' ? 'card' : 'cash',
+        status: p.status === 'PAID' ? 'confirmed' : p.status === 'PENDING' ? 'pending' : 'failed',
+        reference: p.mpesaReceiptNumber || p.mpesaTransactionId || `Order #${p.order?.orderNumber || ''}`,
+        createdAt: p.createdAt || p.processedAt || new Date().toISOString(),
+      })) : []
+      set({ transactions: normalized })
     } catch (err: any) {
       toast.error(err?.response?.data?.message || 'Failed to load payments')
     }

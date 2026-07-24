@@ -63,6 +63,7 @@ const customerCreateOrderSchema = z.object({
   })).min(1, 'At least one item is required'),
   specialNotes: z.string().max(1000).optional(),
   paymentMethod: z.enum(['mpesa', 'cash', 'card']).default('cash'),
+  customerPhone: z.string().optional(),
 });
 
 const TRANSITION_MAP: Record<string, string[]> = {

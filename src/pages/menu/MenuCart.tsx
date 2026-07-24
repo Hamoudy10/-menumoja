@@ -4,6 +4,7 @@ import { useParams, useNavigate, useSearchParams } from 'react-router-dom'
 import { ShoppingCart, Trash2, Minus, Plus, ArrowLeft, CreditCard, Smartphone, Banknote, Loader2 } from 'lucide-react'
 import { useStore } from '@/store/useStore'
 import { Button } from '@/components/ui/Button'
+import { Input } from '@/components/ui/Input'
 import { showSuccessToast } from '@/components/ui/Toast'
 
 export default function MenuCart() {
@@ -12,6 +13,7 @@ export default function MenuCart() {
   const [searchParams] = useSearchParams()
   const tableFromUrl = searchParams.get('table')
   const [placing, setPlacing] = useState(false)
+  const [mpesaPhone, setMpesaPhone] = useState('')
   const { cart, removeFromCart, updateCartQuantity, clearCart, placeOrder } = useStore()
 
   const total = cart.reduce((s, i) => s + i.item.price * i.quantity, 0)
@@ -32,6 +34,7 @@ export default function MenuCart() {
         })),
         total,
         paymentMethod: method,
+        customerPhone: method === 'mpesa' ? mpesaPhone : undefined,
         specialInstructions: '',
       })
       clearCart()
@@ -127,6 +130,13 @@ export default function MenuCart() {
             </div>
 
             <div className="space-y-2">
+              <Input
+                label="M-Pesa Phone Number"
+                value={mpesaPhone}
+                onChange={(e) => setMpesaPhone(e.target.value)}
+                placeholder="+2547XX XXX XXX"
+                type="tel"
+              />
               <Button
                 variant="primary"
                 size="lg"

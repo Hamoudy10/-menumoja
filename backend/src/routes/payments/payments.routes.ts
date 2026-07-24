@@ -728,6 +728,44 @@ router.get('/report/tax',
   })
 );
 
+// POST /card/record - Record card payment
+router.post('/card/record',
+  authenticate,
+  enforceRestaurantScope,
+  auditLog,
+  asyncHandler(async (req, res) => {
+    const restaurantId = (req as any).restaurantId;
+    const { orderId, amount } = req.body;
+
+    const order = await prisma.order.findFirst({
+      where: { id: orderId, restaurantId },
+      select: { id: true, totalAmount: true, paymentStatus: true },
+    });
+
+    if (!order) throw new NotFoundError('Order not found', 'Agizo halikupatikana');
+    if (order.paymentStatus === 'PAID') throw new ValidationError('Order is already paid', 'Agizo tayari limelipwa');
+
+    const [payment] = await Promise.all([
+      prisma.payment.create({
+        data: {
+          restaurantId,
+          orderId,
+          paymentMethod: 'CARD',
+          amount,
+          status: 'PAID',
+          processedAt: new Date(),
+        },
+      }),
+      prisma.order.update({
+        where: { id: orderId },
+        data: { paymentStatus: 'PAID' },
+      }),
+    ]);
+
+    res.status(201).json({ success: true, data: payment });
+  })
+);
+
 const openShiftSchema = z.object({
   cashierId: z.string().uuid('Invalid cashier ID'),
 }).strict();
