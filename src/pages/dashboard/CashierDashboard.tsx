@@ -329,7 +329,7 @@ export default function CashierDashboard() {
                       </div>
                     )}
                     <div className="flex justify-between text-[11px] text-text-secondary">
-                      <span>VAT (16%)</span>
+                      <span>VAT (16% incl.)</span>
                       <span>{formatKES(Math.round((lastPayment?.total || 0) * 0.16 / 1.16))}</span>
                     </div>
                     <div className="flex justify-between font-bold text-sm pt-1 border-t border-gray-200 dark:border-white/10">
@@ -344,6 +344,7 @@ export default function CashierDashboard() {
                     </div>
                   )}
                   <div className="text-center mt-3 pt-3 border-t-2 border-dashed border-gray-300 dark:border-white/20">
+                    <p className="text-[10px] text-text-secondary">** Prices inclusive of VAT **</p>
                     <p className="text-[10px] text-text-secondary">Goods once sold cannot be returned</p>
                     <p className="text-[10px] text-text-secondary">Thank you for your business!</p>
                     <p className="text-[9px] text-text-secondary mt-1">Served by: {localStorage.getItem('staffName') || 'Cashier'}</p>
