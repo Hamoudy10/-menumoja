@@ -152,12 +152,16 @@ export default function CashierDashboard() {
       } else if (paymentMethod === 'card') {
         await paymentsApi.recordCardPayment(selectedOrder.id, orderTotal)
       } else if (paymentMethod === 'mpesa') {
-        if (!mpesaPhone) { showErrorToast('Enter customer phone number'); return }
+        if (!mpesaPhone) { showErrorToast('Enter customer phone number'); setProcessing(false); return }
         await paymentsApi.initiateMpesa(selectedOrder.id, mpesaPhone)
         showSuccessToast('M-Pesa STK Push sent to customer phone')
         setMpesaPhone('')
+        setSelectedOrder(null)
+        setProcessing(false)
         fetchOrders()
         return
+      }
+      if (paymentMethod !== 'mpesa') {
       const receiptNo = genReceiptNo()
       const receipt = {
         receiptNo,
@@ -180,6 +184,7 @@ export default function CashierDashboard() {
       setCashReceived('')
       setDiscount('')
       fetchOrders()
+      }
     } catch { showErrorToast('Payment failed') }
     finally { setProcessing(false) }
   }
