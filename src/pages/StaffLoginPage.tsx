@@ -24,6 +24,7 @@ export default function StaffLoginPage() {
       localStorage.setItem('staffRefreshToken', refreshToken)
       localStorage.setItem('staffRole', data.staff?.role || 'waiter')
       localStorage.setItem('staffName', data.staff?.fullName || 'Staff')
+      localStorage.setItem('staffId', data.staff?.id || '')
       localStorage.setItem('staffRestaurantSlug', slug)
       toast.success(`Welcome, ${data.staff?.fullName || 'Staff'}!`)
       const role = data.staff?.role || 'waiter'

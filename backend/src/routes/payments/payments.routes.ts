@@ -785,7 +785,7 @@ router.post('/cash/open-shift',
   validate(openShiftSchema),
   asyncHandler(async (req, res) => {
     const restaurantId = (req as any).restaurantId;
-    const { cashierId } = req.body;
+    const cashierId = req.user?.userId || req.body.cashierId;
 
     const cashier = await prisma.staff.findFirst({
       where: { id: cashierId, restaurantId, isActive: true },

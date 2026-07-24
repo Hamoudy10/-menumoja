@@ -32,6 +32,9 @@ export default function CashierDashboard() {
   const [lastPayment, setLastPayment] = useState<any>(null)
   const [page, setPage] = useState(1)
   const [stats, setStats] = useState({ todayTotal: 0, ordersCount: 0, pendingCount: 0 })
+  const [shift, setShift] = useState<any>(null)
+  const [closeCashAmount, setCloseCashAmount] = useState('')
+  const [showCloseShift, setShowCloseShift] = useState(false)
 
   const fetchOrders = async () => {
     try {
@@ -71,6 +74,42 @@ export default function CashierDashboard() {
 
   useEffect(() => { fetchOrders() }, [activeTab])
   useEffect(() => { const interval = setInterval(fetchOrders, 30000); return () => clearInterval(interval) }, [activeTab])
+
+  useEffect(() => {
+    paymentsApi.getShifts().then((data: any) => {
+      const shifts = Array.isArray(data) ? data : data?.shifts || data || []
+      const openShift = shifts.find((s: any) => s.status === 'OPEN')
+      setShift(openShift || null)
+    }).catch(() => {})
+  }, [showReceipt])
+
+  const handleOpenShift = async () => {
+    try {
+      const res = await paymentsApi.openShift('')
+      setShift(res.shift || res)
+      showSuccessToast('Shift opened!')
+    } catch (e: any) {
+      if (e?.response?.status === 409) { showErrorToast('Shift already open') }
+      else { showErrorToast('Failed to open shift. Are you logged in as cashier?') }
+    }
+  }
+
+  const handleCloseShift = async () => {
+    if (!shift || !closeCashAmount) return
+    try {
+      const actualCash = parseFloat(closeCashAmount)
+      const res = await paymentsApi.closeShift(shift.id, actualCash)
+      const discrepancy = (res.discrepancy || 0)
+      if (Math.abs(discrepancy) > 100) {
+        showErrorToast(`Discrepancy: KES ${discrepancy.toLocaleString()}. Please verify cash count.`)
+      } else {
+        showSuccessToast(`Shift closed. Variance: KES ${discrepancy.toLocaleString()}`)
+      }
+      setShift(null)
+      setCloseCashAmount('')
+      setShowCloseShift(false)
+    } catch { showErrorToast('Failed to close shift') }
+  }
 
   const filtered = useMemo(() => {
     return orders.filter((o: any) => {
@@ -161,6 +200,26 @@ export default function CashierDashboard() {
         {/* LEFT: Order List */}
         <div className="flex-1 flex flex-col min-w-0 border-r border-white/10">
           <header className="shrink-0 bg-white dark:bg-primary-light border-b border-white/10 px-4 py-3">
+            {shift ? (
+              <div className="flex items-center justify-between mb-2 px-3 py-2 rounded-xl bg-success/10 border border-success/20">
+                <div className="flex items-center gap-2 text-xs text-success">
+                  <div className="w-2 h-2 rounded-full bg-success animate-pulse" />
+                  <span className="font-medium">Shift Open</span>
+                  <span>·</span>
+                  <span>Expected: {formatKES(shift.expectedCash || 0)}</span>
+                </div>
+                <button onClick={() => setShowCloseShift(true)} className="text-xs font-medium text-red-500 hover:text-red-600">
+                  Close Shift
+                </button>
+              </div>
+            ) : (
+              <div className="flex items-center justify-between mb-2 px-3 py-2 rounded-xl bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800">
+                <span className="text-xs text-amber-600 font-medium">No open shift</span>
+                <button onClick={handleOpenShift} className="text-xs font-medium text-secondary hover:text-secondary-dark">
+                  Open Shift
+                </button>
+              </div>
+            )}
             <div className="flex items-center justify-between mb-3">
               <div>
                 <h1 className="font-heading text-lg font-bold text-text-primary dark:text-white">POS Terminal</h1>
@@ -460,6 +519,41 @@ export default function CashierDashboard() {
           </AnimatePresence>
         </div>
       </div>
+
+      {showCloseShift && shift && (
+        <>
+          <div className="fixed inset-0 z-50 bg-black/40 backdrop-blur-sm" onClick={() => setShowCloseShift(false)} />
+          <motion.div initial={{ scale: 0.9, opacity: 0 }} animate={{ scale: 1, opacity: 1 }}
+            className="fixed inset-0 z-50 flex items-center justify-center p-4">
+            <div className="bg-white dark:bg-primary-light rounded-2xl p-6 w-full max-w-sm shadow-soft border border-white/10">
+              <h3 className="font-heading font-bold text-lg text-text-primary mb-4">Close Shift</h3>
+              <div className="space-y-3 mb-4">
+                <div className="bg-black/5 dark:bg-white/5 rounded-xl p-3 text-sm">
+                  <div className="flex justify-between"><span className="text-text-secondary">Expected Cash</span><span className="font-bold">{formatKES(shift.expectedCash || 0)}</span></div>
+                </div>
+                <Input label="Actual Cash Count" type="number" value={closeCashAmount}
+                  onChange={(e) => setCloseCashAmount(e.target.value)}
+                  icon={<Banknote className="h-4 w-4" />} />
+                {closeCashAmount && (
+                  <div className={`rounded-xl p-3 text-sm font-medium ${
+                    parseFloat(closeCashAmount) === (shift.expectedCash || 0) ? 'bg-success/10 text-success' : 'bg-amber-50 dark:bg-amber-900/20 text-amber-600'
+                  }`}>
+                    Variance: KES {((parseFloat(closeCashAmount) || 0) - (shift.expectedCash || 0)).toLocaleString()}
+                    {parseFloat(closeCashAmount) === (shift.expectedCash || 0) && ' ✓ Matched'}
+                    {Math.abs((parseFloat(closeCashAmount) || 0) - (shift.expectedCash || 0)) > 100 && ' ⚠️ Over KES 100'}
+                  </div>
+                )}
+              </div>
+              <div className="flex gap-2">
+                <Button variant="ghost" fullWidth onClick={() => setShowCloseShift(false)}>Cancel</Button>
+                <Button fullWidth disabled={!closeCashAmount} onClick={handleCloseShift}>
+                  <CheckCircle className="h-4 w-4" /> Confirm & Close
+                </Button>
+              </div>
+            </div>
+          </motion.div>
+        </>
+      )}
     </div>
   )
 }
