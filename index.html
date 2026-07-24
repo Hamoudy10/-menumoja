@@ -19,18 +19,14 @@
       rel="stylesheet"
     />
     <link rel="apple-touch-icon" href="/icons/icon-192x192.png" />
-    <link rel="manifest" href="/manifest.webmanifest" />
   </head>
   <body>
     <div id="root"></div>
     <noscript>MenuMoja requires JavaScript to run. Please enable JavaScript in your browser.</noscript>
     <script>
-      if ('serviceWorker' in navigator && !localStorage.getItem('sw_cleaned_v2')) {
-        navigator.serviceWorker.getRegistrations().then(function(r) {
-          r.forEach(function(s) { s.unregister(); });
-          localStorage.setItem('sw_cleaned_v2', '1');
-          window.location.reload();
-        });
+      if ('serviceWorker' in navigator) {
+        caches.keys().then(function(keys) { keys.forEach(function(k) { caches.delete(k); }); });
+        navigator.serviceWorker.getRegistrations().then(function(r) { r.forEach(function(s) { s.unregister(); }); });
       }
     </script>
     <script type="module" src="/src/main.tsx"></script>
