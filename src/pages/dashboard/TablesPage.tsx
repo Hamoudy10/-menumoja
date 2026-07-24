@@ -64,7 +64,7 @@ export default function TablesPage() {
           <h1 className="font-heading text-2xl font-bold text-text-primary dark:text-white">Tables</h1>
           <p className="font-body text-sm text-text-secondary dark:text-white/50">Manage your restaurant tables and seating areas</p>
         </div>
-        <Button onClick={() => { setEditTable(null); setForm({ tableNumber: '', label: '', capacity: '4', shape: 'ROUND' }); setShowForm(true) }}>
+        <Button onClick={() => { setEditTable(null); setForm({ tableNumber: '', label: '', capacity: '4', area: '', shape: 'ROUND' }); setShowForm(true) }}>
           <Plus className="h-4 w-4" /> Add Table
         </Button>
       </div>
@@ -109,6 +109,7 @@ export default function TablesPage() {
                       tableNumber: String(table.tableNumber),
                       label: table.label,
                       capacity: String(table.capacity || 4),
+                      area: table.area || '',
                       shape: table.shape || 'ROUND',
                     })
                     setShowForm(true)
