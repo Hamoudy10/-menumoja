@@ -811,10 +811,15 @@ export default function SettingsPage() {
           <div className="space-y-4">
             <div className="rounded-2xl bg-gradient-to-br from-primary to-primary-light p-6 text-white">
               <Crown className="h-8 w-8 text-accent mb-3" />
-              <h3 className="font-heading text-xl font-bold">{t('subscription.businessPlan')}</h3>
-              <p className="font-body text-sm text-white/70 mt-1">KES 2,500/month</p>
+              <h3 className="font-heading text-xl font-bold">{restaurant?.plan === 'premium' ? 'Premium Plan' : restaurant?.plan === 'starter' ? 'Starter Plan' : 'Business Plan'}</h3>
+              <p className="font-body text-sm text-white/70 mt-1">{restaurant?.plan === 'premium' ? 'KES 7,500/month' : restaurant?.plan === 'starter' ? 'KES 1,500/month' : 'KES 3,500/month'}</p>
               <div className="mt-4 space-y-2">
-                {['unlimitedItems', 'aiMarketing', 'staffManagement', 'qrCodes', 'analytics', 'prioritySupport'].map((feature) => (
+                {(restaurant?.plan === 'starter'
+                  ? ['unlimitedItems', 'qrCodes']
+                  : restaurant?.plan === 'premium'
+                  ? ['unlimitedItems', 'aiMarketing', 'staffManagement', 'qrCodes', 'analytics', 'prioritySupport']
+                  : ['unlimitedItems', 'aiMarketing', 'staffManagement', 'qrCodes', 'analytics']
+                ).map((feature) => (
                   <div key={feature} className="flex items-center gap-2 text-sm text-white/80">
                     <Shield className="h-3.5 w-3.5 text-accent" />
                     {t(`subscription.features.${feature}`)}
@@ -822,7 +827,9 @@ export default function SettingsPage() {
                 ))}
               </div>
             </div>
-            <Button variant="secondary" fullWidth><Crown className="h-4 w-4" /> {t('subscription.upgrade')}</Button>
+            <Button variant="secondary" fullWidth onClick={() => window.open('https://menumoja.vercel.app', '_blank')}>
+              <Crown className="h-4 w-4" /> {t('subscription.upgrade')}
+            </Button>
           </div>
         )
 

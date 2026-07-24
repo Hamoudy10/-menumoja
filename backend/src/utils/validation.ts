@@ -127,8 +127,10 @@ export const updateSettingsSchema = z
     taxPercent: z.number().optional(),
     announcement: z.string().optional(),
     announcementActive: z.boolean().optional(),
-  })
-  .strict();
+    language: z.string().optional(),
+    notifications: z.any().optional(),
+    paymentSettings: z.any().optional(),
+  });
 
 export const createCategorySchema = z
   .object({

@@ -632,7 +632,6 @@ export const useStore = create<AppState>((set) => ({
     try {
       const res = await staffApi.addStaff(data)
       set((s) => ({ staff: [...s.staff, res.staff || res] }))
-      toast.success('Staff added')
     } catch (err: any) {
       toast.error(err?.response?.data?.message || 'Failed to add staff')
       throw err
@@ -773,7 +772,6 @@ export const useStore = create<AppState>((set) => ({
         merged.brandColor = merged.brandColor || merged.settings.primaryColor || '#FF6B35'
       }
       set({ restaurant: merged })
-      toast.success('Settings saved')
     } catch (err: any) {
       toast.error(err?.response?.data?.message || 'Failed to save settings')
       throw err
