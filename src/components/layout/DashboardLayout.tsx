@@ -124,7 +124,7 @@ export default function DashboardLayout() {
                     {restaurant?.name || 'MenuMoja'}
                   </p>
                   <p className="font-accent text-[10px] text-text-secondary leading-tight">
-                    {(() => { const p = restaurant?.plan; if (!p) return ''; const name = typeof p === 'string' ? p : p.name; return name.charAt(0).toUpperCase() + name.slice(1) + ' Plan'; })()}
+                    {(() => { const p = restaurant?.plan as any; if (!p) return ''; const name = typeof p === 'string' ? p : p.name || ''; return name.charAt(0).toUpperCase() + name.slice(1) + ' Plan'; })()}
                   </p>
                 </div>
               </div>

@@ -829,17 +829,18 @@ export default function SettingsPage() {
           </div>
         )
 
-      case 'subscription':
+      case 'subscription': {
+        const planName = (typeof restaurant?.plan === 'string' ? restaurant.plan : (restaurant?.plan as any)?.name || 'business').toLowerCase()
         return (
           <div className="space-y-4">
             <div className="rounded-2xl bg-gradient-to-br from-primary to-primary-light p-6 text-white">
               <Crown className="h-8 w-8 text-accent mb-3" />
-              <h3 className="font-heading text-xl font-bold">{restaurant?.plan === 'premium' ? 'Premium Plan' : restaurant?.plan === 'starter' ? 'Starter Plan' : 'Business Plan'}</h3>
-              <p className="font-body text-sm text-white/70 mt-1">{restaurant?.plan === 'premium' ? 'KES 7,500/month' : restaurant?.plan === 'starter' ? 'KES 1,500/month' : 'KES 3,500/month'}</p>
+              <h3 className="font-heading text-xl font-bold">{planName === 'premium' ? 'Premium Plan' : planName === 'starter' ? 'Starter Plan' : 'Business Plan'}</h3>
+              <p className="font-body text-sm text-white/70 mt-1">{planName === 'premium' ? 'KES 7,500/month' : planName === 'starter' ? 'KES 1,500/month' : 'KES 3,500/month'}</p>
               <div className="mt-4 space-y-2">
-                {(restaurant?.plan === 'starter'
+                {(planName === 'starter'
                   ? ['unlimitedItems', 'qrCodes']
-                  : restaurant?.plan === 'premium'
+                  : planName === 'premium'
                   ? ['unlimitedItems', 'aiMarketing', 'staffManagement', 'qrCodes', 'analytics', 'prioritySupport']
                   : ['unlimitedItems', 'aiMarketing', 'staffManagement', 'qrCodes', 'analytics']
                 ).map((feature) => (
@@ -855,6 +856,7 @@ export default function SettingsPage() {
             </Button>
           </div>
         )
+      }
 
       case 'delete':
         return (
