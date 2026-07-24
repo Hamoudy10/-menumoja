@@ -226,7 +226,7 @@ export default function AdminRestaurants() {
                   </td>
                   <td className="px-4 py-3">
                     <Badge variant={r.plan === 'premium' ? 'info' : r.plan === 'business' ? 'warning' : 'default'} size="sm">
-                      {r.plan.charAt(0).toUpperCase() + r.plan.slice(1)}
+                      {(typeof r.plan === 'string' ? r.plan : (r.plan as any)?.name || '').charAt(0).toUpperCase() + (typeof r.plan === 'string' ? r.plan : (r.plan as any)?.name || '').slice(1)}
                     </Badge>
                   </td>
                   <td className="px-4 py-3">
@@ -317,7 +317,7 @@ export default function AdminRestaurants() {
               </div>
               <div className="bg-primary-light rounded-xl p-4">
                 <p className="text-xs text-white/40 mb-1">Plan</p>
-                <p className="text-sm text-white font-medium">{selectedRestaurant.plan.charAt(0).toUpperCase() + selectedRestaurant.plan.slice(1)}</p>
+                <p className="text-sm text-white font-medium">{(typeof selectedRestaurant.plan === 'string' ? selectedRestaurant.plan : (selectedRestaurant.plan as any)?.name || '').charAt(0).toUpperCase() + (typeof selectedRestaurant.plan === 'string' ? selectedRestaurant.plan : (selectedRestaurant.plan as any)?.name || '').slice(1)}</p>
               </div>
             </div>
 

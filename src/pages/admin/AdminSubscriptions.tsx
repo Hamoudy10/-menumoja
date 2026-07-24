@@ -237,7 +237,7 @@ export default function AdminSubscriptions() {
                   </td>
                   <td className="px-3 py-3">
                     <Badge variant={r.plan === 'premium' ? 'info' : r.plan === 'business' ? 'warning' : 'default'} size="sm">
-                      {r.plan.charAt(0).toUpperCase() + r.plan.slice(1)}
+                      {(typeof r.plan === 'string' ? r.plan : (r.plan as any)?.name || '').charAt(0).toUpperCase() + (typeof r.plan === 'string' ? r.plan : (r.plan as any)?.name || '').slice(1)}
                     </Badge>
                   </td>
                   <td className="px-3 py-3 text-right">

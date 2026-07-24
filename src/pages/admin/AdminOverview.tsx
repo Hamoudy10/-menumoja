@@ -243,7 +243,7 @@ export default function AdminOverview() {
                     signup.plan === 'business' ? 'bg-secondary/20 text-secondary' :
                     'bg-white/10 text-white/60'
                   }`}>
-                    {signup.plan.charAt(0).toUpperCase() + signup.plan.slice(1)}
+                    {(typeof signup.plan === 'string' ? signup.plan : (signup.plan as any)?.name || '').charAt(0).toUpperCase() + (typeof signup.plan === 'string' ? signup.plan : (signup.plan as any)?.name || '').slice(1)}
                   </span>
                   <p className="text-[10px] text-white/30 mt-0.5">{signup.date}</p>
                 </div>
