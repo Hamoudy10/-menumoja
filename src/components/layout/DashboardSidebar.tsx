@@ -1,12 +1,13 @@
 import { NavLink } from 'react-router-dom'
 import {
   LayoutDashboard, UtensilsCrossed, ShoppingCart, CreditCard,
-  BarChart3, Camera, Megaphone, Settings, HelpCircle, ChefHat, X,
+  BarChart3, Camera, Megaphone, Settings, HelpCircle, ChefHat, X, Table2,
 } from 'lucide-react'
 import { useStore } from '@/store/useStore'
 
 const menuItems = [
   { path: '/dashboard', label: 'Overview', icon: LayoutDashboard, end: true },
+  { path: '/dashboard/tables', label: 'Tables', icon: Table2 },
   { path: '/dashboard/menu', label: 'Menu', icon: UtensilsCrossed },
   { path: '/dashboard/orders', label: 'Orders', icon: ShoppingCart },
   { path: '/dashboard/payments', label: 'Payments', icon: CreditCard },
