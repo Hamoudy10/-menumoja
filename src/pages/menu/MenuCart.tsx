@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { motion } from 'framer-motion'
-import { useParams, useNavigate } from 'react-router-dom'
+import { useParams, useNavigate, useSearchParams } from 'react-router-dom'
 import { ShoppingCart, Trash2, Minus, Plus, ArrowLeft, CreditCard, Smartphone, Banknote, Loader2 } from 'lucide-react'
 import { useStore } from '@/store/useStore'
 import { Button } from '@/components/ui/Button'
@@ -9,6 +9,8 @@ import { showSuccessToast } from '@/components/ui/Toast'
 export default function MenuCart() {
   const { restaurantSlug } = useParams()
   const navigate = useNavigate()
+  const [searchParams] = useSearchParams()
+  const tableFromUrl = searchParams.get('table')
   const [placing, setPlacing] = useState(false)
   const { cart, removeFromCart, updateCartQuantity, clearCart, placeOrder } = useStore()
 
@@ -20,7 +22,7 @@ export default function MenuCart() {
     try {
       const order = await placeOrder({
         restaurantSlug,
-        tableNumber: 0,
+        tableNumber: tableFromUrl ? parseInt(tableFromUrl) : 0,
         items: cart.map(c => ({
           menuItemId: c.item.id,
           name: c.item.name,

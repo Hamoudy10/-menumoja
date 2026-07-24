@@ -111,7 +111,7 @@ export default function MenuView() {
               </div>
             </div>
             <button
-              onClick={() => navigate(`/menu/${restaurantSlug}/cart`)}
+              onClick={() => navigate(`/menu/${restaurantSlug}/cart${location.search}`)}
               className="relative w-10 h-10 rounded-xl bg-secondary/10 flex items-center justify-center"
             >
               <ShoppingCart className="w-5 h-5 text-secondary" />
