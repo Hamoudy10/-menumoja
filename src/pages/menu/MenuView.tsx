@@ -135,6 +135,7 @@ export default function MenuView() {
               )}
             </button>
           </div>
+          </div>
 
           <div className="flex gap-1 overflow-x-auto pb-1">
             {menuCategories.map((cat) => (
