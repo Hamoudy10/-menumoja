@@ -252,17 +252,20 @@ export const useStore = create<AppState>((set) => ({
     const refreshToken = localStorage.getItem('refreshToken')
     if (!accessToken || !refreshToken) return
     try {
-      set({ accessToken, refreshToken })
+      set({ accessToken, refreshToken, isAuthenticated: true })
       const data = await restaurantApi.fetchRestaurant()
       if (data) {
         set({
-          isAuthenticated: true,
           userRole: data.user?.role || 'owner',
           restaurant: data.restaurant || data,
         })
       }
-    } catch {
-      set({ isAuthenticated: false })
+    } catch (err: any) {
+      if (err?.response?.status === 401) {
+        localStorage.removeItem('accessToken')
+        localStorage.removeItem('refreshToken')
+        set({ isAuthenticated: false, userRole: null, restaurant: null, accessToken: null, refreshToken: null })
+      }
     }
   },
 
