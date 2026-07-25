@@ -148,7 +148,12 @@ router.post('/mpesa/initiate',
       );
     }
 
-    logger.info('Initiating M-Pesa STK Push', { orderId: order.id, amount: Number(order.totalAmount) });
+    logger.info('Initiating M-Pesa STK Push', { orderId: order.id, amount: Number(order.totalAmount), phone: formattedPhone });
+
+    await prisma.order.update({
+      where: { id: order.id },
+      data: { customerPhone: formattedPhone },
+    });
 
     const result = await mpesaService.initiatePayment(
       order.id,
