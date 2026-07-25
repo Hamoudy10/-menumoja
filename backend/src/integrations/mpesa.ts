@@ -100,9 +100,17 @@ export async function getAccessToken(): Promise<string> {
     const auth = Buffer.from(`${consumerKey}:${consumerSecret}`).toString('base64');
 
     const response = await api.post('/oauth/v1/generate?grant_type=client_credentials', null, {
-      headers: { Authorization: `Basic ${auth}` },
+      headers: {
+        Authorization: `Basic ${auth}`,
+        'Content-Type': 'application/x-www-form-urlencoded',
+      },
       timeout: 10000,
     });
+
+    if (!response.data || !response.data.access_token) {
+      logger.error('Invalid M-Pesa token response', { data: response.data, status: response.status });
+      throw new AppError(502, 'MPESA_TOKEN_ERROR', 'Invalid token response from M-Pesa', 'Jibu batili la token kutoka M-Pesa');
+    }
 
     const { access_token, expires_in } = response.data;
 
