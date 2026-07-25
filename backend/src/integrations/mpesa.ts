@@ -174,7 +174,7 @@ export async function stkPush(
       Timestamp: timestamp,
       TransactionType: 'CustomerPayBillOnline',
       Amount: Math.round(amount),
-      PartyA: formattedPhone,
+      PartyA: process.env.MPESA_ENV === 'sandbox' ? '254708374149' : formattedPhone,
       PartyB: businessShortCode,
       PhoneNumber: formattedPhone,
       CallBackURL: callbackUrl,
