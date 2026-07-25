@@ -1,7 +1,8 @@
 import { useState, useEffect } from 'react'
 import { motion } from 'framer-motion'
-import { ChefHat, Clock, CheckCircle, Timer } from 'lucide-react'
+import { ChefHat, Clock, CheckCircle, Timer, LogOut } from 'lucide-react'
 import { useStore } from '@/store/useStore'
+import { useNavigate } from 'react-router-dom'
 import { Badge } from '@/components/ui/Badge'
 import { Button } from '@/components/ui/Button'
 import { showSuccessToast } from '@/components/ui/Toast'
@@ -14,7 +15,20 @@ const statusColors: Record<string, string> = {
 }
 
 export default function KitchenDisplay() {
+  const navigate = useNavigate()
   const { orders, liveOrders, fetchOrders, fetchLiveOrders, updateOrderStatus } = useStore()
+
+  const staffName = localStorage.getItem('staffName') || 'Staff'
+
+  const handleSignOut = () => {
+    localStorage.removeItem('staffAccessToken')
+    localStorage.removeItem('staffRefreshToken')
+    localStorage.removeItem('staffRole')
+    localStorage.removeItem('staffName')
+    localStorage.removeItem('staffId')
+    localStorage.removeItem('staffRestaurantSlug')
+    navigate('/login')
+  }
   const [loading, setLoading] = useState(true)
 
   useEffect(() => {
@@ -61,8 +75,12 @@ export default function KitchenDisplay() {
           </div>
         </div>
         <div className="flex items-center gap-2">
+          <span className="text-xs text-text-secondary hidden sm:inline">{staffName}</span>
           <Timer className="w-4 h-4 text-text-secondary" />
           <span className="text-xs text-text-secondary">Auto-refreshes every 15s</span>
+          <button onClick={handleSignOut} className="p-1.5 rounded-lg hover:bg-red-100 dark:hover:bg-red-900/30 text-text-secondary hover:text-red-500 transition-colors" title="Sign Out">
+            <LogOut className="h-3.5 w-3.5" />
+          </button>
         </div>
       </div>
 

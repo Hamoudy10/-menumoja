@@ -2,21 +2,34 @@ import { useState, useEffect, useMemo } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import {
   Search, CreditCard, Banknote, Smartphone, CheckCircle, Clock,
-  Receipt, Calculator, ShoppingBag, X, ChevronDown, ChevronUp,
-  Coffee, UtensilsCrossed, ArrowRight, Loader2, Hash, User, Printer
+  Receipt, Calculator, ShoppingBag, X, ChevronDown, LogOut, Coffee, UtensilsCrossed, ArrowRight, Loader2, Hash, User, Printer
 } from 'lucide-react'
 import { Button } from '@/components/ui/Button'
 import { Input } from '@/components/ui/Input'
 import { Badge } from '@/components/ui/Badge'
 import { showSuccessToast, showErrorToast } from '@/components/ui/Toast'
 import { useStore } from '@/store/useStore'
+import { useNavigate } from 'react-router-dom'
 import * as ordersApi from '@/api/orders'
 import * as paymentsApi from '@/api/payments'
 
 const ITEMS_PER_PAGE = 15
 
 export default function CashierDashboard() {
+  const navigate = useNavigate()
   const { restaurant } = useStore()
+
+  const staffName = localStorage.getItem('staffName') || 'Cashier'
+
+  const handleSignOut = () => {
+    localStorage.removeItem('staffAccessToken')
+    localStorage.removeItem('staffRefreshToken')
+    localStorage.removeItem('staffRole')
+    localStorage.removeItem('staffName')
+    localStorage.removeItem('staffId')
+    localStorage.removeItem('staffRestaurantSlug')
+    navigate('/login')
+  }
   const [orders, setOrders] = useState<any[]>([])
   const [allOrders, setAllOrders] = useState<any[]>([])
   const [loading, setLoading] = useState(true)
@@ -238,9 +251,15 @@ export default function CashierDashboard() {
                   <Badge size="sm" variant={stats.pendingCount > 0 ? 'warning' : 'default'}>{stats.pendingCount} pending</Badge>
                 </div>
               </div>
-              <button onClick={fetchOrders} className="p-2 rounded-xl hover:bg-black/5">
-                <Clock className="h-4 w-4 text-text-secondary" />
-              </button>
+              <div className="flex items-center gap-1">
+                <span className="text-xs text-text-secondary hidden sm:inline">{staffName}</span>
+                <button onClick={handleSignOut} className="p-2 rounded-xl hover:bg-red-100 dark:hover:bg-red-900/30 text-text-secondary hover:text-red-500 transition-colors" title="Sign Out">
+                  <LogOut className="h-4 w-4" />
+                </button>
+                <button onClick={fetchOrders} className="p-2 rounded-xl hover:bg-black/5">
+                  <Clock className="h-4 w-4 text-text-secondary" />
+                </button>
+              </div>
             </div>
             <div className="flex gap-2">
               <Input placeholder="Search order # or item..." value={search} onChange={(e) => { setSearch(e.target.value); setPage(1) }}
