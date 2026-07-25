@@ -164,9 +164,9 @@ export async function stkPush(
     const token = await getAccessToken();
     const timestamp = generateTimestamp();
     const businessShortCode = shortCode || process.env.MPESA_SHORTCODE || '174379';
-    const passkey = process.env.MPESA_PASSKEY || '';
+    const passkey = process.env.MPESA_PASSKEY || 'bfb279f9aa9bdbcf158e97dd71a467cd2e0c893059b10f78e6b72ada1ed2c919';
     const password = generatePassword(businessShortCode, passkey, timestamp);
-    const callbackUrl = process.env.MPESA_CALLBACK_URL || '';
+    const callbackUrl = process.env.MPESA_CALLBACK_URL || 'https://menumoja.onrender.com/api/v1/payments/mpesa/callback';
 
     const payload = {
       BusinessShortCode: businessShortCode,
