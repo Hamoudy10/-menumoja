@@ -99,11 +99,8 @@ export async function getAccessToken(): Promise<string> {
 
     const auth = Buffer.from(`${consumerKey}:${consumerSecret}`).toString('base64');
 
-    const response = await api.post('/oauth/v1/generate?grant_type=client_credentials', null, {
-      headers: {
-        Authorization: `Basic ${auth}`,
-        'Content-Type': 'application/x-www-form-urlencoded',
-      },
+    const response = await api.get('/oauth/v1/generate?grant_type=client_credentials', {
+      headers: { Authorization: `Basic ${auth}` },
       timeout: 10000,
     });
 
