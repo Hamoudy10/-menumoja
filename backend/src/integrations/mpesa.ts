@@ -116,7 +116,7 @@ export async function getAccessToken(): Promise<string> {
     return access_token;
   } catch (error) {
     if (error instanceof AppError) throw error;
-    logger.error('getAccessToken failed', { error });
+    logger.error('getAccessToken failed', { message: (error as any)?.message, code: (error as any)?.code, response: (error as any)?.response?.data });
     throw new AppError(502, 'MPESA_TOKEN_ERROR', 'Failed to authenticate with M-Pesa', 'Imeshindwa kuthibitishwa na M-Pesa');
   }
 }
