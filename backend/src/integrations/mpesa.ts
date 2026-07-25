@@ -2,17 +2,11 @@ import axios, { AxiosInstance, AxiosError } from 'axios';
 import crypto from 'crypto';
 import logger from '../utils/logger';
 import { AppError } from '../utils/errors';
-import Redis from 'ioredis';
+import { redis } from '../config/redis';
 
-const redis = new Redis(process.env.REDIS_URL || 'redis://localhost:6379', {
-  maxRetriesPerRequest: 3,
-  retryStrategy: (times) => Math.min(times * 100, 3000),
-  lazyConnect: true,
-});
-
-const MPESA_API_URL = process.env.NODE_ENV === 'production'
-  ? 'https://api.safaricom.co.ke'
-  : 'https://sandbox.safaricom.co.ke';
+const MPESA_API_URL = process.env.MPESA_ENV === 'sandbox' || process.env.NODE_ENV !== 'production'
+  ? 'https://sandbox.safaricom.co.ke'
+  : 'https://api.safaricom.co.ke';
 
 const TOKEN_CACHE_KEY = 'mpesa:access_token';
 const TOKEN_EXPIRY_BUFFER = 60;
