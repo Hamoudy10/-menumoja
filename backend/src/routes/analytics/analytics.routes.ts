@@ -79,16 +79,14 @@ router.get('/overview', asyncHandler(async (req: AuthenticatedRequest, res: Resp
   const range = getDateRange(query.period, query.startDate, query.endDate);
   const prevRange = getPreviousRange(range);
 
-  const [currentOrders, prevOrders, currentPayments, prevPayments, currentScans, prevScans, menuItems, currentAnalytics] = await Promise.all([
-    prisma.order.findMany({ where: { restaurantId, createdAt: { gte: range.start, lte: range.end } } }),
-    prisma.order.findMany({ where: { restaurantId, createdAt: { gte: prevRange.start, lte: prevRange.end } } }),
-    prisma.payment.findMany({ where: { restaurantId, createdAt: { gte: range.start, lte: range.end } } }),
-    prisma.payment.findMany({ where: { restaurantId, createdAt: { gte: prevRange.start, lte: prevRange.end } } }),
-    prisma.qrScan.findMany({ where: { restaurantId, scannedAt: { gte: range.start, lte: range.end } } }),
-    prisma.qrScan.findMany({ where: { restaurantId, scannedAt: { gte: prevRange.start, lte: prevRange.end } } }),
-    prisma.menuItem.findMany({ where: { restaurantId }, orderBy: { totalOrders: 'desc' }, take: 1 }),
-    prisma.analyticsDaily.findMany({ where: { restaurantId, date: { gte: range.start, lte: range.end } } }),
-  ]);
+  const currentOrders = await prisma.order.findMany({ where: { restaurantId, createdAt: { gte: range.start, lte: range.end } } })
+  const prevOrders = await prisma.order.findMany({ where: { restaurantId, createdAt: { gte: prevRange.start, lte: prevRange.end } } })
+  const currentPayments = await prisma.payment.findMany({ where: { restaurantId, createdAt: { gte: range.start, lte: range.end } } })
+  const prevPayments = await prisma.payment.findMany({ where: { restaurantId, createdAt: { gte: prevRange.start, lte: prevRange.end } } })
+  const currentScans = await prisma.qrScan.findMany({ where: { restaurantId, scannedAt: { gte: range.start, lte: range.end } } })
+  const prevScans = await prisma.qrScan.findMany({ where: { restaurantId, scannedAt: { gte: prevRange.start, lte: prevRange.end } } })
+  const menuItems = await prisma.menuItem.findMany({ where: { restaurantId }, orderBy: { totalOrders: 'desc' }, take: 1 })
+  const currentAnalytics = await prisma.analyticsDaily.findMany({ where: { restaurantId, date: { gte: range.start, lte: range.end } } })
 
   const totalRevenue = currentPayments.reduce((s, p) => s + Number(p.amount), 0);
   const prevRevenue = prevPayments.reduce((s, p) => s + Number(p.amount), 0);
@@ -111,6 +109,9 @@ router.get('/overview', asyncHandler(async (req: AuthenticatedRequest, res: Resp
     totalScans,
     topItem: topItem ? { id: topItem.id, name: topItem.name } : null,
     busiestHour,
+    revenueMpesa: currentPayments.filter(p => p.paymentMethod === 'MPESA').reduce((s, p) => s + Number(p.amount), 0),
+    revenueCash: currentPayments.filter(p => p.paymentMethod === 'CASH').reduce((s, p) => s + Number(p.amount), 0),
+    revenueCard: currentPayments.filter(p => p.paymentMethod === 'CARD').reduce((s, p) => s + Number(p.amount), 0),
   };
 
   const comparisons = {
