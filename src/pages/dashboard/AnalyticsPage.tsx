@@ -62,9 +62,10 @@ export default function AnalyticsPage() {
 
       const paymentData = overviewRes.status === 'fulfilled' ? overviewRes.value : null
       if (paymentData) {
+        const m = paymentData.metrics || paymentData
         const parts: any[] = []
-        const mpesa = safeNum(paymentData.revenueMpesa)
-        const cash = safeNum(paymentData.revenueCash)
+        const mpesa = safeNum(m.revenueMpesa)
+        const cash = safeNum(m.revenueCash)
         const totalRev = safeNum(paymentData.totalRevenue)
         if (totalRev > 0) {
           if (mpesa > 0) parts.push({ name: 'M-Pesa', value: Math.round((mpesa / totalRev) * 100), color: '#3B82F6' })
@@ -82,16 +83,17 @@ export default function AnalyticsPage() {
   useEffect(() => { fetchData(period) }, [period])
 
   const stats = useMemo(() => {
-    const rev = safeNum(overview?.totalRevenue)
-    const orders = safeNum(overview?.totalOrders)
-    const scans = safeNum(overview?.totalScans)
+    const m = overview?.metrics || overview || {}
+    const rev = safeNum(m.totalRevenue)
+    const orders = safeNum(m.totalOrders)
+    const scans = safeNum(m.totalScans)
     const avgOrder = orders > 0 ? Math.round(rev / orders) : 0
-    const topItem = topItems[0]
+    const topItem = m.topItem || topItems[0]
     return [
-      { icon: DollarSign, label: 'Revenue', value: formatKES(rev), sub: overview?.revenueChange != null ? `${overview.revenueChange > 0 ? '+' : ''}${overview.revenueChange}%` : null, color: 'from-secondary to-accent' },
-      { icon: ShoppingBag, label: 'Orders', value: orders.toLocaleString(), sub: overview?.ordersChange != null ? `${overview.ordersChange > 0 ? '+' : ''}${overview.ordersChange}%` : null, color: 'from-blue-500 to-purple-500' },
+      { icon: DollarSign, label: 'Revenue', value: formatKES(rev), sub: overview?.comparisons?.revenueChange != null ? `${overview.comparisons.revenueChange > 0 ? '+' : ''}${overview.comparisons.revenueChange}%` : null, color: 'from-secondary to-accent' },
+      { icon: ShoppingBag, label: 'Orders', value: orders.toLocaleString(), sub: overview?.comparisons?.ordersChange != null ? `${overview.comparisons.ordersChange > 0 ? '+' : ''}${overview.comparisons.ordersChange}%` : null, color: 'from-blue-500 to-purple-500' },
       { icon: TrendingUp, label: 'Avg Order', value: formatKES(avgOrder), sub: null, color: 'from-success to-emerald-400' },
-      { icon: ScanLine, label: 'QR Scans', value: scans.toLocaleString(), sub: null, color: 'from-pink-500 to-rose-400' },
+      { icon: ScanLine, label: 'QR Scans', value: scans.toLocaleString(), sub: overview?.comparisons?.scansChange != null ? `${overview.comparisons.scansChange > 0 ? '+' : ''}${overview.comparisons.scansChange}%` : null, color: 'from-pink-500 to-rose-400' },
       { icon: Star, label: 'Top Item', value: topItem?.name || '--', sub: topItem?.orders ? `${topItem.orders} orders` : null, color: 'from-amber-500 to-yellow-300' },
       { icon: Clock, label: `${period === 'today' ? 'Today' : period === 'week' ? 'This Week' : 'This Month'}`, value: `${orders} orders`, sub: null, color: 'from-purple-500 to-indigo-500' },
     ]
