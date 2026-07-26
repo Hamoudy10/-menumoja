@@ -66,7 +66,7 @@ export default function AnalyticsPage() {
         const parts: any[] = []
         const mpesa = safeNum(m.revenueMpesa)
         const cash = safeNum(m.revenueCash)
-        const totalRev = safeNum(paymentData.totalRevenue)
+        const totalRev = safeNum(m.totalRevenue)
         if (totalRev > 0) {
           if (mpesa > 0) parts.push({ name: 'M-Pesa', value: Math.round((mpesa / totalRev) * 100), color: '#3B82F6' })
           if (cash > 0) parts.push({ name: 'Cash', value: Math.round((cash / totalRev) * 100), color: '#FF6B35' })
