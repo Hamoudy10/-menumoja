@@ -233,7 +233,7 @@ export default function SurveillancePage() {
           <button onClick={() => { fetchCameras(); fetchAlerts() }} className="flex h-9 w-9 items-center justify-center rounded-xl bg-black/5 dark:bg-white/10 hover:bg-black/10 dark:hover:bg-white/20 transition-colors">
             <RefreshCw className="h-4 w-4 text-text-secondary" />
           </button>
-          <Button variant="outline" onClick={startWebcam} disabled={!!webcamError} title={webcamError || ''}>
+          <Button variant="outline" onClick={startWebcam} disabled={!!webcamError}>
             <Webcam className="h-4 w-4" /> Test Webcam
           </Button>
           <Button onClick={() => setShowSetup(true)}><Plus className="h-4 w-4" /> Add Camera</Button>
