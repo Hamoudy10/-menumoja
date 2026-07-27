@@ -2,8 +2,8 @@ import { useState, useEffect } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import {
   Camera, Maximize2, Minimize2, Bell, Plus, X, Shield,
-  AlertTriangle, Clock, Monitor, Wifi, WifiOff, Trash2,
-  RefreshCw, CheckCircle2, Server, Loader2, Eye, EyeOff,
+  AlertTriangle, Clock, Monitor, Wifi, WifiOff,
+  RefreshCw, CheckCircle2, Server, Loader2,
 } from 'lucide-react'
 import { useStore } from '@/store/useStore'
 import { Button } from '@/components/ui/Button'
@@ -13,10 +13,14 @@ import { EmptyState } from '@/components/ui/EmptyState'
 import { showSuccessToast, showErrorToast } from '@/components/ui/Toast'
 
 interface CameraForm {
-  name: string; ip: string; port: string; username: string; password: string; location: string
+  name: string; ipAddress: string; port: string; username: string; password: string; location: string; streamUrl: string
 }
 
-const defaultForm: CameraForm = { name: '', ip: '', port: '554', username: '', password: '', location: '' }
+const defaultForm: CameraForm = { name: '', ipAddress: '', port: '8080', username: '', password: '', location: '', streamUrl: '' }
+
+function isHttpFeed(url?: string | null) {
+  return url && (url.startsWith('http://') || url.startsWith('https://'))
+}
 
 export default function SurveillancePage() {
   const { cameras, alerts, fetchCameras, fetchAlerts, addCamera, updateCamera } = useStore()
@@ -26,21 +30,43 @@ export default function SurveillancePage() {
   const [testing, setTesting] = useState(false)
   const [testResult, setTestResult] = useState<'idle' | 'success' | 'fail'>('idle')
   const [loading, setLoading] = useState(false)
+  const [imgErrors, setImgErrors] = useState<Record<string, boolean>>({})
 
   useEffect(() => { setLoading(true); Promise.all([fetchCameras(), fetchAlerts()]).finally(() => setLoading(false)) }, [])
 
-  const allAlerts = (alerts || cameras.flatMap((c) =>
+  const allAlerts = (alerts || cameras.flatMap((c: any) =>
     c.alerts?.map((a: any) => ({ ...a, cameraName: c.name })) || []
   )).sort((a: any, b: any) => new Date(b.timestamp || 0).getTime() - new Date(a.timestamp || 0).getTime())
 
+  const autoFillStreamUrl = (ip: string, port: string) => {
+    if (!ip) return ''
+    return `http://${ip}:${port || '8080'}/video`
+  }
+
+  const handleIpChange = (ip: string) => {
+    setNewCam((prev) => ({
+      ...prev,
+      ipAddress: ip,
+      streamUrl: prev.streamUrl || autoFillStreamUrl(ip, prev.port),
+    }))
+  }
+
+  const handlePortChange = (port: string) => {
+    setNewCam((prev) => ({
+      ...prev,
+      port,
+      streamUrl: prev.streamUrl || autoFillStreamUrl(prev.ipAddress, port),
+    }))
+  }
+
   const handleTestConnection = async () => {
-    if (!newCam.ip) return
+    if (!newCam.ipAddress) return
     setTesting(true)
     setTestResult('idle')
     try {
       const controller = new AbortController()
       const timeout = setTimeout(() => controller.abort(), 5000)
-      const res = await fetch(`http://${newCam.ip}:${newCam.port || 554}`, {
+      const res = await fetch(`http://${newCam.ipAddress}:${newCam.port || 8080}`, {
         method: 'HEAD',
         signal: controller.signal,
       })
@@ -58,16 +84,18 @@ export default function SurveillancePage() {
   }
 
   const handleAddCamera = async () => {
-    if (!newCam.name || !newCam.ip) return
+    if (!newCam.name || !newCam.ipAddress) return
     try {
-      await addCamera({
+      const payload: any = {
         name: newCam.name,
-        ip: newCam.ip,
-        port: parseInt(newCam.port) || 554,
+        ipAddress: newCam.ipAddress,
+        port: parseInt(newCam.port) || 8080,
         username: newCam.username || undefined,
         password: newCam.password || undefined,
         location: newCam.location || undefined,
-      })
+      }
+      if (newCam.streamUrl) payload.streamUrl = newCam.streamUrl
+      await addCamera(payload)
       setNewCam(defaultForm)
       setShowSetup(false)
       setTestResult('idle')
@@ -77,42 +105,42 @@ export default function SurveillancePage() {
     }
   }
 
-  if (loading && cameras.length === 0) {
-    return (
-      <div className="flex items-center justify-center min-h-[400px]">
-        <Loader2 className="h-8 w-8 animate-spin text-secondary" />
-      </div>
-    )
-  }
+  const feedUrl = (cam: any) => cam.streamUrl || (cam.ipAddress ? `http://${cam.ipAddress}:${cam.port || 8080}/video` : null)
 
   if (fullscreen) {
-    const cam = cameras.find((c) => c.id === fullscreen)
+    const cam: any = cameras.find((c) => c.id === fullscreen)
     if (!cam) return null
+    const url = feedUrl(cam)
+    const feedFailed = imgErrors[fullscreen]
     return (
       <div className="fixed inset-0 z-50 bg-background-dark">
         <div className="absolute top-4 right-4 z-10 flex gap-2">
-          <Badge variant={cam.active ? 'success' : 'danger'} size="lg">
-            {cam.active ? 'Live' : 'Offline'}
+          <Badge variant={cam.isActive ? 'success' : 'danger'} size="lg">
+            {cam.isActive ? 'Live' : 'Offline'}
           </Badge>
           <button onClick={() => setFullscreen(null)} className="flex h-10 w-10 items-center justify-center rounded-xl bg-white/10 text-white hover:bg-white/20 transition-colors">
             <Minimize2 className="h-5 w-5" />
           </button>
         </div>
-        <div className="flex h-full items-center justify-center">
-          <div className="text-center">
-            <Camera className="h-20 w-20 text-white/20 mx-auto mb-4" />
-            <h2 className="font-heading text-2xl text-white font-bold">{cam.name}</h2>
-            <p className="font-accent text-white/50 mt-1">{cam.ip}:{cam.port || '554'}</p>
-            {cam.location && <p className="font-accent text-white/30 mt-1">{cam.location}</p>}
-            <div className="mt-6 inline-flex items-center gap-2 rounded-full bg-success/20 px-4 py-2">
-              <span className="relative flex h-3 w-3">
-                <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-success opacity-75" />
-                <span className="relative inline-flex h-3 w-3 rounded-full bg-success" />
-              </span>
-              <span className="font-accent text-sm text-success font-medium">{cam.active ? 'Streaming' : 'Offline'}</span>
+        {isHttpFeed(url) && !feedFailed ? (
+          <img src={url} alt={cam.name} className="h-full w-full object-contain" onError={() => setImgErrors((e) => ({ ...e, [fullscreen]: true }))} />
+        ) : (
+          <div className="flex h-full items-center justify-center">
+            <div className="text-center">
+              <Camera className="h-20 w-20 text-white/20 mx-auto mb-4" />
+              <h2 className="font-heading text-2xl text-white font-bold">{cam.name}</h2>
+              <p className="font-accent text-white/50 mt-1">{cam.ipAddress}:{cam.port || '8080'}</p>
+              {cam.location && <p className="font-accent text-white/30 mt-1">{cam.location}</p>}
+              <div className="mt-6 inline-flex items-center gap-2 rounded-full bg-success/20 px-4 py-2">
+                <span className="relative flex h-3 w-3">
+                  <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-success opacity-75" />
+                  <span className="relative inline-flex h-3 w-3 rounded-full bg-success" />
+                </span>
+                <span className="font-accent text-sm text-success font-medium">{cam.isActive ? 'Streaming' : 'Offline'}</span>
+              </div>
             </div>
           </div>
-        </div>
+        )}
       </div>
     )
   }
@@ -122,7 +150,7 @@ export default function SurveillancePage() {
       <div className="flex items-center justify-between">
         <div>
           <h1 className="font-heading text-2xl font-bold text-text-primary dark:text-white">Surveillance</h1>
-          <p className="font-body text-sm text-text-secondary dark:text-white/50">Monitor your restaurant cameras and AI alerts</p>
+          <p className="font-body text-sm text-text-secondary dark:text-white/50">Monitor your restaurant cameras</p>
         </div>
         <div className="flex items-center gap-2">
           <button onClick={() => { fetchCameras(); fetchAlerts() }} className="flex h-9 w-9 items-center justify-center rounded-xl bg-black/5 dark:bg-white/10 hover:bg-black/10 dark:hover:bg-white/20 transition-colors">
@@ -144,8 +172,10 @@ export default function SurveillancePage() {
             />
           </div>
         ) : (
-          cameras.map((cam) => {
+          (cameras as any[]).map((cam) => {
             const unreadAlerts = (cam.alerts || []).filter((a: any) => !a.viewed).length
+            const url = feedUrl(cam)
+            const feedFailed = imgErrors[cam.id]
             return (
               <motion.div
                 key={cam.id} layout
@@ -153,9 +183,13 @@ export default function SurveillancePage() {
                 animate={{ opacity: 1, scale: 1 }}
                 className="group relative overflow-hidden rounded-2xl bg-gradient-to-br from-black/80 to-black/60 border border-white/10"
               >
-                <div className="aspect-video bg-black/50 flex items-center justify-center relative">
-                  <Camera className="h-12 w-12 text-white/20" />
-                  {cam.active && (
+                <div className="aspect-video bg-black/50 flex items-center justify-center relative overflow-hidden">
+                  {isHttpFeed(url) && !feedFailed ? (
+                    <img src={url} alt={cam.name} className="h-full w-full object-cover" onError={() => setImgErrors((e) => ({ ...e, [cam.id]: true }))} />
+                  ) : (
+                    <Camera className="h-12 w-12 text-white/20" />
+                  )}
+                  {cam.isActive && isHttpFeed(url) && !feedFailed && (
                     <div className="absolute top-3 left-3 flex items-center gap-2">
                       <span className="relative flex h-2.5 w-2.5">
                         <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-red-500 opacity-75" />
@@ -172,9 +206,9 @@ export default function SurveillancePage() {
                   </div>
                   <div className="absolute bottom-3 left-3 right-3 flex items-center justify-between">
                     <span className="font-accent text-sm text-white font-medium">{cam.name}</span>
-                    <span className="font-accent text-[10px] text-white/50">{cam.ip}</span>
+                    <span className="font-accent text-[10px] text-white/50">{cam.ipAddress}:{cam.port}</span>
                   </div>
-                  {!cam.active && (
+                  {(!cam.isActive) && (
                     <div className="absolute inset-0 flex items-center justify-center bg-black/60">
                       <div className="text-center">
                         <WifiOff className="h-8 w-8 text-red-400 mx-auto mb-2" />
@@ -187,15 +221,15 @@ export default function SurveillancePage() {
                   {cam.location && <p className="font-accent text-xs text-white/40">{cam.location}</p>}
                   <div className="flex items-center justify-between">
                     <div className="flex items-center gap-2">
-                      {cam.active ? <Wifi className="h-3.5 w-3.5 text-success" /> : <WifiOff className="h-3.5 w-3.5 text-red-400" />}
-                      <span className="font-accent text-xs text-white/60">{cam.active ? 'Connected' : 'Disconnected'}</span>
+                      {cam.isActive ? <Wifi className="h-3.5 w-3.5 text-success" /> : <WifiOff className="h-3.5 w-3.5 text-red-400" />}
+                      <span className="font-accent text-xs text-white/60">{cam.isActive ? 'Connected' : 'Disconnected'}</span>
                     </div>
                     <div className="flex items-center gap-1">
-                      <motion.button whileTap={{ scale: 0.95 }} onClick={() => updateCamera(cam.id, { active: !cam.active })}
+                      <motion.button whileTap={{ scale: 0.95 }} onClick={() => updateCamera(cam.id, { isActive: !cam.isActive })}
                         className={`rounded-full px-2.5 py-1 text-[10px] font-accent font-medium transition-colors ${
-                          cam.active ? 'bg-red-500/20 text-red-400 hover:bg-red-500/30' : 'bg-success/20 text-success hover:bg-success/30'
+                          cam.isActive ? 'bg-red-500/20 text-red-400 hover:bg-red-500/30' : 'bg-success/20 text-success hover:bg-success/30'
                         }`}>
-                        {cam.active ? 'Disable' : 'Enable'}
+                        {cam.isActive ? 'Disable' : 'Enable'}
                       </motion.button>
                     </div>
                   </div>
@@ -256,7 +290,7 @@ export default function SurveillancePage() {
             <div className="space-y-3">
               {[
                 { icon: Monitor, label: 'Total Cameras', value: cameras.length, color: 'text-secondary' },
-                { icon: Shield, label: 'Active', value: cameras.filter((c) => c.active).length, color: 'text-success' },
+                { icon: Shield, label: 'Active', value: (cameras as any[]).filter((c) => c.isActive).length, color: 'text-success' },
                 { icon: AlertTriangle, label: 'Alerts Today', value: allAlerts.length, color: 'text-red-500' },
                 { icon: null, label: 'Recording', value: 'All', color: 'text-success', pulse: true },
               ].map((stat, i) => (
@@ -299,17 +333,18 @@ export default function SurveillancePage() {
                   <Input label="Camera Name" value={newCam.name} onChange={(e) => setNewCam({ ...newCam, name: e.target.value })} placeholder="e.g., Main Entrance" />
                   <div className="grid grid-cols-3 gap-3">
                     <div className="col-span-2">
-                      <Input label="IP Address" value={newCam.ip} onChange={(e) => setNewCam({ ...newCam, ip: e.target.value })} placeholder="e.g., 192.168.1.100" />
+                      <Input label="IP Address" value={newCam.ipAddress} onChange={(e) => handleIpChange(e.target.value)} placeholder="e.g., 192.168.1.100" />
                     </div>
-                    <Input label="Port" value={newCam.port} onChange={(e) => setNewCam({ ...newCam, port: e.target.value })} placeholder="554" />
+                    <Input label="Port" value={newCam.port} onChange={(e) => handlePortChange(e.target.value)} placeholder="8080" />
                   </div>
+                  <Input label="Stream URL (auto-filled)" value={newCam.streamUrl} onChange={(e) => setNewCam({ ...newCam, streamUrl: e.target.value })} placeholder="http://192.168.1.100:8080/video" />
                   <Input label="Location (optional)" value={newCam.location} onChange={(e) => setNewCam({ ...newCam, location: e.target.value })} placeholder="e.g., Main Dining Area" />
                   <div className="grid grid-cols-2 gap-3">
                     <Input label="Username (optional)" value={newCam.username} onChange={(e) => setNewCam({ ...newCam, username: e.target.value })} placeholder="admin" />
                     <Input label="Password (optional)" type="password" value={newCam.password} onChange={(e) => setNewCam({ ...newCam, password: e.target.value })} placeholder="••••••••" />
                   </div>
                   <div className="flex items-center gap-3">
-                    <Button variant="outline" size="sm" onClick={handleTestConnection} disabled={testing || !newCam.ip} className="flex-1">
+                    <Button variant="outline" size="sm" onClick={handleTestConnection} disabled={testing || !newCam.ipAddress} className="flex-1">
                       {testing ? <Loader2 className="h-4 w-4 animate-spin" /> : <Server className="h-4 w-4" />}
                       {testing ? 'Testing...' : 'Test Connection'}
                     </Button>
@@ -317,7 +352,7 @@ export default function SurveillancePage() {
                     {testResult === 'fail' && <X className="h-5 w-5 text-red-500 shrink-0" />}
                   </div>
                   <div className="flex gap-3 pt-2">
-                    <Button fullWidth onClick={handleAddCamera} disabled={!newCam.name || !newCam.ip}>
+                    <Button fullWidth onClick={handleAddCamera} disabled={!newCam.name || !newCam.ipAddress}>
                       <Plus className="h-4 w-4" /> Add Camera
                     </Button>
                     <Button variant="ghost" fullWidth onClick={() => { setShowSetup(false); setNewCam(defaultForm); setTestResult('idle') }}>

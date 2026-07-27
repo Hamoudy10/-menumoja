@@ -149,13 +149,15 @@ export interface Alert {
 export interface Camera {
   id: string
   name: string
-  ip: string
+  ipAddress: string
   port?: number
   username?: string
   location?: string
-  active: boolean
-  feedUrl: string
-  alerts: Alert[]
+  isActive: boolean
+  streamUrl?: string
+  lastSeen?: string
+  alertCount?: number
+  alerts?: Alert[]
 }
 
 export interface CartItem {

@@ -21,6 +21,8 @@ const addCameraSchema = z.object({
   username: z.string().max(100).optional(),
   password: z.string().max(255).optional(),
   location: z.string().max(200).optional(),
+  streamUrl: z.string().max(500).optional(),
+  isActive: z.boolean().optional(),
 });
 
 const updateCameraSchema = addCameraSchema.partial();
@@ -78,7 +80,7 @@ router.post('/', validate(addCameraSchema), asyncHandler(async (req: Authenticat
   const restaurantId = (req as any).restaurantId;
   const data = req.body as z.infer<typeof addCameraSchema>;
 
-  const streamUrl = `rtsp://${data.username ? `${encodeURIComponent(data.username)}:${data.password ? encodeURIComponent(data.password) : ''}@` : ''}${data.ipAddress}:${data.port}/live`;
+  const streamUrl = data.streamUrl || `rtsp://${data.username ? `${encodeURIComponent(data.username)}:${data.password ? encodeURIComponent(data.password) : ''}@` : ''}${data.ipAddress}:${data.port}/live`;
 
   let passwordEncrypted: string | null = null;
   if (data.password) {
@@ -95,7 +97,7 @@ router.post('/', validate(addCameraSchema), asyncHandler(async (req: Authenticat
       passwordEncrypted,
       streamUrl,
       location: data.location || null,
-      isActive: true,
+      isActive: data.isActive ?? true,
     },
   });
 
@@ -213,12 +215,14 @@ router.put('/:id', validate(updateCameraSchema), asyncHandler(async (req: Authen
   if (data.port !== undefined) updateData.port = data.port;
   if (data.username !== undefined) updateData.username = data.username;
   if (data.location !== undefined) updateData.location = data.location;
+  if (data.streamUrl !== undefined) updateData.streamUrl = data.streamUrl;
+  if (data.isActive !== undefined) updateData.isActive = data.isActive;
 
   if (data.password !== undefined) {
     updateData.passwordEncrypted = encrypt(data.password);
   }
 
-  if (data.ipAddress !== undefined || data.port !== undefined || data.username !== undefined || data.password !== undefined) {
+  if (!data.streamUrl && (data.ipAddress !== undefined || data.port !== undefined || data.username !== undefined || data.password !== undefined)) {
     const ip = data.ipAddress || existing.ipAddress;
     const port = data.port || existing.port;
     const user = data.username !== undefined ? data.username : existing.username;
