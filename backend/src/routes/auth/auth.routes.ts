@@ -440,24 +440,27 @@ router.post(
   '/forgot-password',
   authLimiter,
   asyncHandler(async (req, res) => {
-    const { phone } = req.body;
-    if (!phone) {
-      throw new AppError(400, 'PHONE_REQUIRED', 'Phone number is required', 'Nambari ya simu inahitajika');
+    const { phone, email } = req.body;
+    const identifier = phone || email;
+    if (!identifier) {
+      throw new AppError(400, 'IDENTIFIER_REQUIRED', 'Phone number or email is required', 'Nambari ya simu au barua pepe inahitajika');
     }
 
-    const owner = await prisma.owner.findUnique({ where: { phone } });
+    const owner = email
+      ? await prisma.owner.findUnique({ where: { email } })
+      : await prisma.owner.findUnique({ where: { phone: identifier } });
     if (!owner) {
-      throw new AppError(404, 'USER_NOT_FOUND', 'No account found with this phone number', 'Hakuna akaunti iliyopatikana kwa nambari hii ya simu');
+      throw new AppError(404, 'USER_NOT_FOUND', 'No account found with this phone number or email', 'Hakuna akaunti iliyopatikana');
     }
 
     const otp = String(Math.floor(100000 + Math.random() * 900000));
-    await redis.setex(`reset_otp:${phone}`, 600, otp);
+    const key = `reset_otp:${owner.phone}`;
+    await redis.setex(key, 600, otp);
 
     try {
-      logger.info('Password reset OTP generated', { phone, otp });
+      logger.info('Password reset OTP generated', { phone: owner.phone, email: owner.email, otp });
     } catch (err) {
-      // SMS sending failed — log OTP for dev use
-      logger.warn('SMS not available, OTP logged for development', { phone, otp });
+      logger.warn('SMS not available, OTP logged for development', { phone: owner.phone, otp });
     }
 
     res.json({

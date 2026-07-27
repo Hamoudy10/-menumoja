@@ -23,8 +23,13 @@ export const logout = (refreshToken?: string) =>
 export const refreshToken = (token: string) =>
   api.post('/auth/refresh-token', { refreshToken: token }).then(unwrap)
 
-export const forgotPassword = (phone: string) =>
-  api.post('/auth/forgot-password', { phone }).then(unwrap)
+export const forgotPassword = (identifier: string) => {
+  const isEmail = identifier.includes('@')
+  return api.post('/auth/forgot-password', isEmail ? { email: identifier } : { phone: identifier }).then(unwrap)
+}
+
+export const resetPassword = (phone: string, otp: string, newPassword: string) =>
+  api.post('/auth/reset-password', { phone, otp, newPassword }).then(unwrap)
 
 export const staffLogin = (pin: string, restaurantSlug: string) =>
   api.post('/auth/staff/login', { pin, restaurantSlug }).then(unwrap)
