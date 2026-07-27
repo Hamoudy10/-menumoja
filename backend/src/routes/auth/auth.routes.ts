@@ -454,13 +454,15 @@ router.post(
     }
 
     const otp = String(Math.floor(100000 + Math.random() * 900000));
-    const key = `reset_otp:${owner.phone}`;
-    await redis.setex(key, 600, otp);
+    const redisKey = `reset_otp:${owner.email}`;
+    const redisKeyPhone = owner.phone ? `reset_otp:${owner.phone}` : null;
+    await redis.setex(redisKey, 600, otp);
+    if (redisKeyPhone) await redis.setex(redisKeyPhone, 600, otp);
 
     try {
       logger.info('Password reset OTP generated', { phone: owner.phone, email: owner.email, otp });
     } catch (err) {
-      logger.warn('SMS not available, OTP logged for development', { phone: owner.phone, otp });
+      logger.warn('SMS not available, OTP logged for development', { email: owner.email, otp });
     }
 
     res.json({
@@ -475,16 +477,17 @@ router.post(
   '/reset-password',
   authLimiter,
   asyncHandler(async (req, res) => {
-    const { phone, otp, newPassword } = req.body;
-    if (!phone || !otp || !newPassword) {
-      throw new AppError(400, 'MISSING_FIELDS', 'Phone, OTP, and new password are required', 'Simu, OTP, na neno la siri mpya zinahitajika');
+    const { phone, email, otp, newPassword } = req.body;
+    const identifier = phone || email;
+    if (!identifier || !otp || !newPassword) {
+      throw new AppError(400, 'MISSING_FIELDS', 'Phone/email, OTP, and new password are required', 'Simu/barua pepe, OTP, na neno la siri mpya zinahitajika');
     }
 
     if (newPassword.length < 8) {
       throw new AppError(400, 'WEAK_PASSWORD', 'Password must be at least 8 characters', 'Neno la siri lazima liwe na angalau herufi 8');
     }
 
-    const storedOtp = await redis.get(`reset_otp:${phone}`);
+    const storedOtp = await redis.get(`reset_otp:${identifier}`);
     if (!storedOtp) {
       throw new AppError(400, 'OTP_EXPIRED', 'OTP has expired. Request a new one.', 'OTP imeisha muda. Omba mpya.');
     }
@@ -494,14 +497,13 @@ router.post(
     }
 
     const passwordHash = await hashPassword(newPassword);
-    await prisma.owner.update({
-      where: { phone },
-      data: { passwordHash },
-    });
+    const owner = email
+      ? await prisma.owner.update({ where: { email }, data: { passwordHash } })
+      : await prisma.owner.update({ where: { phone: identifier }, data: { passwordHash } });
 
-    await redis.del(`reset_otp:${phone}`);
+    await redis.del(`reset_otp:${identifier}`);
 
-    logger.info('Password reset successful', { phone });
+    logger.info('Password reset successful', { email: owner.email, phone: owner.phone });
 
     res.json({
       success: true,
