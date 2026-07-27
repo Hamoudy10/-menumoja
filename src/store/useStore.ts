@@ -760,7 +760,7 @@ export const useStore = create<AppState>((set) => ({
     }
   },
   addAlert: (cameraId: string, alert: any) => set((s) => ({
-    cameras: s.cameras.map((c) => c.id === cameraId ? { ...c, alerts: [alert, ...c.alerts] } : c),
+    cameras: s.cameras.map((c) => c.id === cameraId ? { ...c, alerts: [alert, ...(c.alerts || [])] } : c),
     alerts: [alert, ...s.alerts],
   })),
   fetchAlerts: async () => {
