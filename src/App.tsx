@@ -41,6 +41,8 @@ const HelpPage = lazy(() => import('@/pages/dashboard/HelpPage'))
 const StaffLoginPage = lazy(() => import('@/pages/StaffLoginPage'))
 const KitchenDisplay = lazy(() => import('@/pages/dashboard/KitchenDisplay'))
 const CashierDashboard = lazy(() => import('@/pages/dashboard/CashierDashboard'))
+const WaiterDashboard = lazy(() => import('@/pages/staff/WaiterDashboard'))
+const StaffProfile = lazy(() => import('@/pages/staff/StaffProfile'))
 
 const AdminOverview = lazy(() => import('@/pages/admin/AdminOverview'))
 const AdminRestaurants = lazy(() => import('@/pages/admin/AdminRestaurants'))
@@ -102,6 +104,16 @@ function AppRoutes() {
           <Route path="/staff/cashier" element={
             <ProtectedRoute requiredRole="staff">
               <CashierDashboard />
+            </ProtectedRoute>
+          } />
+          <Route path="/staff/waiter" element={
+            <ProtectedRoute requiredRole="staff">
+              <WaiterDashboard />
+            </ProtectedRoute>
+          } />
+          <Route path="/staff/profile" element={
+            <ProtectedRoute requiredRole="staff">
+              <StaffProfile />
             </ProtectedRoute>
           } />
 

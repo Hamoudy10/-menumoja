@@ -65,6 +65,7 @@ export default function LoginPage() {
       localStorage.setItem('staffName', data.staff?.fullName || 'Staff')
       const r = data.staff?.role || 'waiter'
       if (r === 'cashier') navigate('/staff/cashier')
+      else if (r === 'waiter') navigate('/staff/waiter')
       else navigate('/staff/kitchen')
     } catch (err: any) {
       toast.error(err?.response?.data?.error?.message || 'Invalid PIN or slug')

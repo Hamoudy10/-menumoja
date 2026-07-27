@@ -30,6 +30,7 @@ export default function StaffLoginPage() {
       const role = data.staff?.role || 'waiter'
       if (role === 'cashier') navigate('/staff/cashier')
       else if (role === 'kitchen') navigate('/staff/kitchen')
+      else if (role === 'waiter') navigate('/staff/waiter')
       else navigate('/staff/kitchen')
     } catch (err: any) {
       toast.error(err?.response?.data?.error?.message || 'Invalid PIN or slug')

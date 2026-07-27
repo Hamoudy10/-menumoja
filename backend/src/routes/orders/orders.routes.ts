@@ -681,6 +681,34 @@ router.put('/:id/assign-waiter',
   })
 );
 
+router.post('/:id/complaint',
+  authenticate,
+  enforceRestaurantScope,
+  asyncHandler(async (req, res) => {
+    const restaurantId = (req as any).restaurantId;
+    const orderId = req.params.id;
+    const { type, description, evidence } = req.body;
+
+    const order = await prisma.order.findFirst({
+      where: { id: orderId, restaurantId },
+    });
+
+    if (!order) {
+      throw new NotFoundError('Order not found', 'Agizo halikupatikana');
+    }
+
+    logger.info('Complaint submitted', { orderId, type, description, restaurantId });
+
+    res.json({
+      success: true,
+      data: {
+        message: 'Complaint submitted successfully',
+        messageSwahili: 'Malalamiko yamewasilishwa kwa mafanikio',
+      },
+    });
+  })
+);
+
 router.delete('/:id',
   authenticate,
   enforceRestaurantScope,
