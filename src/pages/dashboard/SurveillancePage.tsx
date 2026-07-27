@@ -1,9 +1,9 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import {
   Camera, Maximize2, Minimize2, Bell, Plus, X, Shield,
   AlertTriangle, Clock, Monitor, Wifi, WifiOff,
-  RefreshCw, CheckCircle2, Server, Loader2,
+  RefreshCw, CheckCircle2, Server, Loader2, Webcam,
 } from 'lucide-react'
 import apiClient from '@/api/client'
 import { useStore } from '@/store/useStore'
@@ -12,6 +12,8 @@ import { Input } from '@/components/ui/Input'
 import { Badge } from '@/components/ui/Badge'
 import { EmptyState } from '@/components/ui/EmptyState'
 import { showSuccessToast, showErrorToast } from '@/components/ui/Toast'
+
+interface LocalCam { id: string; name: string; stream: MediaStream; }
 
 interface CameraForm {
   name: string; ipAddress: string; port: string; username: string; password: string; location: string; streamUrl: string
@@ -23,9 +25,12 @@ function isHttpFeed(url?: string | null) {
   return url && (url.startsWith('http://') || url.startsWith('https://'))
 }
 
+let localCamIdCounter = 0
+
 export default function SurveillancePage() {
   const { cameras, alerts, fetchCameras, fetchAlerts, addCamera, updateCamera } = useStore()
   const [fullscreen, setFullscreen] = useState<string | null>(null)
+  const [fullscreenLocal, setFullscreenLocal] = useState<string | null>(null)
   const [showSetup, setShowSetup] = useState(false)
   const [newCam, setNewCam] = useState<CameraForm>(defaultForm)
   const [testing, setTesting] = useState(false)
@@ -33,6 +38,9 @@ export default function SurveillancePage() {
   const [loading, setLoading] = useState(false)
   const [imgErrors, setImgErrors] = useState<Record<string, boolean>>({})
   const [streamTokens, setStreamTokens] = useState<Record<string, string>>({})
+  const [localCams, setLocalCams] = useState<LocalCam[]>([])
+  const videoRefs = useRef<Record<string, HTMLVideoElement>>({})
+  const [webcamError, setWebcamError] = useState<string | null>(null)
 
   useEffect(() => { setLoading(true); Promise.all([fetchCameras(), fetchAlerts()]).finally(() => setLoading(false)) }, [])
 
@@ -47,6 +55,36 @@ export default function SurveillancePage() {
       }
     })
   }, [cameras])
+
+  // attach local cam streams to video elements
+  useEffect(() => {
+    localCams.forEach((lc) => {
+      const el = videoRefs.current[lc.id]
+      if (el && el.srcObject !== lc.stream) el.srcObject = lc.stream
+    })
+  }, [localCams])
+
+  const startWebcam = async () => {
+    setWebcamError(null)
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({ video: true, audio: false })
+      const id = `local-${++localCamIdCounter}`
+      setLocalCams((prev) => [...prev, { id, name: `Webcam ${localCamIdCounter}`, stream }])
+      showSuccessToast('Webcam connected')
+    } catch (err: any) {
+      setWebcamError(err.message || 'Camera access denied')
+      showErrorToast('Could not access webcam')
+    }
+  }
+
+  const stopLocalCam = (id: string) => {
+    setLocalCams((prev) => {
+      const cam = prev.find((c) => c.id === id)
+      if (cam) cam.stream.getTracks().forEach((t) => t.stop())
+      return prev.filter((c) => c.id !== id)
+    })
+    if (fullscreenLocal === id) setFullscreenLocal(null)
+  }
 
   const allAlerts = (alerts || cameras.flatMap((c: any) =>
     c.alerts?.map((a: any) => ({ ...a, cameraName: c.name })) || []
@@ -129,6 +167,23 @@ export default function SurveillancePage() {
     return token ? `${base}/cameras/${cam.id}/stream?token=${token}` : null
   }
 
+  if (fullscreenLocal) {
+    const lc = localCams.find((c) => c.id === fullscreenLocal)
+    if (!lc) { setFullscreenLocal(null) } else {
+      return (
+        <div className="fixed inset-0 z-50 bg-background-dark">
+          <div className="absolute top-4 right-4 z-10 flex gap-2">
+            <Badge variant="success" size="lg">Live</Badge>
+            <button onClick={() => setFullscreenLocal(null)} className="flex h-10 w-10 items-center justify-center rounded-xl bg-white/10 text-white hover:bg-white/20 transition-colors">
+              <Minimize2 className="h-5 w-5" />
+            </button>
+          </div>
+          <video ref={(el) => { if (el) videoRefs.current[lc.id] = el }} autoPlay muted playsInline className="h-full w-full object-contain" />
+        </div>
+      )
+    }
+  }
+
   if (fullscreen) {
     const cam: any = cameras.find((c) => c.id === fullscreen)
     if (!cam) return null
@@ -178,87 +233,136 @@ export default function SurveillancePage() {
           <button onClick={() => { fetchCameras(); fetchAlerts() }} className="flex h-9 w-9 items-center justify-center rounded-xl bg-black/5 dark:bg-white/10 hover:bg-black/10 dark:hover:bg-white/20 transition-colors">
             <RefreshCw className="h-4 w-4 text-text-secondary" />
           </button>
+          <Button variant="outline" onClick={startWebcam} disabled={!!webcamError} title={webcamError || ''}>
+            <Webcam className="h-4 w-4" /> Test Webcam
+          </Button>
           <Button onClick={() => setShowSetup(true)}><Plus className="h-4 w-4" /> Add Camera</Button>
         </div>
       </div>
 
       <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-4">
-        {cameras.length === 0 ? (
+        {cameras.length === 0 && localCams.length === 0 ? (
           <div className="sm:col-span-2 xl:col-span-3">
             <EmptyState
               icon={<Camera className="h-12 w-12" />}
               title="No cameras configured"
-              description="Add your first camera to start monitoring your restaurant"
+              description="Add your first camera or use Test Webcam to try with your laptop's camera"
               actionLabel="Add Camera"
               onAction={() => setShowSetup(true)}
             />
           </div>
         ) : (
-          (cameras as any[]).map((cam) => {
-            const unreadAlerts = (cam.alerts || []).filter((a: any) => !a.viewed).length
-            const url = feedUrl(cam)
-            const feedFailed = imgErrors[cam.id]
-            return (
+          <>
+            {(cameras as any[]).map((cam) => {
+              const unreadAlerts = (cam.alerts || []).filter((a: any) => !a.viewed).length
+              const url = feedUrl(cam)
+              const feedFailed = imgErrors[cam.id]
+              return (
+                <motion.div
+                  key={cam.id} layout
+                  initial={{ opacity: 0, scale: 0.95 }}
+                  animate={{ opacity: 1, scale: 1 }}
+                  className="group relative overflow-hidden rounded-2xl bg-gradient-to-br from-black/80 to-black/60 border border-white/10"
+                >
+                  <div className="aspect-video bg-black/50 flex items-center justify-center relative overflow-hidden">
+                    {isHttpFeed(url) && !feedFailed ? (
+                      <img src={url} alt={cam.name} className="h-full w-full object-cover" onError={() => setImgErrors((e) => ({ ...e, [cam.id]: true }))} />
+                    ) : (
+                      <Camera className="h-12 w-12 text-white/20" />
+                    )}
+                    {cam.isActive && isHttpFeed(url) && !feedFailed && (
+                      <div className="absolute top-3 left-3 flex items-center gap-2">
+                        <span className="relative flex h-2.5 w-2.5">
+                          <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-red-500 opacity-75" />
+                          <span className="relative inline-flex h-2.5 w-2.5 rounded-full bg-red-500" />
+                        </span>
+                        <span className="font-accent text-[10px] text-white/70 uppercase tracking-wider">Live</span>
+                      </div>
+                    )}
+                    <div className="absolute top-3 right-3 flex items-center gap-2">
+                      {unreadAlerts > 0 && (<Badge variant="danger" size="sm">{unreadAlerts} alerts</Badge>)}
+                      <button onClick={() => setFullscreen(cam.id)} className="flex h-7 w-7 items-center justify-center rounded-lg bg-black/50 text-white/70 hover:text-white hover:bg-black/70 transition-colors opacity-0 group-hover:opacity-100">
+                        <Maximize2 className="h-3.5 w-3.5" />
+                      </button>
+                    </div>
+                    <div className="absolute bottom-3 left-3 right-3 flex items-center justify-between">
+                      <span className="font-accent text-sm text-white font-medium">{cam.name}</span>
+                      <span className="font-accent text-[10px] text-white/50">{cam.ipAddress}:{cam.port}</span>
+                    </div>
+                    {(!cam.isActive) && (
+                      <div className="absolute inset-0 flex items-center justify-center bg-black/60">
+                        <div className="text-center">
+                          <WifiOff className="h-8 w-8 text-red-400 mx-auto mb-2" />
+                          <p className="font-accent text-sm text-red-400 font-medium">Offline</p>
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                  <div className="p-3 space-y-2">
+                    {cam.location && <p className="font-accent text-xs text-white/40">{cam.location}</p>}
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-2">
+                        {cam.isActive ? <Wifi className="h-3.5 w-3.5 text-success" /> : <WifiOff className="h-3.5 w-3.5 text-red-400" />}
+                        <span className="font-accent text-xs text-white/60">{cam.isActive ? 'Connected' : 'Disconnected'}</span>
+                      </div>
+                      <div className="flex items-center gap-1">
+                        <motion.button whileTap={{ scale: 0.95 }} onClick={() => updateCamera(cam.id, { isActive: !cam.isActive })}
+                          className={`rounded-full px-2.5 py-1 text-[10px] font-accent font-medium transition-colors ${
+                            cam.isActive ? 'bg-red-500/20 text-red-400 hover:bg-red-500/30' : 'bg-success/20 text-success hover:bg-success/30'
+                          }`}>
+                          {cam.isActive ? 'Disable' : 'Enable'}
+                        </motion.button>
+                      </div>
+                    </div>
+                  </div>
+                </motion.div>
+              )
+            })}
+            {localCams.map((lc) => (
               <motion.div
-                key={cam.id} layout
+                key={lc.id} layout
                 initial={{ opacity: 0, scale: 0.95 }}
                 animate={{ opacity: 1, scale: 1 }}
                 className="group relative overflow-hidden rounded-2xl bg-gradient-to-br from-black/80 to-black/60 border border-white/10"
               >
                 <div className="aspect-video bg-black/50 flex items-center justify-center relative overflow-hidden">
-                  {isHttpFeed(url) && !feedFailed ? (
-                    <img src={url} alt={cam.name} className="h-full w-full object-cover" onError={() => setImgErrors((e) => ({ ...e, [cam.id]: true }))} />
-                  ) : (
-                    <Camera className="h-12 w-12 text-white/20" />
-                  )}
-                  {cam.isActive && isHttpFeed(url) && !feedFailed && (
-                    <div className="absolute top-3 left-3 flex items-center gap-2">
-                      <span className="relative flex h-2.5 w-2.5">
-                        <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-red-500 opacity-75" />
-                        <span className="relative inline-flex h-2.5 w-2.5 rounded-full bg-red-500" />
-                      </span>
-                      <span className="font-accent text-[10px] text-white/70 uppercase tracking-wider">Live</span>
-                    </div>
-                  )}
+                  <video
+                    ref={(el) => { if (el) { videoRefs.current[lc.id] = el; el.srcObject = lc.stream } }}
+                    autoPlay muted playsInline
+                    className="h-full w-full object-cover"
+                  />
+                  <div className="absolute top-3 left-3 flex items-center gap-2">
+                    <span className="relative flex h-2.5 w-2.5">
+                      <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-red-500 opacity-75" />
+                      <span className="relative inline-flex h-2.5 w-2.5 rounded-full bg-red-500" />
+                    </span>
+                    <span className="font-accent text-[10px] text-white/70 uppercase tracking-wider">Live</span>
+                  </div>
                   <div className="absolute top-3 right-3 flex items-center gap-2">
-                    {unreadAlerts > 0 && (<Badge variant="danger" size="sm">{unreadAlerts} alerts</Badge>)}
-                    <button onClick={() => setFullscreen(cam.id)} className="flex h-7 w-7 items-center justify-center rounded-lg bg-black/50 text-white/70 hover:text-white hover:bg-black/70 transition-colors opacity-0 group-hover:opacity-100">
+                    <button onClick={() => setFullscreenLocal(lc.id)} className="flex h-7 w-7 items-center justify-center rounded-lg bg-black/50 text-white/70 hover:text-white hover:bg-black/70 transition-colors opacity-0 group-hover:opacity-100">
                       <Maximize2 className="h-3.5 w-3.5" />
                     </button>
                   </div>
                   <div className="absolute bottom-3 left-3 right-3 flex items-center justify-between">
-                    <span className="font-accent text-sm text-white font-medium">{cam.name}</span>
-                    <span className="font-accent text-[10px] text-white/50">{cam.ipAddress}:{cam.port}</span>
+                    <span className="font-accent text-sm text-white font-medium">{lc.name}</span>
+                    <span className="font-accent text-[10px] text-white/50">Local Webcam</span>
                   </div>
-                  {(!cam.isActive) && (
-                    <div className="absolute inset-0 flex items-center justify-center bg-black/60">
-                      <div className="text-center">
-                        <WifiOff className="h-8 w-8 text-red-400 mx-auto mb-2" />
-                        <p className="font-accent text-sm text-red-400 font-medium">Offline</p>
-                      </div>
-                    </div>
-                  )}
                 </div>
-                <div className="p-3 space-y-2">
-                  {cam.location && <p className="font-accent text-xs text-white/40">{cam.location}</p>}
+                <div className="p-3">
                   <div className="flex items-center justify-between">
                     <div className="flex items-center gap-2">
-                      {cam.isActive ? <Wifi className="h-3.5 w-3.5 text-success" /> : <WifiOff className="h-3.5 w-3.5 text-red-400" />}
-                      <span className="font-accent text-xs text-white/60">{cam.isActive ? 'Connected' : 'Disconnected'}</span>
+                      <Wifi className="h-3.5 w-3.5 text-success" />
+                      <span className="font-accent text-xs text-white/60">Connected</span>
                     </div>
-                    <div className="flex items-center gap-1">
-                      <motion.button whileTap={{ scale: 0.95 }} onClick={() => updateCamera(cam.id, { isActive: !cam.isActive })}
-                        className={`rounded-full px-2.5 py-1 text-[10px] font-accent font-medium transition-colors ${
-                          cam.isActive ? 'bg-red-500/20 text-red-400 hover:bg-red-500/30' : 'bg-success/20 text-success hover:bg-success/30'
-                        }`}>
-                        {cam.isActive ? 'Disable' : 'Enable'}
-                      </motion.button>
-                    </div>
+                    <motion.button whileTap={{ scale: 0.95 }} onClick={() => stopLocalCam(lc.id)}
+                      className="rounded-full px-2.5 py-1 text-[10px] font-accent font-medium bg-red-500/20 text-red-400 hover:bg-red-500/30 transition-colors">
+                      Stop
+                    </motion.button>
                   </div>
                 </div>
               </motion.div>
-            )
-          })
+            ))}
+          </>
         )}
       </div>
 
@@ -311,8 +415,8 @@ export default function SurveillancePage() {
             <h3 className="font-heading text-lg font-bold text-text-primary dark:text-white mb-4">Camera Summary</h3>
             <div className="space-y-3">
               {[
-                { icon: Monitor, label: 'Total Cameras', value: cameras.length, color: 'text-secondary' },
-                { icon: Shield, label: 'Active', value: (cameras as any[]).filter((c) => c.isActive).length, color: 'text-success' },
+                { icon: Monitor, label: 'Total Cameras', value: cameras.length + localCams.length, color: 'text-secondary' },
+                { icon: Shield, label: 'Active', value: (cameras as any[]).filter((c) => c.isActive).length + localCams.length, color: 'text-success' },
                 { icon: AlertTriangle, label: 'Alerts Today', value: allAlerts.length, color: 'text-red-500' },
                 { icon: null, label: 'Recording', value: 'All', color: 'text-success', pulse: true },
               ].map((stat, i) => (
