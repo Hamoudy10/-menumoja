@@ -105,7 +105,11 @@ export default function SurveillancePage() {
     }
   }
 
-  const feedUrl = (cam: any) => cam.streamUrl || (cam.ipAddress ? `http://${cam.ipAddress}:${cam.port || 8080}/video` : null)
+  const apiBaseUrl = import.meta.env.VITE_API_URL || '/api/v1'
+  const feedUrl = (cam: any) =>
+    cam.streamUrl?.startsWith('http')
+      ? `${apiBaseUrl.replace(/\/+$/, '')}/cameras/${cam.id}/stream`
+      : cam.streamUrl || (cam.ipAddress ? `http://${cam.ipAddress}:${cam.port || 8080}/video` : null)
 
   if (fullscreen) {
     const cam: any = cameras.find((c) => c.id === fullscreen)

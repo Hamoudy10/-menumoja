@@ -374,4 +374,64 @@ router.get('/:id/alerts', asyncHandler(async (req: AuthenticatedRequest, res: Re
   });
 }));
 
+router.get('/:id/stream', asyncHandler(async (req: AuthenticatedRequest, res: Response) => {
+  const restaurantId = (req as any).restaurantId;
+  const cameraId = req.params.id;
+
+  const camera = await prisma.camera.findFirst({
+    where: { id: cameraId, restaurantId },
+  });
+
+  if (!camera) {
+    throw new NotFoundError('Camera not found', 'Kamera haikupatikana');
+  }
+
+  const url = camera.streamUrl;
+  if (!url || !url.startsWith('http')) {
+    res.status(400).json({ success: false, message: 'Camera has no HTTP stream URL' });
+    return;
+  }
+
+  try {
+    const controller = new AbortController();
+    req.on('close', () => controller.abort());
+
+    const upstream = await fetch(url, { signal: controller.signal });
+    if (!upstream.ok && upstream.status !== 200) {
+      res.status(502).json({ success: false, message: 'Camera stream unreachable' });
+      return;
+    }
+
+    res.setHeader('Cache-Control', 'no-cache, no-store, must-revalidate');
+    res.setHeader('Pragma', 'no-cache');
+    res.setHeader('Expires', '0');
+    res.setHeader('Access-Control-Allow-Origin', '*');
+
+    const contentType = upstream.headers.get('content-type');
+    if (contentType) res.setHeader('Content-Type', contentType);
+
+    const reader = upstream.body?.getReader();
+    if (!reader) {
+      res.status(502).json({ success: false, message: 'No response body' });
+      return;
+    }
+
+    const pump = async () => {
+      try {
+        while (true) {
+          const { done, value } = await reader.read();
+          if (done) break;
+          if (!res.destroyed) res.write(value);
+        }
+      } catch { /* ignore */ }
+      if (!res.destroyed) res.end();
+    };
+    pump();
+  } catch (err: any) {
+    if (!res.destroyed) {
+      res.status(502).json({ success: false, message: err.message || 'Stream proxy failed' });
+    }
+  }
+}));
+
 export default router;
