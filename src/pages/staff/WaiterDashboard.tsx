@@ -6,7 +6,7 @@ import {
   UtensilsCrossed, ArrowLeft, Loader2, X, MessageSquare,
   ThumbsUp, FileText, Camera, Upload, Image, User
 } from 'lucide-react'
-import { fetchOrders, updateOrderStatus } from '@/api/orders'
+import { fetchLiveOrders, updateOrderStatus } from '@/api/orders'
 import api from '@/api/client'
 import { Button } from '@/components/ui/Button'
 import { Badge } from '@/components/ui/Badge'
@@ -57,12 +57,13 @@ export default function WaiterDashboard() {
   const loadOrders = async () => {
     setLoading(true)
     try {
-      const [live, history] = await Promise.all([
-        fetchOrders({ status: 'PENDING,CONFIRMED,PREPARING,READY', perPage: 100 }),
-        fetchOrders({ status: 'SERVED,CANCELLED', perPage: 50 }),
+      const [live, historyRes] = await Promise.all([
+        fetchLiveOrders(),
+        api.get('/orders/history', { params: { perPage: 50 } }),
       ])
       setOrders(Array.isArray(live) ? live : [])
-      setServedOrders(Array.isArray(history) ? history : [])
+      const hist = historyRes.data?.data || historyRes.data || []
+      setServedOrders(Array.isArray(hist) ? hist : [])
     } catch {
       showErrorToast('Failed to load orders')
     } finally {
