@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import { useNavigate } from 'react-router-dom'
 import { 
-  ClipboardList, Clock, CheckCircle2, AlertTriangle, 
+  ClipboardList, Clock, CheckCircle2, AlertTriangle, AlertCircle,
   UtensilsCrossed, ArrowLeft, Loader2, X, MessageSquare,
   ThumbsUp, FileText, Camera, Upload, Image, User
 } from 'lucide-react'
@@ -53,19 +53,24 @@ export default function WaiterDashboard() {
   const [complaintForm, setComplaintForm] = useState<ComplaintForm>({ orderId: '', type: 'complaint', description: '', evidence: [] })
   const [updatingId, setUpdatingId] = useState<string | null>(null)
   const [servedOrders, setServedOrders] = useState<any[]>([])
+  const [loadError, setLoadError] = useState<string | null>(null)
 
   const loadOrders = async () => {
     setLoading(true)
+    setLoadError(null)
     try {
       const [live, historyRes] = await Promise.all([
         fetchLiveOrders(),
         api.get('/orders/history', { params: { perPage: 50 } }),
       ])
       setOrders(Array.isArray(live) ? live : [])
-      const hist = historyRes.data?.data || historyRes.data || []
+      const histData = historyRes.data
+      const hist = histData?.data || histData || []
       setServedOrders(Array.isArray(hist) ? hist : [])
-    } catch {
-      showErrorToast('Failed to load orders')
+    } catch (err: any) {
+      const msg = err?.response?.data?.message || err?.message || 'Failed to load orders'
+      setLoadError(msg)
+      showErrorToast(msg)
     } finally {
       setLoading(false)
     }
@@ -220,6 +225,16 @@ export default function WaiterDashboard() {
           </button>
         </div>
       </header>
+
+      {loadError && (
+        <div className="max-w-3xl mx-auto px-4 pt-4">
+          <div className="bg-red-50 border border-red-200 text-red-700 text-sm rounded-xl p-3 flex items-center gap-2">
+            <AlertCircle className="w-4 h-4 shrink-0" />
+            {loadError}
+            <button onClick={loadOrders} className="ml-auto text-red-600 underline text-xs shrink-0">Retry</button>
+          </div>
+        </div>
+      )}
 
       <main className="max-w-3xl mx-auto px-4 py-4 space-y-3">
         {loading && orders.length === 0 ? (
