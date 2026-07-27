@@ -15,22 +15,61 @@ interface RedisLike {
   status: string;
 }
 
-const nullRedis: RedisLike = {
-  get: async () => null,
-  set: async () => {},
-  setex: async () => {},
-  del: async () => 0,
-  expire: async () => 0,
-  incr: async () => 1,
-  exists: async () => 0,
-  ttl: async () => -2,
-  keys: async () => [],
-  quit: async () => {},
+const memoryStore = new Map<string, { value: any; expiresAt: number }>();
+
+const memoryRedis: RedisLike = {
+  get: async (key: string) => {
+    const entry = memoryStore.get(key);
+    if (!entry) return null;
+    if (Date.now() > entry.expiresAt) { memoryStore.delete(key); return null; }
+    return entry.value;
+  },
+  set: async (key: string, value: any, ...args: any[]) => {
+    const ttlIndex = args.findIndex((a: any) => a === 'EX' || a === 'PX');
+    let ttlMs = 0;
+    if (ttlIndex >= 0 && ttlIndex + 1 < args.length) {
+      const num = Number(args[ttlIndex + 1]);
+      ttlMs = args[ttlIndex] === 'PX' ? num : num * 1000;
+    }
+    memoryStore.set(key, { value, expiresAt: ttlMs ? Date.now() + ttlMs : Infinity });
+  },
+  setex: async (key: string, seconds: number, value: any) => {
+    memoryStore.set(key, { value, expiresAt: Date.now() + seconds * 1000 });
+  },
+  del: async (...keys: string[]) => {
+    let count = 0;
+    keys.forEach((k) => { if (memoryStore.delete(k)) count++; });
+    return count;
+  },
+  expire: async (key: string, seconds: number) => {
+    const entry = memoryStore.get(key);
+    if (!entry) return 0;
+    entry.expiresAt = Date.now() + seconds * 1000;
+    return 1;
+  },
+  incr: async (key: string) => {
+    const entry = memoryStore.get(key);
+    const next = entry ? Number(entry.value) + 1 : 1;
+    memoryStore.set(key, { value: String(next), expiresAt: Infinity });
+    return next;
+  },
+  exists: async (...keys: string[]) => keys.filter((k) => memoryStore.has(k)).length,
+  ttl: async (key: string) => {
+    const entry = memoryStore.get(key);
+    if (!entry) return -2;
+    const remaining = Math.floor((entry.expiresAt - Date.now()) / 1000);
+    return remaining > 0 ? remaining : -2;
+  },
+  keys: async (pattern: string) => {
+    const regex = new RegExp('^' + pattern.replace(/\*/g, '.*') + '$');
+    return Array.from(memoryStore.keys()).filter((k) => regex.test(k));
+  },
+  quit: async () => { memoryStore.clear(); },
   on: () => {},
   status: 'disabled',
 };
 
-let redis: RedisLike = nullRedis;
+let redis: RedisLike = memoryRedis;
 
 if (config.redisUrl && !config.redisUrl.includes('localhost')) {
   try {
