@@ -463,6 +463,212 @@ router.get('/live',
   })
 );
 
+// ── These MUST be before /:id to avoid route capture ──
+
+router.get('/history',
+  authenticate,
+  enforceRestaurantScope,
+  validateQuery(historyQuerySchema),
+  asyncHandler(async (req, res) => {
+    const restaurantId = (req as any).restaurantId;
+    const { dateFrom, dateTo, search, page, perPage } = req.query as any;
+
+    const where: any = {
+      restaurantId,
+      status: { in: ['SERVED', 'CANCELLED'] },
+    };
+
+    if (dateFrom || dateTo) {
+      where.createdAt = {};
+      if (dateFrom) where.createdAt.gte = new Date(dateFrom);
+      if (dateTo) where.createdAt.lte = new Date(dateTo);
+    }
+
+    if (search) {
+      where.OR = [
+        { orderNumber: { contains: search, mode: 'insensitive' } },
+        { tableNumber: isNaN(Number(search)) ? undefined : Number(search) },
+      ].filter(Boolean);
+    }
+
+    const hSafePage = Math.max(1, Number(page) || 1);
+    const hSafePerPage = Math.min(100, Math.max(1, Number(perPage) || 20));
+    const [total, orders] = await Promise.all([
+      prisma.order.count({ where }),
+      prisma.order.findMany({
+        where,
+        orderBy: { createdAt: 'desc' },
+        skip: (hSafePage - 1) * hSafePerPage,
+        take: hSafePerPage,
+        select: {
+          id: true,
+          orderNumber: true,
+          tableNumber: true,
+          status: true,
+          paymentStatus: true,
+          paymentMethod: true,
+          totalAmount: true,
+          createdAt: true,
+          servedAt: true,
+          cancelledAt: true,
+          waiter: { select: { id: true, fullName: true } },
+          _count: { select: { items: true } },
+        },
+      }),
+    ]);
+
+    res.json({
+      success: true,
+      data: orders.map((o) => ({
+        id: o.id,
+        orderNumber: o.orderNumber,
+        tableNumber: o.tableNumber,
+        status: o.status,
+        paymentStatus: o.paymentStatus,
+        paymentMethod: o.paymentMethod,
+        totalAmount: Number(o.totalAmount),
+        createdAt: o.createdAt,
+        servedAt: o.servedAt,
+        cancelledAt: o.cancelledAt,
+        waiter: o.waiter,
+        itemCount: o._count.items,
+      })),
+      meta: buildPaginationMeta(total, page, perPage),
+    });
+  })
+);
+
+router.get('/export',
+  authenticate,
+  enforceRestaurantScope,
+  validateQuery(exportQuerySchema),
+  asyncHandler(async (req, res) => {
+    const restaurantId = (req as any).restaurantId;
+    const { startDate, endDate } = req.query as z.infer<typeof exportQuerySchema>;
+
+    const orders = await prisma.order.findMany({
+      where: {
+        restaurantId,
+        createdAt: {
+          gte: new Date(startDate),
+          lte: new Date(endDate),
+        },
+      },
+      include: {
+        items: {
+          select: { itemName: true, quantity: true },
+        },
+        payments: {
+          select: { paymentMethod: true },
+          take: 1,
+        },
+      },
+      orderBy: { createdAt: 'asc' },
+    });
+
+    const headers = [
+      'Order#',
+      'Table',
+      'Items',
+      'Total (KES)',
+      'Payment Method',
+      'Status',
+      'Date',
+    ];
+
+    const csvRows = orders.map((o) => {
+      const itemsStr = o.items.map((i) => `${i.itemName} x${i.quantity}`).join('; ');
+      const paymentMethod = o.payments[0]?.paymentMethod || o.paymentMethod;
+      return [
+        o.orderNumber,
+        o.tableNumber || 'N/A',
+        `"${itemsStr}"`,
+        Number(o.totalAmount).toFixed(2),
+        paymentMethod,
+        o.status,
+        o.createdAt.toISOString(),
+      ].join(',');
+    });
+
+    const csv = [headers.join(','), ...csvRows].join('\n');
+
+    res.setHeader('Content-Type', 'text/csv');
+    res.setHeader('Content-Disposition', `attachment; filename="orders-${startDate.substring(0, 10)}-${endDate.substring(0, 10)}.csv"`);
+    res.send(csv);
+  })
+);
+
+// ── Kitchen Display Routes ──
+
+router.get('/kitchen',
+  authenticate,
+  enforceRestaurantScope,
+  asyncHandler(async (req, res) => {
+    const restaurantId = (req as any).restaurantId;
+    const userRole = req.user?.role;
+
+    if (userRole !== 'kitchen' && userRole !== 'manager' && userRole !== 'super_admin') {
+      throw new AppError(403, 'FORBIDDEN', 'Only kitchen staff and managers can view kitchen display', 'Wafanyakazi wa jikoni na wasimamizi pekee wanaweza kuona onyesho la jikoni');
+    }
+
+    const orders = await prisma.order.findMany({
+      where: {
+        restaurantId,
+        status: { in: ['CONFIRMED', 'PREPARING'] },
+      },
+      orderBy: { confirmedAt: 'asc' },
+      select: {
+        id: true,
+        orderNumber: true,
+        tableNumber: true,
+        status: true,
+        confirmedAt: true,
+        estimatedPrepMinutes: true,
+        createdAt: true,
+        items: {
+          select: {
+            id: true,
+            itemName: true,
+            quantity: true,
+            specialInstructions: true,
+          },
+          orderBy: { createdAt: 'asc' },
+        },
+        waiter: { select: { id: true, fullName: true } },
+      },
+    });
+
+    const now = Date.now();
+    const data = orders.map((o) => {
+      const confirmedTime = o.confirmedAt || o.createdAt;
+      const elapsedSeconds = Math.floor((now - new Date(confirmedTime).getTime()) / 1000);
+      const minutes = Math.floor(elapsedSeconds / 60);
+      const seconds = elapsedSeconds % 60;
+      const timer = `${String(minutes).padStart(2, '0')}:${String(seconds).padStart(2, '0')}`;
+
+      const isOverdue = o.estimatedPrepMinutes
+        ? minutes > o.estimatedPrepMinutes
+        : minutes > 20;
+
+      return {
+        id: o.id,
+        orderNumber: o.orderNumber,
+        tableNumber: o.tableNumber,
+        status: o.status,
+        timer,
+        elapsedMinutes: minutes,
+        estimatedPrepMinutes: o.estimatedPrepMinutes,
+        isOverdue,
+        items: o.items,
+        waiter: o.waiter,
+        confirmedAt: o.confirmedAt,
+      };
+    });
+
+    res.json({ success: true, data });
+  })
+);
+
 router.get('/:id',
   authenticate,
   enforceRestaurantScope,
@@ -783,210 +989,6 @@ router.delete('/:id',
     }
 
     res.json({ success: true, data: updated });
-  })
-);
-
-router.get('/history',
-  authenticate,
-  enforceRestaurantScope,
-  validateQuery(historyQuerySchema),
-  asyncHandler(async (req, res) => {
-    const restaurantId = (req as any).restaurantId;
-    const { dateFrom, dateTo, search, page, perPage } = req.query as any;
-
-    const where: any = {
-      restaurantId,
-      status: { in: ['SERVED', 'CANCELLED'] },
-    };
-
-    if (dateFrom || dateTo) {
-      where.createdAt = {};
-      if (dateFrom) where.createdAt.gte = new Date(dateFrom);
-      if (dateTo) where.createdAt.lte = new Date(dateTo);
-    }
-
-    if (search) {
-      where.OR = [
-        { orderNumber: { contains: search, mode: 'insensitive' } },
-        { tableNumber: isNaN(Number(search)) ? undefined : Number(search) },
-      ].filter(Boolean);
-    }
-
-    const hSafePage = Math.max(1, Number(page) || 1);
-    const hSafePerPage = Math.min(100, Math.max(1, Number(perPage) || 20));
-    const [total, orders] = await Promise.all([
-      prisma.order.count({ where }),
-      prisma.order.findMany({
-        where,
-        orderBy: { createdAt: 'desc' },
-        skip: (hSafePage - 1) * hSafePerPage,
-        take: hSafePerPage,
-        select: {
-          id: true,
-          orderNumber: true,
-          tableNumber: true,
-          status: true,
-          paymentStatus: true,
-          paymentMethod: true,
-          totalAmount: true,
-          createdAt: true,
-          servedAt: true,
-          cancelledAt: true,
-          waiter: { select: { id: true, fullName: true } },
-          _count: { select: { items: true } },
-        },
-      }),
-    ]);
-
-    res.json({
-      success: true,
-      data: orders.map((o) => ({
-        id: o.id,
-        orderNumber: o.orderNumber,
-        tableNumber: o.tableNumber,
-        status: o.status,
-        paymentStatus: o.paymentStatus,
-        paymentMethod: o.paymentMethod,
-        totalAmount: Number(o.totalAmount),
-        createdAt: o.createdAt,
-        servedAt: o.servedAt,
-        cancelledAt: o.cancelledAt,
-        waiter: o.waiter,
-        itemCount: o._count.items,
-      })),
-      meta: buildPaginationMeta(total, page, perPage),
-    });
-  })
-);
-
-router.get('/export',
-  authenticate,
-  enforceRestaurantScope,
-  validateQuery(exportQuerySchema),
-  asyncHandler(async (req, res) => {
-    const restaurantId = (req as any).restaurantId;
-    const { startDate, endDate } = req.query as z.infer<typeof exportQuerySchema>;
-
-    const orders = await prisma.order.findMany({
-      where: {
-        restaurantId,
-        createdAt: {
-          gte: new Date(startDate),
-          lte: new Date(endDate),
-        },
-      },
-      include: {
-        items: {
-          select: { itemName: true, quantity: true },
-        },
-        payments: {
-          select: { paymentMethod: true },
-          take: 1,
-        },
-      },
-      orderBy: { createdAt: 'asc' },
-    });
-
-    const headers = [
-      'Order#',
-      'Table',
-      'Items',
-      'Total (KES)',
-      'Payment Method',
-      'Status',
-      'Date',
-    ];
-
-    const csvRows = orders.map((o) => {
-      const itemsStr = o.items.map((i) => `${i.itemName} x${i.quantity}`).join('; ');
-      const paymentMethod = o.payments[0]?.paymentMethod || o.paymentMethod;
-      return [
-        o.orderNumber,
-        o.tableNumber || 'N/A',
-        `"${itemsStr}"`,
-        Number(o.totalAmount).toFixed(2),
-        paymentMethod,
-        o.status,
-        o.createdAt.toISOString(),
-      ].join(',');
-    });
-
-    const csv = [headers.join(','), ...csvRows].join('\n');
-
-    res.setHeader('Content-Type', 'text/csv');
-    res.setHeader('Content-Disposition', `attachment; filename="orders-${startDate.substring(0, 10)}-${endDate.substring(0, 10)}.csv"`);
-    res.send(csv);
-  })
-);
-
-// ── Kitchen Display Routes ──
-
-router.get('/kitchen',
-  authenticate,
-  enforceRestaurantScope,
-  asyncHandler(async (req, res) => {
-    const restaurantId = (req as any).restaurantId;
-    const userRole = req.user?.role;
-
-    if (userRole !== 'kitchen' && userRole !== 'manager' && userRole !== 'super_admin') {
-      throw new AppError(403, 'FORBIDDEN', 'Only kitchen staff and managers can view kitchen display', 'Wafanyakazi wa jikoni na wasimamizi pekee wanaweza kuona onyesho la jikoni');
-    }
-
-    const orders = await prisma.order.findMany({
-      where: {
-        restaurantId,
-        status: { in: ['CONFIRMED', 'PREPARING'] },
-      },
-      orderBy: { confirmedAt: 'asc' },
-      select: {
-        id: true,
-        orderNumber: true,
-        tableNumber: true,
-        status: true,
-        confirmedAt: true,
-        estimatedPrepMinutes: true,
-        createdAt: true,
-        items: {
-          select: {
-            id: true,
-            itemName: true,
-            quantity: true,
-            specialInstructions: true,
-          },
-          orderBy: { createdAt: 'asc' },
-        },
-        waiter: { select: { id: true, fullName: true } },
-      },
-    });
-
-    const now = Date.now();
-    const data = orders.map((o) => {
-      const confirmedTime = o.confirmedAt || o.createdAt;
-      const elapsedSeconds = Math.floor((now - new Date(confirmedTime).getTime()) / 1000);
-      const minutes = Math.floor(elapsedSeconds / 60);
-      const seconds = elapsedSeconds % 60;
-      const timer = `${String(minutes).padStart(2, '0')}:${String(seconds).padStart(2, '0')}`;
-
-      const isOverdue = o.estimatedPrepMinutes
-        ? minutes > o.estimatedPrepMinutes
-        : minutes > 20;
-
-      return {
-        id: o.id,
-        orderNumber: o.orderNumber,
-        tableNumber: o.tableNumber,
-        status: o.status,
-        timer,
-        elapsedMinutes: minutes,
-        estimatedPrepMinutes: o.estimatedPrepMinutes,
-        isOverdue,
-        items: o.items,
-        waiter: o.waiter,
-        confirmedAt: o.confirmedAt,
-      };
-    });
-
-    res.json({ success: true, data });
   })
 );
 

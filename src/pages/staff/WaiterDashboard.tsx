@@ -68,7 +68,7 @@ export default function WaiterDashboard() {
       const hist = histData?.data || histData || []
       setServedOrders(Array.isArray(hist) ? hist : [])
     } catch (err: any) {
-      const msg = err?.response?.data?.message || err?.message || 'Failed to load orders'
+      const msg = err?.response?.data?.error?.message || err?.response?.data?.message || err?.message || 'Failed to load orders'
       setLoadError(msg)
       showErrorToast(msg)
     } finally {
