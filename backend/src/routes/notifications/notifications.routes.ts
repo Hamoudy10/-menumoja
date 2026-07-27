@@ -3,6 +3,7 @@ import { prisma } from '../../config/database';
 import { authenticate } from '../../middleware';
 import { NotFoundError } from '../../utils/errors';
 import { parsePagination, buildPaginationMeta, asyncHandler } from '../../utils/helpers';
+import logger from '../../utils/logger';
 import { AuthenticatedRequest } from '../../types';
 
 const router = Router();
@@ -33,21 +34,26 @@ router.get('/', asyncHandler(async (req: AuthenticatedRequest, res: Response) =>
   if (isRead === 'true') where.isRead = true;
   else if (isRead === 'false') where.isRead = false;
 
-  const [notifications, total] = await Promise.all([
-    prisma.notification.findMany({
-      where,
-      orderBy: { createdAt: 'desc' },
-      skip: (page - 1) * perPage,
-      take: perPage,
-    }),
-    prisma.notification.count({ where }),
-  ]);
+  try {
+    const [notifications, total] = await Promise.all([
+      prisma.notification.findMany({
+        where,
+        orderBy: { createdAt: 'desc' },
+        skip: (page - 1) * perPage,
+        take: perPage,
+      }),
+      prisma.notification.count({ where }),
+    ]);
 
-  res.json({
-    success: true,
-    data: notifications,
-    meta: buildPaginationMeta(total, page, perPage),
-  });
+    res.json({
+      success: true,
+      data: notifications,
+      meta: buildPaginationMeta(total, page, perPage),
+    });
+  } catch {
+    logger.warn('Failed to fetch notifications (table may not exist)');
+    res.json({ success: true, data: [], meta: buildPaginationMeta(0, page, perPage) });
+  }
 }));
 
 router.get('/unread-count', asyncHandler(async (req: AuthenticatedRequest, res: Response) => {

@@ -5,7 +5,6 @@ import {
   AlertTriangle, Clock, Monitor, Wifi, WifiOff,
   RefreshCw, CheckCircle2, Server, Loader2, Webcam,
 } from 'lucide-react'
-import apiClient from '@/api/client'
 import { useStore } from '@/store/useStore'
 import { Button } from '@/components/ui/Button'
 import { Input } from '@/components/ui/Input'
@@ -22,13 +21,13 @@ interface CameraForm {
 const defaultForm: CameraForm = { name: '', ipAddress: '', port: '8080', username: '', password: '', location: '', streamUrl: '' }
 
 function isHttpFeed(url?: string | null) {
-  return url && (url.startsWith('http://') || url.startsWith('https://'))
+  return !!url
 }
 
 let localCamIdCounter = 0
 
 export default function SurveillancePage() {
-  const { cameras, alerts, fetchCameras, fetchAlerts, addCamera, updateCamera } = useStore()
+  const { cameras, alerts, fetchCameras, fetchAlerts, addCamera, updateCamera, deleteCamera } = useStore()
   const [fullscreen, setFullscreen] = useState<string | null>(null)
   const [fullscreenLocal, setFullscreenLocal] = useState<string | null>(null)
   const [showSetup, setShowSetup] = useState(false)
@@ -37,24 +36,11 @@ export default function SurveillancePage() {
   const [testResult, setTestResult] = useState<'idle' | 'success' | 'fail'>('idle')
   const [loading, setLoading] = useState(false)
   const [imgErrors, setImgErrors] = useState<Record<string, boolean>>({})
-  const [streamTokens, setStreamTokens] = useState<Record<string, string>>({})
   const [localCams, setLocalCams] = useState<LocalCam[]>([])
   const videoRefs = useRef<Record<string, HTMLVideoElement>>({})
   const [webcamError, setWebcamError] = useState<string | null>(null)
 
   useEffect(() => { setLoading(true); Promise.all([fetchCameras(), fetchAlerts()]).finally(() => setLoading(false)) }, [])
-
-  useEffect(() => {
-    (cameras as any[]).forEach(async (cam: any) => {
-      if (cam.streamUrl?.startsWith('http') && !streamTokens[cam.id]) {
-        try {
-          const res = await apiClient.post(`/cameras/${cam.id}/stream-token`)
-          const token = res.data?.data?.token
-          if (token) setStreamTokens((t) => ({ ...t, [cam.id]: token }))
-        } catch { /* token fetch failed */ }
-      }
-    })
-  }, [cameras])
 
   // attach local cam streams to video elements
   useEffect(() => {
@@ -157,14 +143,10 @@ export default function SurveillancePage() {
     }
   }
 
-  const apiBaseUrl = import.meta.env.VITE_API_URL || '/api/v1'
   const feedUrl = (cam: any) => {
-    if (!cam.streamUrl?.startsWith('http')) {
-      return cam.streamUrl || (cam.ipAddress ? `http://${cam.ipAddress}:${cam.port || 8080}/video` : null)
-    }
-    const base = apiBaseUrl.replace(/\/+$/, '')
-    const token = streamTokens[cam.id]
-    return token ? `${base}/cameras/${cam.id}/stream?token=${token}` : null
+    if (cam.streamUrl?.startsWith('http')) return cam.streamUrl
+    if (cam.ipAddress) return `http://${cam.ipAddress}:${cam.port || 8080}/video`
+    return null
   }
 
   if (fullscreenLocal) {
@@ -178,7 +160,7 @@ export default function SurveillancePage() {
               <Minimize2 className="h-5 w-5" />
             </button>
           </div>
-          <video ref={(el) => { if (el) videoRefs.current[lc.id] = el }} autoPlay muted playsInline className="h-full w-full object-contain" />
+          <video ref={(el) => { if (el) { videoRefs.current[lc.id] = el; el.srcObject = lc.stream } }} autoPlay muted playsInline className="h-full w-full object-contain" />
         </div>
       )
     }
@@ -199,7 +181,7 @@ export default function SurveillancePage() {
             <Minimize2 className="h-5 w-5" />
           </button>
         </div>
-        {isHttpFeed(url) && !feedFailed ? (
+        {url && !feedFailed ? (
           <img src={url} alt={cam.name} className="h-full w-full object-contain" onError={() => setImgErrors((e) => ({ ...e, [fullscreen]: true }))} />
         ) : (
           <div className="flex h-full items-center justify-center">
@@ -265,7 +247,7 @@ export default function SurveillancePage() {
                   className="group relative overflow-hidden rounded-2xl bg-gradient-to-br from-black/80 to-black/60 border border-white/10"
                 >
                   <div className="aspect-video bg-black/50 flex items-center justify-center relative overflow-hidden">
-                    {isHttpFeed(url) && !feedFailed ? (
+                    {url && !feedFailed ? (
                       <img src={url} alt={cam.name} className="h-full w-full object-cover" onError={() => setImgErrors((e) => ({ ...e, [cam.id]: true }))} />
                     ) : (
                       <Camera className="h-12 w-12 text-white/20" />
@@ -281,6 +263,9 @@ export default function SurveillancePage() {
                     )}
                     <div className="absolute top-3 right-3 flex items-center gap-2">
                       {unreadAlerts > 0 && (<Badge variant="danger" size="sm">{unreadAlerts} alerts</Badge>)}
+                      <button onClick={() => { if (window.confirm('Delete this camera?')) deleteCamera(cam.id) }} className="flex h-7 w-7 items-center justify-center rounded-lg bg-black/50 text-red-400 hover:text-red-300 hover:bg-black/70 transition-colors opacity-0 group-hover:opacity-100">
+                        <X className="h-3.5 w-3.5" />
+                      </button>
                       <button onClick={() => setFullscreen(cam.id)} className="flex h-7 w-7 items-center justify-center rounded-lg bg-black/50 text-white/70 hover:text-white hover:bg-black/70 transition-colors opacity-0 group-hover:opacity-100">
                         <Maximize2 className="h-3.5 w-3.5" />
                       </button>

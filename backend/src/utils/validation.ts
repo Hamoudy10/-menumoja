@@ -93,9 +93,12 @@ export const createRestaurantSchema = z
     businessRegNo: z.string().optional(),
     vatRegNo: z.string().optional(),
     businessType: z.string().optional(),
-    county: z.string().optional(),
     brandColor: z.string().optional(),
     fontStyle: z.string().optional(),
+    description: z.string().optional(),
+    cuisine: z.string().optional(),
+    ownerName: z.string().optional(),
+    location: z.string().optional(),
   })
   .strict();
 

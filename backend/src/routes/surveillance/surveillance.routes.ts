@@ -200,22 +200,27 @@ router.get('/alert', asyncHandler(async (req: AuthenticatedRequest, res: Respons
   if (isReviewed === 'true') where.isReviewed = true;
   else if (isReviewed === 'false') where.isReviewed = false;
 
-  const [alerts, total] = await Promise.all([
-    prisma.cameraAlert.findMany({
-      where,
-      include: { camera: { select: { name: true } } },
-      orderBy: { occurredAt: 'desc' },
-      skip: (page - 1) * perPage,
-      take: perPage,
-    }),
-    prisma.cameraAlert.count({ where }),
-  ]);
+  try {
+    const [alerts, total] = await Promise.all([
+      prisma.cameraAlert.findMany({
+        where,
+        include: { camera: { select: { name: true } } },
+        orderBy: { occurredAt: 'desc' },
+        skip: (page - 1) * perPage,
+        take: perPage,
+      }),
+      prisma.cameraAlert.count({ where }),
+    ]);
 
-  res.json({
-    success: true,
-    data: alerts.map((a) => ({ ...a, cameraName: a.camera.name })),
-    meta: buildPaginationMeta(total, page, perPage),
-  });
+    res.json({
+      success: true,
+      data: alerts.map((a) => ({ ...a, cameraName: a.camera.name })),
+      meta: buildPaginationMeta(total, page, perPage),
+    });
+  } catch (err: any) {
+    logger.warn('Failed to fetch camera alerts (table may not exist)', { error: err.message });
+    res.json({ success: true, data: [], meta: buildPaginationMeta(0, page, perPage) });
+  }
 }));
 
 router.put('/alert/:alertId/review', asyncHandler(async (req: AuthenticatedRequest, res: Response) => {

@@ -88,6 +88,7 @@ interface AppState {
   fetchCameras: () => Promise<void>
   addCamera: (camera: any) => Promise<void>
   updateCamera: (id: string, data: any) => Promise<void>
+  deleteCamera: (id: string) => Promise<void>
   addAlert: (cameraId: string, alert: any) => void
   fetchAlerts: () => Promise<void>
 
@@ -757,6 +758,15 @@ export const useStore = create<AppState>((set) => ({
       toast.success('Camera updated')
     } catch (err: any) {
       toast.error(err?.response?.data?.message || 'Failed to update camera')
+    }
+  },
+  deleteCamera: async (id: string) => {
+    try {
+      await surveillanceApi.deleteCamera(id)
+      set((s) => ({ cameras: s.cameras.filter((c) => c.id !== id) }))
+      toast.success('Camera deleted')
+    } catch (err: any) {
+      toast.error(err?.response?.data?.message || 'Failed to delete camera')
     }
   },
   addAlert: (cameraId: string, alert: any) => set((s) => ({

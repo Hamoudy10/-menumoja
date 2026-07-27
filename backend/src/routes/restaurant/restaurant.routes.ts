@@ -86,7 +86,8 @@ router.put(
       })();
     }
 
-    const { brandColor, fontStyle, ...restaurantData } = data;
+    const { brandColor, fontStyle, cuisine, ownerName, ...restaurantData } = data;
+    if (data.location) restaurantData.address = data.location;
 
     const restaurant = await prisma.restaurant.update({
       where: { id: restaurantId },
