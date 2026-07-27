@@ -2,14 +2,15 @@ import { useState, useEffect, useMemo, useRef } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import {
   Clock, Search, Filter, ChevronDown, ChevronUp, AlertTriangle, CheckCircle2,
-  CookingPot, UtensilsCrossed, ChefHat,
+  CookingPot, UtensilsCrossed, ChefHat, Loader2,
 } from 'lucide-react'
 import { useStore } from '@/store/useStore'
+import { getOrderHistory, fetchLiveOrders as fetchLiveOrdersApi } from '@/api/orders'
 import { OrderCard } from '@/components/dashboard/OrderCard'
 import { Badge } from '@/components/ui/Badge'
 import { SearchBar } from '@/components/ui/SearchBar'
 import { EmptyState } from '@/components/ui/EmptyState'
-import { showSuccessToast } from '@/components/ui/Toast'
+import { showSuccessToast, showErrorToast } from '@/components/ui/Toast'
 import type { Order } from '@/types'
 
 type Tab = 'live' | 'history' | 'kitchen'
@@ -121,13 +122,25 @@ function LiveOrdersView({ orders, updateOrderStatus }: { orders: Order[]; update
 function OrderHistory({ orders }: { orders: Order[] }) {
   const [search, setSearch] = useState('')
   const [expanded, setExpanded] = useState<string | null>(null)
-  const [filter, setFilter] = useState<Order['status'] | 'all'>('all')
+  const [filter, setFilter] = useState<string>('all')
   const [tableSearch, setTableSearch] = useState('')
+  const [historyOrders, setHistoryOrders] = useState<any[]>([])
+  const [loading, setLoading] = useState(false)
 
-  const filtered = orders.filter((o) => {
-    const matchSearch = o.id.toLowerCase().includes(search.toLowerCase()) || (o.items || []).some((i: any) => (i.name || i.itemName || '').toLowerCase().includes(search.toLowerCase()))
-    const matchFilter = filter === 'all' || o.status === filter
-    const matchTable = !tableSearch || String(o.tableNumber).includes(tableSearch)
+  useEffect(() => {
+    setLoading(true)
+    getOrderHistory({ perPage: 200 })
+      .then((data) => setHistoryOrders(Array.isArray(data) ? data : []))
+      .catch(() => showErrorToast('Failed to load order history'))
+      .finally(() => setLoading(false))
+  }, [])
+
+  const sourceOrders = historyOrders.length > 0 ? historyOrders : orders
+
+  const filtered = sourceOrders.filter((o: any) => {
+    const matchSearch = (o.id || '').toLowerCase().includes(search.toLowerCase()) || (o.items || []).some((i: any) => (i.name || i.itemName || '').toLowerCase().includes(search.toLowerCase()))
+    const matchFilter = filter === 'all' || (o.status || '').toLowerCase() === filter.toLowerCase()
+    const matchTable = !tableSearch || String(o.tableNumber || '').includes(tableSearch)
     return matchSearch && matchFilter && matchTable
   })
 
@@ -141,7 +154,7 @@ function OrderHistory({ orders }: { orders: Order[] }) {
           className="w-28 rounded-xl border-2 border-gray-200 dark:border-white/20 bg-white dark:bg-white/5 px-3 py-2 text-xs font-body text-text-primary dark:text-white placeholder:text-text-secondary/50 focus:border-secondary focus:outline-none"
         />
         <div className="flex gap-1 rounded-lg bg-black/5 dark:bg-white/10 p-1">
-          {(['all', 'new', 'preparing', 'ready', 'served'] as const).map((f) => (
+          {(['all', 'served', 'cancelled'] as const).map((f) => (
             <button
               key={f}
               onClick={() => setFilter(f)}
@@ -156,7 +169,9 @@ function OrderHistory({ orders }: { orders: Order[] }) {
       </div>
 
       <div className="space-y-2">
-        {filtered.length === 0 ? (
+        {loading ? (
+          <div className="flex items-center justify-center py-16"><Loader2 className="w-8 h-8 animate-spin text-secondary" /></div>
+        ) : filtered.length === 0 ? (
           <EmptyState icon={<Search className="h-12 w-12" />} title="No orders found" description="Try a different search or filter" />
         ) : (
           filtered.map((order) => (
@@ -176,18 +191,18 @@ function OrderHistory({ orders }: { orders: Order[] }) {
                 </span>
                 <div className="flex-1 min-w-0">
                   <p className="font-body text-sm text-text-primary dark:text-white truncate">
-                    {(order.items || []).map((i: any) => `${i.quantity}x ${i.name}`).join(', ')}
+                    {(order.items || []).map((i: any) => `${i.quantity}x ${i.itemName || i.name}`).join(', ')}
                   </p>
                   <p className="font-accent text-xs text-text-secondary dark:text-white/50 mt-0.5">
                     {new Date(order.createdAt).toLocaleString()}
                   </p>
                 </div>
                 <Badge variant={
-                  order.status === 'new' ? 'info' : order.status === 'preparing' ? 'warning' : order.status === 'ready' ? 'success' : 'default'
+                  order.status === 'SERVED' ? 'success' : order.status === 'CANCELLED' ? 'danger' : order.status === 'new' ? 'info' : order.status === 'preparing' ? 'warning' : order.status === 'ready' ? 'success' : 'default'
                 } size="sm">
                   {order.status}
                 </Badge>
-                <span className="font-accent text-sm font-bold text-secondary">KES {(order.total || 0).toLocaleString()}</span>
+                <span className="font-accent text-sm font-bold text-secondary">KES {(order.totalAmount || order.total || 0).toLocaleString()}</span>
                 {expanded === order.id ? <ChevronUp className="h-4 w-4 text-text-secondary" /> : <ChevronDown className="h-4 w-4 text-text-secondary" />}
               </button>
               <AnimatePresence>
@@ -201,9 +216,9 @@ function OrderHistory({ orders }: { orders: Order[] }) {
                     <div className="p-4 space-y-3">
                       {(order.items || []).map((item: any, i: any) => (
                         <div key={i} className="flex items-center justify-between text-sm">
-                          <span className="font-body text-text-primary dark:text-white/80">{item.name}</span>
+                          <span className="font-body text-text-primary dark:text-white/80">{item.itemName || item.name}</span>
                           <span className="font-accent text-text-secondary dark:text-white/50">
-                            {item.quantity} × KES {item.price.toLocaleString()} = KES {(item.quantity * item.price).toLocaleString()}
+                            {item.quantity} × KES {(item.itemPrice || item.price || 0).toLocaleString()} = KES {((item.itemPrice || item.price || 0) * item.quantity).toLocaleString()}
                           </span>
                         </div>
                       ))}
