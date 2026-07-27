@@ -89,10 +89,32 @@ router.put(
     const { brandColor, fontStyle, cuisine, ownerName, location, ...restaurantData } = data;
     if (location) restaurantData.address = location;
 
+    const oldSlug = existing.slug;
     const restaurant = await prisma.restaurant.update({
       where: { id: restaurantId },
       data: restaurantData,
     });
+
+    if (restaurantData.slug && restaurantData.slug !== oldSlug) {
+      const FRONTEND_URL = process.env.FRONTEND_URL || 'https://menumoja.app';
+      const qrCodes = await prisma.qrCode.findMany({
+        where: { restaurantId },
+        select: { id: true, targetUrl: true },
+      });
+      await Promise.all(
+        qrCodes.map((qr) =>
+          prisma.qrCode.update({
+            where: { id: qr.id },
+            data: {
+              targetUrl: qr.targetUrl.replace(
+                `/menu/${oldSlug}`,
+                `/menu/${restaurantData.slug}`
+              ),
+            },
+          })
+        )
+      );
+    }
 
     if (brandColor !== undefined || fontStyle !== undefined) {
       const settingsUpdate: any = {};
