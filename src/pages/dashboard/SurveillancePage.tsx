@@ -5,6 +5,7 @@ import {
   AlertTriangle, Clock, Monitor, Wifi, WifiOff,
   RefreshCw, CheckCircle2, Server, Loader2,
 } from 'lucide-react'
+import apiClient from '@/api/client'
 import { useStore } from '@/store/useStore'
 import { Button } from '@/components/ui/Button'
 import { Input } from '@/components/ui/Input'
@@ -31,8 +32,21 @@ export default function SurveillancePage() {
   const [testResult, setTestResult] = useState<'idle' | 'success' | 'fail'>('idle')
   const [loading, setLoading] = useState(false)
   const [imgErrors, setImgErrors] = useState<Record<string, boolean>>({})
+  const [streamTokens, setStreamTokens] = useState<Record<string, string>>({})
 
   useEffect(() => { setLoading(true); Promise.all([fetchCameras(), fetchAlerts()]).finally(() => setLoading(false)) }, [])
+
+  useEffect(() => {
+    (cameras as any[]).forEach(async (cam: any) => {
+      if (cam.streamUrl?.startsWith('http') && !streamTokens[cam.id]) {
+        try {
+          const res = await apiClient.post(`/cameras/${cam.id}/stream-token`)
+          const token = res.data?.data?.token
+          if (token) setStreamTokens((t) => ({ ...t, [cam.id]: token }))
+        } catch { /* token fetch failed */ }
+      }
+    })
+  }, [cameras])
 
   const allAlerts = (alerts || cameras.flatMap((c: any) =>
     c.alerts?.map((a: any) => ({ ...a, cameraName: c.name })) || []
@@ -106,10 +120,14 @@ export default function SurveillancePage() {
   }
 
   const apiBaseUrl = import.meta.env.VITE_API_URL || '/api/v1'
-  const feedUrl = (cam: any) =>
-    cam.streamUrl?.startsWith('http')
-      ? `${apiBaseUrl.replace(/\/+$/, '')}/cameras/${cam.id}/stream`
-      : cam.streamUrl || (cam.ipAddress ? `http://${cam.ipAddress}:${cam.port || 8080}/video` : null)
+  const feedUrl = (cam: any) => {
+    if (!cam.streamUrl?.startsWith('http')) {
+      return cam.streamUrl || (cam.ipAddress ? `http://${cam.ipAddress}:${cam.port || 8080}/video` : null)
+    }
+    const base = apiBaseUrl.replace(/\/+$/, '')
+    const token = streamTokens[cam.id]
+    return token ? `${base}/cameras/${cam.id}/stream?token=${token}` : null
+  }
 
   if (fullscreen) {
     const cam: any = cameras.find((c) => c.id === fullscreen)

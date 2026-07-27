@@ -12,6 +12,77 @@ import { AuthenticatedRequest } from '../../types';
 
 const router = Router();
 
+// Stream proxy — no auth middleware (img tags can't send headers).
+// Uses signed JWT token from /cameras/:id/stream-token as query param.
+router.get('/:id/stream', asyncHandler(async (req: AuthenticatedRequest, res: Response) => {
+  const cameraId = req.params.id;
+  const token = (req.query.token as string) || '';
+
+  try {
+    const payload = jwt.verify(token, getAccessSecret()) as any;
+    if (payload.type !== 'stream' || payload.cameraId !== cameraId) {
+      res.status(403).json({ success: false, message: 'Invalid stream token' });
+      return;
+    }
+  } catch {
+    res.status(403).json({ success: false, message: 'Invalid or expired stream token' });
+    return;
+  }
+
+  const camera = await prisma.camera.findFirst({ where: { id: cameraId } });
+  if (!camera) {
+    res.status(404).json({ success: false, message: 'Camera not found' });
+    return;
+  }
+
+  const url = camera.streamUrl;
+  if (!url || !url.startsWith('http')) {
+    res.status(400).json({ success: false, message: 'Camera has no HTTP stream URL' });
+    return;
+  }
+
+  try {
+    const controller = new AbortController();
+    req.on('close', () => controller.abort());
+
+    const upstream = await fetch(url, { signal: controller.signal });
+    if (!upstream.ok && upstream.status !== 200) {
+      res.status(502).json({ success: false, message: 'Camera stream unreachable' });
+      return;
+    }
+
+    res.setHeader('Cache-Control', 'no-cache, no-store, must-revalidate');
+    res.setHeader('Pragma', 'no-cache');
+    res.setHeader('Expires', '0');
+    res.setHeader('Access-Control-Allow-Origin', '*');
+
+    const contentType = upstream.headers.get('content-type');
+    if (contentType) res.setHeader('Content-Type', contentType);
+
+    const reader = upstream.body?.getReader();
+    if (!reader) {
+      res.status(502).json({ success: false, message: 'No response body' });
+      return;
+    }
+
+    const pump = async () => {
+      try {
+        while (true) {
+          const { done, value } = await reader.read();
+          if (done) break;
+          if (!res.destroyed) res.write(value);
+        }
+      } catch { /* ignore */ }
+      if (!res.destroyed) res.end();
+    };
+    pump();
+  } catch (err: any) {
+    if (!res.destroyed) {
+      res.status(502).json({ success: false, message: err.message || 'Stream proxy failed' });
+    }
+  }
+}));
+
 router.use(authenticate, enforceRestaurantScope);
 
 const addCameraSchema = z.object({
@@ -372,66 +443,6 @@ router.get('/:id/alerts', asyncHandler(async (req: AuthenticatedRequest, res: Re
     data: alerts.map((a) => ({ ...a, cameraName: camera.name })),
     meta: buildPaginationMeta(total, page, perPage),
   });
-}));
-
-router.get('/:id/stream', asyncHandler(async (req: AuthenticatedRequest, res: Response) => {
-  const restaurantId = (req as any).restaurantId;
-  const cameraId = req.params.id;
-
-  const camera = await prisma.camera.findFirst({
-    where: { id: cameraId, restaurantId },
-  });
-
-  if (!camera) {
-    throw new NotFoundError('Camera not found', 'Kamera haikupatikana');
-  }
-
-  const url = camera.streamUrl;
-  if (!url || !url.startsWith('http')) {
-    res.status(400).json({ success: false, message: 'Camera has no HTTP stream URL' });
-    return;
-  }
-
-  try {
-    const controller = new AbortController();
-    req.on('close', () => controller.abort());
-
-    const upstream = await fetch(url, { signal: controller.signal });
-    if (!upstream.ok && upstream.status !== 200) {
-      res.status(502).json({ success: false, message: 'Camera stream unreachable' });
-      return;
-    }
-
-    res.setHeader('Cache-Control', 'no-cache, no-store, must-revalidate');
-    res.setHeader('Pragma', 'no-cache');
-    res.setHeader('Expires', '0');
-    res.setHeader('Access-Control-Allow-Origin', '*');
-
-    const contentType = upstream.headers.get('content-type');
-    if (contentType) res.setHeader('Content-Type', contentType);
-
-    const reader = upstream.body?.getReader();
-    if (!reader) {
-      res.status(502).json({ success: false, message: 'No response body' });
-      return;
-    }
-
-    const pump = async () => {
-      try {
-        while (true) {
-          const { done, value } = await reader.read();
-          if (done) break;
-          if (!res.destroyed) res.write(value);
-        }
-      } catch { /* ignore */ }
-      if (!res.destroyed) res.end();
-    };
-    pump();
-  } catch (err: any) {
-    if (!res.destroyed) {
-      res.status(502).json({ success: false, message: err.message || 'Stream proxy failed' });
-    }
-  }
 }));
 
 export default router;
