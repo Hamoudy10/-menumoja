@@ -12,7 +12,7 @@ export const getOrder = (id: string) =>
   api.get(`/orders/${id}`).then(unwrap)
 
 export const updateOrderStatus = (id: string, status: string, reason?: string) =>
-  api.put(`/orders/${id}/status`, { status, cancelledReason: reason }).then(unwrap)
+  api.put(`/orders/${id}/status`, { status: status.toLowerCase(), cancelledReason: reason }).then(unwrap)
 
 export const assignWaiter = (orderId: string, waiterId: string) =>
   api.put(`/orders/${orderId}/assign-waiter`, { waiterId }).then(unwrap)

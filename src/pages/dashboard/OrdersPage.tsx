@@ -129,7 +129,7 @@ function OrderHistory({ orders }: { orders: Order[] }) {
 
   useEffect(() => {
     setLoading(true)
-    getOrderHistory({ perPage: 200 })
+    getOrderHistory({ perPage: 100 })
       .then((data) => setHistoryOrders(Array.isArray(data) ? data : []))
       .catch(() => showErrorToast('Failed to load order history'))
       .finally(() => setLoading(false))
