@@ -37,3 +37,12 @@ export const getShifts = () =>
 
 export const recordCardPayment = (orderId: string, amount: number) =>
   api.post('/payments/card/record', { orderId, amount }).then(unwrap)
+
+export const recordTip = (orderId: string, amount: number, method: string) =>
+  api.post('/payments/tip', { orderId, amount, method }).then(unwrap)
+
+export const recordServiceCharge = (orderId: string, amount: number) =>
+  api.post('/payments/service-charge', { orderId, amount }).then(unwrap)
+
+export const voidPayment = (paymentId: string, reason: string) =>
+  api.post(`/payments/${paymentId}/void`, { reason }).then(unwrap)

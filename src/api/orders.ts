@@ -31,3 +31,12 @@ export const placeOrder = (data: any) =>
 
 export const getOrderStatus = (orderId: string) =>
   api.get(`/orders/public/${orderId}/status`).then(unwrap)
+
+export const createPosOrder = (data: any) =>
+  api.post('/orders', data).then(unwrap)
+
+export const addOrderNote = (id: string, note: string) =>
+  api.put(`/orders/${id}/note`, { note }).then(unwrap)
+
+export const refundOrder = (id: string, reason: string, items?: any[]) =>
+  api.post(`/orders/${id}/refund`, { reason, items }).then(unwrap)
