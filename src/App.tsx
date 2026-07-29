@@ -26,7 +26,6 @@ const OnboardingMenu = lazy(() => import('@/pages/onboarding/OnboardingMenu'))
 const OnboardingAppearance = lazy(() => import('@/pages/onboarding/OnboardingAppearance'))
 const OnboardingAiSetup = lazy(() => import('@/pages/onboarding/OnboardingAiSetup'))
 const OnboardingQR = lazy(() => import('@/pages/onboarding/OnboardingQR'))
-const OnboardingMarketing = lazy(() => import('@/pages/onboarding/OnboardingMarketing'))
 
 const DashboardHome = lazy(() => import('@/pages/dashboard/DashboardHome'))
 const MenuManager = lazy(() => import('@/pages/dashboard/MenuManager'))
@@ -35,7 +34,6 @@ const OrdersPage = lazy(() => import('@/pages/dashboard/OrdersPage'))
 const PaymentsPage = lazy(() => import('@/pages/dashboard/PaymentsPage'))
 const AnalyticsPage = lazy(() => import('@/pages/dashboard/AnalyticsPage'))
 const SurveillancePage = lazy(() => import('@/pages/dashboard/SurveillancePage'))
-const MarketingPage = lazy(() => import('@/pages/dashboard/MarketingPage'))
 const SettingsPage = lazy(() => import('@/pages/dashboard/SettingsPage'))
 const HelpPage = lazy(() => import('@/pages/dashboard/HelpPage'))
 const StaffLoginPage = lazy(() => import('@/pages/StaffLoginPage'))
@@ -93,7 +91,6 @@ function AppRoutes() {
           <Route path="/onboarding/appearance" element={<PageTransition><OnboardingAppearance /></PageTransition>} />
           <Route path="/onboarding/ai-setup" element={<PageTransition><OnboardingAiSetup /></PageTransition>} />
           <Route path="/onboarding/qr" element={<PageTransition><OnboardingQR /></PageTransition>} />
-          <Route path="/onboarding/marketing" element={<PageTransition><OnboardingMarketing /></PageTransition>} />
 
           <Route path="/staff/login" element={<PageTransition><StaffLoginPage /></PageTransition>} />
           <Route path="/staff/kitchen" element={
@@ -129,7 +126,6 @@ function AppRoutes() {
             <Route path="payments" element={<PageTransition><PaymentsPage /></PageTransition>} />
             <Route path="analytics" element={<PageTransition><AnalyticsPage /></PageTransition>} />
             <Route path="surveillance" element={<PageTransition><SurveillancePage /></PageTransition>} />
-            <Route path="marketing" element={<PageTransition><MarketingPage /></PageTransition>} />
             <Route path="settings" element={<PageTransition><SettingsPage /></PageTransition>} />
             <Route path="help" element={<PageTransition><HelpPage /></PageTransition>} />
           </Route>

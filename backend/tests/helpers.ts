@@ -132,10 +132,6 @@ jest.mock('../src/config/database', () => {
     aiConversation: {
       findMany: jest.fn(),
     },
-    marketingPost: {
-      findMany: jest.fn(),
-      count: jest.fn(),
-    },
     notification: {
       findMany: jest.fn(),
       findUnique: jest.fn(),

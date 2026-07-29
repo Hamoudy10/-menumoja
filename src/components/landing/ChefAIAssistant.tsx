@@ -23,7 +23,7 @@ export function ChefAIAssistant() {
       if (lower.includes('pricing') || lower.includes('price') || lower.includes('cost')) {
         reply = 'We offer three plans: Starter (KES 1,500/mo), Business (KES 2,500/mo), and Premium (KES 5,000/mo). Each includes QR menus, ordering, and M-Pesa payments!'
       } else if (lower.includes('feature') || lower.includes('what')) {
-        reply = 'MenuMoja gives you QR digital menus, AI ordering assistant, M-Pesa payments, smart analytics, camera surveillance, and AI marketing tools!'
+        reply = 'MenuMoja gives you QR digital menus, AI ordering assistant, M-Pesa payments, smart analytics, and camera surveillance!'
       } else if (lower.includes('demo')) {
         reply = 'You can try our interactive demo right now! Click the "Watch Demo" button on our homepage to see how it works. 🎯'
       } else if (lower.includes('sign') || lower.includes('start') || lower.includes('register')) {

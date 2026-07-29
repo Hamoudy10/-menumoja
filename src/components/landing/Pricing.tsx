@@ -34,7 +34,7 @@ const plans: PricingPlan[] = [
     name: 'Business',
     monthlyPrice: 3500,
     yearlyPrice: 35000,
-    description: 'Ideal for growing restaurants that want AI-powered tools and marketing automation.',
+    description: 'Ideal for growing restaurants that want AI-powered tools and advanced features.',
     gradient: 'from-secondary to-accent',
     popular: true,
     features: [

@@ -85,8 +85,8 @@ export default function OnboardingQR() {
             Back
           </Button>
           <Button variant="primary" icon={<ArrowRight className="w-4 h-4" />} iconPosition="right"
-            onClick={() => { nextStep(); navigate('/onboarding/marketing') }}>
-            Next Step
+            onClick={() => { nextStep(); navigate('/dashboard') }}>
+            Finish Setup
           </Button>
         </div>
       </motion.div>

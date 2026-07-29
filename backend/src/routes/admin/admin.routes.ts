@@ -114,7 +114,6 @@ router.get('/restaurants/:id', asyncHandler(async (req: AuthenticatedRequest, re
           menuItems: true,
           staff: true,
           cameras: true,
-          marketingPosts: true,
         },
       },
     },

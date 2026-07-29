@@ -80,7 +80,7 @@ export default function SettingsPage() {
   const [selectedHeadingFont, setSelectedHeadingFont] = useState('Playfair Display')
   const [selectedBodyFont, setSelectedBodyFont] = useState('Inter')
   const [selectedAccentFont, setSelectedAccentFont] = useState('Space Grotesk')
-  const [notifSettings, setNotifSettings] = useState({ newOrders: true, payments: true, reviews: true, marketing: false, system: true })
+  const [notifSettings, setNotifSettings] = useState({ newOrders: true, payments: true, reviews: true, system: true })
   const [deleteConfirm, setDeleteConfirm] = useState('')
   const [deletePassword, setDeletePassword] = useState('')
   const [isGoogleUser, setIsGoogleUser] = useState(false)

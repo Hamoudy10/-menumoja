@@ -30,24 +30,22 @@ export default function OnboardingAiSetup() {
 
           <div className="bg-gradient-to-br from-secondary/10 to-accent/5 rounded-2xl p-5 text-center">
             <Sparkles className="w-10 h-10 text-secondary mx-auto mb-3" />
-            <h3 className="text-lg font-heading font-bold text-primary dark:text-white mb-2">AI-Powered Marketing</h3>
+            <h3 className="text-lg font-heading font-bold text-primary dark:text-white mb-2">AI-Powered Insights</h3>
             <p className="text-sm text-text-secondary dark:text-white/60 mb-4">
-              Automatically generate social media posts, promotions, and insights based on your menu and sales data.
+              Gain smart menu recommendations, customer sentiment analysis, and peak hour predictions.
             </p>
             <Toggle
               checked={onboarding.aiMarketing}
               onChange={(val) => updateOnboarding({ aiMarketing: val })}
-              label="Enable AI Marketing"
+              label="Enable AI Tools"
             />
           </div>
 
           <div className="space-y-3">
             <h4 className="text-sm font-semibold text-primary dark:text-white">AI can help you with:</h4>
             {[
-              'Auto-generated social media posts',
               'Smart menu item recommendations',
               'Customer sentiment analysis',
-              'Automated promotions & discounts',
               'Peak hour predictions',
             ].map((item, i) => (
               <div key={i} className="flex items-center gap-2 text-sm text-text-secondary dark:text-white/70">

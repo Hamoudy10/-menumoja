@@ -55,7 +55,6 @@ function createQueue(name: string): QueueLike {
 export const emailQueue = createQueue('email');
 export const smsQueue = createQueue('sms');
 export const socialMediaQueue = createQueue('social-media');
-export const aiMarketingQueue = createQueue('ai-marketing');
 export const analyticsQueue = createQueue('analytics');
 export const mpesaQueue = createQueue('mpesa');
 export const cameraQueue = createQueue('camera');
@@ -69,9 +68,6 @@ async function addSmsJob(name: string, data: Record<string, unknown>, delay?: nu
 }
 async function addSocialMediaJob(name: string, data: Record<string, unknown>, delay?: number): Promise<string | undefined> {
   try { return (await socialMediaQueue.add(name, data, { delay, attempts: 3 }))?.id; } catch { return undefined; }
-}
-async function addAiMarketingJob(name: string, data: Record<string, unknown>, delay?: number): Promise<string | undefined> {
-  try { return (await aiMarketingQueue.add(name, data, { delay }))?.id; } catch { return undefined; }
 }
 async function addAnalyticsJob(name: string, data: Record<string, unknown>, delay?: number): Promise<string | undefined> {
   try { return (await analyticsQueue.add(name, data, { delay }))?.id; } catch { return undefined; }
@@ -91,7 +87,7 @@ function formatJobData<T>(data: T): T { return data; }
 function getQueue(name: string): QueueLike | undefined {
   const queues: Record<string, QueueLike> = {
     email: emailQueue, sms: smsQueue, 'social-media': socialMediaQueue,
-    'ai-marketing': aiMarketingQueue, analytics: analyticsQueue,
+    analytics: analyticsQueue,
     mpesa: mpesaQueue, camera: cameraQueue, cleanup: cleanupQueue,
   };
   return queues[name];

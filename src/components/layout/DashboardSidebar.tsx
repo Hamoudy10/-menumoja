@@ -1,7 +1,7 @@
 import { NavLink } from 'react-router-dom'
 import {
   LayoutDashboard, UtensilsCrossed, ShoppingCart, CreditCard,
-  BarChart3, Camera, Megaphone, Settings, HelpCircle, ChefHat, X, Table2,
+  BarChart3, Camera, Settings, HelpCircle, ChefHat, X, Table2,
 } from 'lucide-react'
 import { useStore } from '@/store/useStore'
 
@@ -13,7 +13,6 @@ const menuItems = [
   { path: '/dashboard/payments', label: 'Payments', icon: CreditCard },
   { path: '/dashboard/analytics', label: 'Analytics', icon: BarChart3 },
   { path: '/dashboard/surveillance', label: 'Surveillance', icon: Camera },
-  { path: '/dashboard/marketing', label: 'Marketing', icon: Megaphone },
   { path: '/dashboard/settings', label: 'Settings', icon: Settings },
   { path: '/dashboard/help', label: 'Help', icon: HelpCircle },
 ]

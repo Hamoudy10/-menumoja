@@ -1,6 +1,6 @@
 import { type ElementType } from 'react'
 import { motion } from 'framer-motion'
-import { QrCode, MessageCircle, Wallet, Megaphone, Camera, BarChart3 } from 'lucide-react'
+import { QrCode, MessageCircle, Wallet, Bot, Camera, BarChart3 } from 'lucide-react'
 
 interface Feature {
   icon: ElementType
@@ -36,10 +36,10 @@ const features: Feature[] = [
     gradient: 'from-success to-secondary',
   },
   {
-    icon: Megaphone,
-    title: 'AI Marketing Bot',
+    icon: Bot,
+    title: 'AI Ordering Assistant',
     description:
-      'Automate social media posts, promotions, and customer engagement across Facebook, Instagram, and WhatsApp.',
+      'Smart AI assistant that helps customers discover menu items, answer questions, and place orders naturally.',
     gradient: 'from-secondary to-accent',
     colSpan: 'lg:col-span-2',
     rowSpan: 'lg:row-span-2',
@@ -91,7 +91,7 @@ export function Features() {
             <span className="text-gradient">modern restaurants</span>
           </h2>
           <p className="text-text-secondary text-sm sm:text-base max-w-2xl mx-auto font-body">
-            From digital menus to AI-powered marketing — everything you need to run a successful restaurant
+            Everything you need to run a successful restaurant
           </p>
         </motion.div>
 

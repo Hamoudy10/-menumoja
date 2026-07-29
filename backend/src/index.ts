@@ -31,7 +31,6 @@ import {
   orderRoutes,
   paymentRoutes,
   aiRoutes,
-  marketingRoutes,
   cameraRoutes,
   analyticsRoutes,
   adminRoutes,
@@ -112,7 +111,6 @@ app.use('/api/v1/qr', qrRoutes);
 app.use('/api/v1/orders', orderRoutes);
 app.use('/api/v1/payments', paymentRoutes);
 app.use('/api/v1/ai', aiRoutes);
-app.use('/api/v1/marketing', marketingRoutes);
 app.use('/api/v1/cameras', cameraRoutes);
 app.use('/api/v1/analytics', analyticsRoutes);
 app.use('/api/v1/admin', adminRoutes);

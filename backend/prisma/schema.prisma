@@ -117,31 +117,6 @@ enum AIContentType {
   IMAGE
 }
 
-enum SocialPlatform {
-  FACEBOOK
-  INSTAGRAM
-  TIKTOK
-  TWITTER
-  WHATSAPP
-}
-
-enum PostType {
-  DAILY_SPECIAL
-  PROMOTION
-  ANNOUNCEMENT
-  ENGAGEMENT
-  SEASONAL
-  CUSTOM
-}
-
-enum PostStatus {
-  DRAFT
-  SCHEDULED
-  PUBLISHED
-  FAILED
-  CANCELLED
-}
-
 enum AlertType {
   MOTION_AFTER_HOURS
   UNATTENDED_TABLE
@@ -205,7 +180,6 @@ model SubscriptionPlan {
   hasOrdering      Boolean  @default(false) @map("has_ordering")
   hasAnalytics     Boolean  @default(false) @map("has_analytics")
   hasSurveillance  Boolean  @default(false) @map("has_surveillance")
-  hasMarketingAi   Boolean  @default(false) @map("has_marketing_ai")
   hasUssd          Boolean  @default(false) @map("has_ussd")
   hasMultiBranch   Boolean  @default(false) @map("has_multi_branch")
   isActive         Boolean  @default(true) @map("is_active")
@@ -291,9 +265,6 @@ model Restaurant {
   aiConversations        AiConversation[]
   faqs                   RestaurantFaq[]
   aiGeneratedContents    AiGeneratedContent[]
-  socialMediaConnections SocialMediaConnection[]
-  marketingPosts         MarketingPost[]
-  whatsappSubscribers    WhatsappSubscriber[]
   cameras                Camera[]
   cameraAlerts           CameraAlert[]
   analyticsDaily         AnalyticsDaily[]
@@ -777,72 +748,6 @@ model AiGeneratedContent {
 
   @@index([restaurantId])
   @@map("ai_generated_content")
-}
-
-model SocialMediaConnection {
-  id              String        @id @default(uuid()) @db.Uuid
-  restaurantId    String        @map("restaurant_id") @db.Uuid
-  platform        SocialPlatform
-  accountName     String        @map("account_name")
-  accessToken     String        @map("access_token")
-  refreshToken    String?       @map("refresh_token")
-  tokenExpiresAt  DateTime?     @map("token_expires_at")
-  pageId          String?       @map("page_id")
-  isActive        Boolean       @default(true) @map("is_active")
-  createdAt       DateTime      @default(now()) @map("created_at")
-  updatedAt       DateTime      @updatedAt @map("updated_at")
-
-  restaurant     Restaurant     @relation(fields: [restaurantId], references: [id], onDelete: Cascade)
-
-  @@unique([restaurantId, platform])
-  @@index([restaurantId])
-  @@map("social_media_connections")
-}
-
-model MarketingPost {
-  id              String      @id @default(uuid()) @db.Uuid
-  restaurantId    String      @map("restaurant_id") @db.Uuid
-  platform        SocialPlatform
-  contentText     String      @map("content_text") @db.Text
-  contentTextSw   String?     @map("content_text_sw") @db.Text
-  imageUrl        String?     @map("image_url")
-  postType        PostType    @default(CUSTOM) @map("post_type")
-  status          PostStatus  @default(DRAFT)
-  aiGenerated     Boolean     @default(false) @map("ai_generated")
-  approvedByOwner Boolean     @default(false) @map("approved_by_owner")
-  scheduledAt     DateTime?   @map("scheduled_at")
-  publishedAt     DateTime?   @map("published_at")
-  platformPostId  String?     @map("platform_post_id")
-  reach           Int?
-  likes           Int?
-  comments        Int?
-  clicks          Int?
-  createdAt       DateTime    @default(now()) @map("created_at")
-  updatedAt       DateTime    @updatedAt @map("updated_at")
-
-  restaurant Restaurant @relation(fields: [restaurantId], references: [id], onDelete: Cascade)
-
-  @@index([restaurantId])
-  @@index([status])
-  @@map("marketing_posts")
-}
-
-model WhatsappSubscriber {
-  id           String   @id @default(uuid()) @db.Uuid
-  restaurantId String   @map("restaurant_id") @db.Uuid
-  phone        String
-  name         String?
-  subscribedAt DateTime @default(now()) @map("subscribed_at")
-  isActive     Boolean  @default(true) @map("is_active")
-  createdAt    DateTime @default(now()) @map("created_at")
-  updatedAt    DateTime @updatedAt @map("updated_at")
-
-  restaurant Restaurant @relation(fields: [restaurantId], references: [id], onDelete: Cascade)
-
-  @@unique([restaurantId, phone])
-  @@index([restaurantId])
-  @@index([phone])
-  @@map("whatsapp_subscribers")
 }
 
 model Camera {

@@ -24,10 +24,6 @@ function startWorkers(): void {
       logger.info(`Processing social media job: ${job.name}`, { jobId: job.id, platform: job.data.platform });
     }, { connection, concurrency: 3 });
 
-    const aiMarketingWorker = new Worker('ai-marketing', async (job: any) => {
-      logger.info(`Processing AI marketing job: ${job.name}`, { jobId: job.id });
-    }, { connection, concurrency: 2 });
-
     const analyticsWorker = new Worker('analytics', async (job: any) => {
       logger.info(`Processing analytics job: ${job.name}`, { jobId: job.id });
     }, { connection, concurrency: 1 });

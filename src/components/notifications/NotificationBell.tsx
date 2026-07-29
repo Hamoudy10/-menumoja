@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
-import { Bell, X, CheckCheck, Trash2, Clock, ShoppingCart, CreditCard, ChefHat, Star, AlertTriangle, Megaphone } from 'lucide-react'
+import { Bell, X, CheckCheck, Trash2, Clock, ShoppingCart, CreditCard, ChefHat, Star, AlertTriangle } from 'lucide-react'
 import { useStore } from '@/store/useStore'
 import { useTranslation } from 'react-i18next'
 import { format } from 'date-fns'
@@ -11,7 +11,6 @@ const iconMap: Record<string, React.ReactNode> = {
   order_ready: <ChefHat className="h-4 w-4" />,
   review: <Star className="h-4 w-4" />,
   alert: <AlertTriangle className="h-4 w-4" />,
-  marketing: <Megaphone className="h-4 w-4" />,
 }
 
 export default function NotificationBell() {

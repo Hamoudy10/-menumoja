@@ -6,7 +6,6 @@ export { default as qrRoutes } from './qrcodes/qrcodes.routes';
 export { default as orderRoutes } from './orders/orders.routes';
 export { default as paymentRoutes } from './payments/payments.routes';
 export { default as aiRoutes } from './ai/ai.routes';
-export { default as marketingRoutes } from './marketing/marketing.routes';
 export { default as cameraRoutes } from './surveillance/surveillance.routes';
 export { default as analyticsRoutes } from './analytics/analytics.routes';
 export { default as adminRoutes } from './admin/admin.routes';

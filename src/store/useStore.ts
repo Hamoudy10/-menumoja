@@ -7,13 +7,12 @@ import * as ordersApi from '@/api/orders'
 import * as tablesApi from '@/api/tables'
 import * as paymentsApi from '@/api/payments'
 import * as staffApi from '@/api/staff'
-import * as marketingApi from '@/api/marketing'
 import * as surveillanceApi from '@/api/surveillance'
 import * as notificationsApi from '@/api/notifications'
 import * as qrcodesApi from '@/api/qrcodes'
 import type {
   MenuCategory, Order, Staff, TableInfo,
-  Transaction, Post, Camera, Customer, OnboardingData, CartItem,
+  Transaction, Camera, Customer, OnboardingData, CartItem,
 } from '@/types'
 import type { Restaurant } from '@/types'
 
@@ -75,13 +74,6 @@ interface AppState {
   addStaff: (data: any) => Promise<void>
   removeStaff: (id: string) => Promise<void>
   updateStaff: (id: string, data: any) => Promise<void>
-
-  posts: any[]
-  fetchPosts: () => Promise<void>
-  addPost: (post: any) => Promise<any>
-  updatePost: (id: string, data: any) => Promise<void>
-  approvePost: (id: string) => Promise<void>
-  publishPost: (id: string) => Promise<void>
 
   cameras: Camera[]
   alerts: any[]
@@ -238,7 +230,6 @@ export const useStore = create<AppState>((set) => ({
         transactions: [],
         todaySummary: null,
         staff: [],
-        posts: [],
         cameras: [],
         alerts: [],
         notifications: [],
@@ -670,61 +661,6 @@ export const useStore = create<AppState>((set) => ({
     } catch (err: any) {
       toast.error(err?.response?.data?.message || 'Failed to update staff')
       throw err
-    }
-  },
-
-  posts: [],
-  fetchPosts: async () => {
-    try {
-      const data = await marketingApi.fetchPosts()
-      set({ posts: data.posts || data })
-    } catch (err: any) {
-      toast.error(err?.response?.data?.message || 'Failed to load posts')
-    }
-  },
-  addPost: async (post: any) => {
-    try {
-      const res = await marketingApi.createPost(post)
-      const newPost = res.post || res
-      set((s) => ({ posts: [...s.posts, newPost] }))
-      toast.success('Post created')
-      return newPost
-    } catch (err: any) {
-      toast.error(err?.response?.data?.message || 'Failed to create post')
-      throw err
-    }
-  },
-  updatePost: async (id: string, data: any) => {
-    try {
-      const res = await marketingApi.updatePost(id, data)
-      set((s) => ({
-        posts: s.posts.map((p) => p.id === id ? { ...p, ...(res.post || res), ...data } : p),
-      }))
-      toast.success('Post updated')
-    } catch (err: any) {
-      toast.error(err?.response?.data?.message || 'Failed to update post')
-    }
-  },
-  approvePost: async (id: string) => {
-    try {
-      await marketingApi.approvePost(id)
-      set((s) => ({
-        posts: s.posts.map((p) => p.id === id ? { ...p, status: 'approved' } : p),
-      }))
-      toast.success('Post approved')
-    } catch (err: any) {
-      toast.error(err?.response?.data?.message || 'Failed to approve post')
-    }
-  },
-  publishPost: async (id: string) => {
-    try {
-      await marketingApi.publishPost(id)
-      set((s) => ({
-        posts: s.posts.map((p) => p.id === id ? { ...p, status: 'posted' } : p),
-      }))
-      toast.success('Post published!')
-    } catch (err: any) {
-      toast.error(err?.response?.data?.message || 'Failed to publish post')
     }
   },
 

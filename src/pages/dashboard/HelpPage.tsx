@@ -15,7 +15,6 @@ const faqs = [
   { q: 'How do I add a new menu item?', a: 'Go to Menu Manager, select a category, and click "Add Menu Item". Fill in the details and save.' },
   { q: 'How do I process M-Pesa payments?', a: 'M-Pesa payments are processed automatically. Ensure your till number is configured in Settings > Payment Settings.' },
   { q: 'How do I add staff members?', a: 'Navigate to Settings > Staff section. Click "Add Staff" and fill in their details and role.' },
-  { q: 'How does AI marketing work?', a: 'Enable Auto Mode in the Marketing page. AI will generate and schedule content based on your menu and preferences.' },
   { q: 'How do I manage live orders?', a: 'Use the Orders page. Live orders appear in a Kanban board. Click on order cards to advance their status.' },
   { q: 'Can I customize my QR code?', a: 'Yes, visit Settings > QR Manager to customize colors, shapes, and templates for your QR codes.' },
   { q: 'How do I view analytics?', a: 'The Analytics page shows revenue trends, popular items, heatmaps, and more. Use the period selector to filter data.' },
@@ -42,12 +41,6 @@ const tutorials = [
     duration: '5:45',
     videoId: 'dQw4w9WgXcQ',
     description: 'Handle live orders and configure M-Pesa payments',
-  },
-  {
-    title: 'AI Marketing Setup Guide',
-    duration: '7:20',
-    videoId: 'dQw4w9WgXcQ',
-    description: 'Set up AI-powered social media marketing for your restaurant',
   },
   {
     title: 'QR Code Generation & Customization',

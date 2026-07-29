@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
-import { ChefHat, Store, Menu, Palette, Bot, QrCode, Share2, Check } from 'lucide-react'
+import { ChefHat, Store, Menu, Palette, Bot, QrCode, Check } from 'lucide-react'
 import { useStore } from '@/store/useStore'
 import Step1Welcome from './Step1Welcome'
 import Step2Profile from './Step2Profile'
@@ -8,7 +8,6 @@ import Step3Menu from './Step3Menu'
 import Step4Appearance from './Step4Appearance'
 import Step5AISetup from './Step5AISetup'
 import Step6QRGeneration from './Step6QRGeneration'
-import Step7SocialConnect from './Step7SocialConnect'
 
 const steps = [
   { icon: ChefHat, label: 'Welcome' },
@@ -17,7 +16,6 @@ const steps = [
   { icon: Palette, label: 'Appearance' },
   { icon: Bot, label: 'AI Setup' },
   { icon: QrCode, label: 'QR Code' },
-  { icon: Share2, label: 'Connect' },
 ]
 
 const illustrations = [
@@ -31,7 +29,6 @@ const stepComponents = [
   Step4Appearance,
   Step5AISetup,
   Step6QRGeneration,
-  Step7SocialConnect,
 ]
 
 export default function OnboardingWizard() {

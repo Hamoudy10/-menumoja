@@ -48,8 +48,8 @@ const features = [
   },
   {
     icon: Zap,
-    title: 'AI Marketing',
-    description: 'Automated social media posts and promotions',
+    title: 'AI Assistant',
+    description: 'Smart AI that understands your customers and helps them order faster',
     color: '#F39C12',
   },
 ]
@@ -436,7 +436,7 @@ export default function DemoPage() {
               Everything You Need to Run Your Restaurant
             </h2>
             <p className="text-text-secondary max-w-xl mx-auto">
-              From digital menus to AI marketing — we've got you covered
+              From digital menus to AI-powered ordering — we've got you covered
             </p>
           </motion.div>
 

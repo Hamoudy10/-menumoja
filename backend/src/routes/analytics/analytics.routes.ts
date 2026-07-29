@@ -354,41 +354,6 @@ router.get('/ai-questions', asyncHandler(async (req: AuthenticatedRequest, res: 
   res.json({ success: true, data: { questions } });
 }));
 
-router.get('/social', asyncHandler(async (req: AuthenticatedRequest, res: Response) => {
-  const restaurantId = (req as any).restaurantId;
-  const query = periodQuerySchema.parse(req.query);
-  const range = getDateRange(query.period, query.startDate, query.endDate);
-
-  const posts = await prisma.marketingPost.findMany({
-    where: { restaurantId, publishedAt: { gte: range.start, lte: range.end }, status: 'PUBLISHED' },
-  });
-
-  const totalReach = posts.reduce((s, p) => s + (p.reach || 0), 0);
-  const totalLikes = posts.reduce((s, p) => s + (p.likes || 0), 0);
-  const totalComments = posts.reduce((s, p) => s + (p.comments || 0), 0);
-
-  const byPlatform: Record<string, { reach: number; likes: number; comments: number; posts: number }> = {};
-  for (const post of posts) {
-    if (!byPlatform[post.platform]) {
-      byPlatform[post.platform] = { reach: 0, likes: 0, comments: 0, posts: 0 };
-    }
-    byPlatform[post.platform].reach += post.reach || 0;
-    byPlatform[post.platform].likes += post.likes || 0;
-    byPlatform[post.platform].comments += post.comments || 0;
-    byPlatform[post.platform].posts++;
-  }
-
-  res.json({
-    success: true,
-    data: {
-      totalReach,
-      totalLikes,
-      totalComments,
-      byPlatform,
-    },
-  });
-}));
-
 router.get('/export', asyncHandler(async (req: AuthenticatedRequest, res: Response) => {
   const restaurantId = (req as any).restaurantId;
   const query = periodQuerySchema.parse(req.query);

@@ -46,9 +46,6 @@ declare module '@prisma/client' {
     aiConversation: any;
     restaurantFaq: any;
     aiGeneratedContent: any;
-    socialMediaConnection: any;
-    marketingPost: any;
-    whatsappSubscriber: any;
     camera: any;
     cameraAlert: any;
     analyticsDaily: any;

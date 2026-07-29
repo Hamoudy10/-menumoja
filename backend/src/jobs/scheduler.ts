@@ -16,7 +16,6 @@ function startScheduler(): void {
       new Queue('email', { connection }),
       new Queue('sms', { connection }),
       new Queue('social-media', { connection }),
-      new Queue('ai-marketing', { connection }),
       new Queue('analytics', { connection }),
       new Queue('mpesa', { connection }),
       new Queue('camera', { connection }),
