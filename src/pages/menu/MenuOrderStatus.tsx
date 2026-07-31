@@ -4,6 +4,7 @@ import { useParams, useNavigate } from 'react-router-dom'
 import { CheckCircle, Clock, ChefHat, Package, ArrowLeft, Home } from 'lucide-react'
 import { useStore } from '@/store/useStore'
 import { Button } from '@/components/ui/Button'
+import { BrandLoader } from '@/components/ui/BrandLoader'
 import * as ordersApi from '@/api/orders'
 
 const steps = [
@@ -59,10 +60,7 @@ export default function MenuOrderStatus() {
   if (loading) {
     return (
       <div className="min-h-screen bg-background-light flex items-center justify-center">
-        <div className="flex flex-col items-center gap-3">
-          <div className="w-8 h-8 border-2 border-secondary border-t-transparent rounded-full animate-spin" />
-          <p className="font-accent text-xs text-text-secondary">Loading order status...</p>
-        </div>
+        <BrandLoader label="Loading order status…" />
       </div>
     )
   }

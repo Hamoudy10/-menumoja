@@ -5,6 +5,7 @@ import { useStore } from '@/store/useStore'
 import { useNavigate } from 'react-router-dom'
 import { Badge } from '@/components/ui/Badge'
 import { Button } from '@/components/ui/Button'
+import { Skeleton } from '@/components/ui/Skeleton'
 import { showSuccessToast } from '@/components/ui/Toast'
 
 const statusColors: Record<string, string> = {
@@ -41,6 +42,7 @@ export default function KitchenDisplay() {
     navigate('/login')
   }
   const [loading, setLoading] = useState(true)
+  const [busyId, setBusyId] = useState<string | null>(null)
 
   useEffect(() => {
     const load = async () => {
@@ -53,10 +55,13 @@ export default function KitchenDisplay() {
   }, [])
 
   const handleStatusUpdate = async (orderId: string, newStatus: string) => {
+    if (busyId) return
+    setBusyId(orderId)
     try {
       await updateOrderStatus(orderId, newStatus)
       showSuccessToast(`Order marked as ${newStatus}`)
     } catch {}
+    finally { setBusyId(null) }
   }
 
   const allOrders = [...liveOrders, ...orders.filter((o: any) => !liveOrders.find((l: any) => l.id === o.id))]
@@ -67,8 +72,31 @@ export default function KitchenDisplay() {
 
   if (loading) {
     return (
-      <div className="flex items-center justify-center h-screen">
-        <div className="w-8 h-8 border-2 border-secondary border-t-transparent rounded-full animate-spin" />
+      <div className="min-h-screen bg-background-light dark:bg-background-dark p-4 md:p-6">
+        <div className="flex items-center justify-between mb-6">
+          <div className="flex items-center gap-3">
+            <div className="w-10 h-10 rounded-xl bg-secondary flex items-center justify-center">
+              <ChefHat className="w-5 h-5 text-white" />
+            </div>
+            <div>
+              <Skeleton variant="text" className="w-44 h-6" />
+              <Skeleton variant="text" className="w-24 h-3 mt-1" />
+            </div>
+          </div>
+        </div>
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+          {Array.from({ length: 6 }).map((_, i) => (
+            <div key={i} className="rounded-2xl p-4 border-2 border-gray-100 bg-white dark:bg-primary-light shadow-soft space-y-3">
+              <div className="flex items-center justify-between">
+                <Skeleton variant="text" className="w-28 h-5" />
+                <Skeleton variant="text" className="w-16 h-4" />
+              </div>
+              <Skeleton variant="text" className="w-3/4 h-4" />
+              <Skeleton variant="text" className="w-1/2 h-4" />
+              <Skeleton variant="card" className="h-9" />
+            </div>
+          ))}
+        </div>
       </div>
     )
   }
@@ -159,17 +187,17 @@ export default function KitchenDisplay() {
 
                 <div className="flex gap-2">
                   {(status === 'PENDING' || status === 'NEW' || status === 'CONFIRMED') && (
-                    <Button size="sm" fullWidth onClick={() => handleStatusUpdate(order.id, 'preparing')}>
+                    <Button size="sm" fullWidth loading={busyId === order.id} disabled={busyId !== null} onClick={() => handleStatusUpdate(order.id, 'preparing')}>
                       <Timer className="w-3.5 h-3.5" /> Start Preparing
                     </Button>
                   )}
                   {status === 'PREPARING' && (
-                    <Button size="sm" fullWidth onClick={() => handleStatusUpdate(order.id, 'ready')}>
+                    <Button size="sm" fullWidth loading={busyId === order.id} disabled={busyId !== null} onClick={() => handleStatusUpdate(order.id, 'ready')}>
                       <CheckCircle className="w-3.5 h-3.5" /> Mark Ready
                     </Button>
                   )}
                   {status === 'READY' && (
-                    <Button size="sm" fullWidth variant="ghost" onClick={() => handleStatusUpdate(order.id, 'served')}>
+                    <Button size="sm" fullWidth variant="ghost" loading={busyId === order.id} disabled={busyId !== null} onClick={() => handleStatusUpdate(order.id, 'served')}>
                       <CheckCircle className="w-3.5 h-3.5" /> Mark Served
                     </Button>
                   )}

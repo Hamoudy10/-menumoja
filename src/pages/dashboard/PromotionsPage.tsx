@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useState } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import {
   Plus, Megaphone, Gift, PartyPopper, Percent, Star, Trash2,
@@ -9,6 +9,8 @@ import * as menuApi from '@/api/menu'
 import { Button } from '@/components/ui/Button'
 import { Input } from '@/components/ui/Input'
 import { Badge } from '@/components/ui/Badge'
+import { RefreshButton } from '@/components/ui/RefreshButton'
+import { Skeleton } from '@/components/ui/Skeleton'
 import { showSuccessToast, showErrorToast } from '@/components/ui/Toast'
 import type { LucideIcon } from 'lucide-react'
 
@@ -65,12 +67,15 @@ export default function PromotionsPage() {
   const [items, setItems] = useState<MenuItemOption[]>([])
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
+  const [deletingId, setDeletingId] = useState<string | null>(null)
+  const [togglingId, setTogglingId] = useState<string | null>(null)
   const [showForm, setShowForm] = useState(false)
   const [editingId, setEditingId] = useState<string | null>(null)
   const [form, setForm] = useState({ ...emptyForm })
   const [nowTs] = useState(() => Date.now())
 
-  const load = async () => {
+  const load = useCallback(async () => {
+    setLoading(true)
     try {
       const [promos, menuData] = await Promise.all([
         promotionsApi.fetchPromotions(),
@@ -92,36 +97,11 @@ export default function PromotionsPage() {
     } finally {
       setLoading(false)
     }
-  }
+  }, [])
 
   useEffect(() => {
-    let cancelled = false
-    Promise.all([
-      promotionsApi.fetchPromotions(),
-      menuApi.fetchCategories().catch(() => []),
-    ])
-      .then(([promos, menuData]) => {
-        if (cancelled) return
-        const flatItems: MenuItemOption[] = (menuData || []).flatMap((cat: { name?: unknown; items?: unknown }) => {
-          const rawItems: Array<Record<string, unknown>> = Array.isArray(cat.items) ? (cat.items as Array<Record<string, unknown>>) : []
-          return rawItems.map((i) => ({
-            id: String(i.id),
-            name: String(i.name),
-            price: Number(i.price),
-            categoryName: String(cat.name ?? ''),
-          }))
-        })
-        setPromotions(promos || [])
-        setItems(flatItems)
-      })
-      .catch((e) => {
-        if (!cancelled) showErrorToast(errMsg(e, 'Failed to load promotions'))
-      })
-      .finally(() => {
-        if (!cancelled) setLoading(false)
-      })
-    return () => { cancelled = true }
-  }, [])
+    load()
+  }, [load])
 
   const openCreate = () => {
     setEditingId(null)
@@ -181,22 +161,28 @@ export default function PromotionsPage() {
 
   const remove = async (id: string) => {
     if (!window.confirm('Delete this promotion?')) return
+    setDeletingId(id)
     try {
       await promotionsApi.deletePromotion(id)
       showSuccessToast('Promotion deleted')
       setPromotions((prev) => prev.filter((p) => p.id !== id))
     } catch (e) {
       showErrorToast(errMsg(e, 'Failed to delete promotion'))
+    } finally {
+      setDeletingId(null)
     }
   }
 
   const toggleActive = async (p: Promotion) => {
+    setTogglingId(p.id)
     try {
       const updated = await promotionsApi.updatePromotion(p.id, { isActive: !p.isActive })
       setPromotions((prev) => prev.map((x) => (x.id === p.id ? { ...x, ...updated, isActive: updated.isActive ?? !p.isActive } : x)))
       showSuccessToast(updated.isActive ? 'Promotion activated' : 'Promotion deactivated')
     } catch (e) {
       showErrorToast(errMsg(e, 'Failed to update promotion'))
+    } finally {
+      setTogglingId(null)
     }
   }
 
@@ -219,12 +205,17 @@ export default function PromotionsPage() {
             Specials, offers, events and giveaways shown on your customer menu
           </p>
         </div>
-        <Button onClick={openCreate}><Plus className="h-4 w-4" /> New Promotion</Button>
+        <div className="flex items-center gap-2">
+          <RefreshButton refreshing={loading} onClick={() => load()} />
+          <Button onClick={openCreate}><Plus className="h-4 w-4" /> New Promotion</Button>
+        </div>
       </div>
 
       {loading ? (
-        <div className="flex items-center justify-center py-20">
-          <Loader2 className="w-6 h-6 text-secondary animate-spin" />
+        <div className="grid gap-4 sm:grid-cols-2">
+          {[0, 1, 2, 3].map((i) => (
+            <Skeleton key={i} variant="card" className="h-48" />
+          ))}
         </div>
       ) : promotions.length === 0 ? (
         <div className="text-center py-20 rounded-2xl border border-dashed border-gray-300 dark:border-white/15">
@@ -261,14 +252,14 @@ export default function PromotionsPage() {
                       {p.isActive && !live && <Badge variant="warning" size="sm">Scheduled</Badge>}
                     </div>
                     <div className="flex items-center gap-1">
-                      <button onClick={() => toggleActive(p)} className="p-1.5 rounded-lg hover:bg-gray-100 dark:hover:bg-white/10" title={p.isActive ? 'Deactivate' : 'Activate'}>
+                      <button onClick={() => toggleActive(p)} disabled={togglingId === p.id} className="p-1.5 rounded-lg hover:bg-gray-100 dark:hover:bg-white/10 disabled:opacity-50" title={p.isActive ? 'Deactivate' : 'Activate'}>
                         {p.isActive ? <ToggleRight className="w-5 h-5 text-secondary" /> : <ToggleLeft className="w-5 h-5 text-text-secondary/50" />}
                       </button>
                       <button onClick={() => openEdit(p)} className="p-1.5 rounded-lg hover:bg-gray-100 dark:hover:bg-white/10" title="Edit">
                         <Edit3 className="w-4 h-4 text-text-secondary" />
                       </button>
-                      <button onClick={() => remove(p.id)} className="p-1.5 rounded-lg hover:bg-red-50 dark:hover:bg-red-500/10" title="Delete">
-                        <Trash2 className="w-4 h-4 text-red-400" />
+                      <button onClick={() => remove(p.id)} disabled={deletingId === p.id} className="p-1.5 rounded-lg hover:bg-red-50 dark:hover:bg-red-500/10 disabled:opacity-50" title="Delete">
+                        {deletingId === p.id ? <Loader2 className="w-4 h-4 text-red-400 animate-spin" /> : <Trash2 className="w-4 h-4 text-red-400" />}
                       </button>
                     </div>
                   </div>

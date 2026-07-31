@@ -11,6 +11,8 @@ import {
 import { Button } from '@/components/ui/Button'
 import { Input } from '@/components/ui/Input'
 import { Badge } from '@/components/ui/Badge'
+import { Skeleton } from '@/components/ui/Skeleton'
+import { RefreshButton } from '@/components/ui/RefreshButton'
 import { showSuccessToast, showErrorToast } from '@/components/ui/Toast'
 import { useStore } from '@/store/useStore'
 import { useNavigate } from 'react-router-dom'
@@ -48,6 +50,9 @@ export default function CashierDashboard() {
   const [cashReceived, setCashReceived] = useState('')
   const [mpesaPhone, setMpesaPhone] = useState('')
   const [processing, setProcessing] = useState(false)
+  const [voiding, setVoiding] = useState(false)
+  const [quickCreating, setQuickCreating] = useState(false)
+  const [closingShift, setClosingShift] = useState(false)
   const [activeTab, setActiveTab] = useState<'pending' | 'paid' | 'receipts'>('pending')
   const [paymentMethod, setPaymentMethod] = useState<'cash' | 'card' | 'mpesa'>('cash')
   const [discount, setDiscount] = useState('')
@@ -138,6 +143,7 @@ export default function CashierDashboard() {
     finally { setLoading(false) }
   }
 
+  const [refreshing, setRefreshing] = useState(false)
   const [stats, setStats] = useState({ todayTotal: 0, ordersCount: 0, pendingCount: 0 })
   const [shift, setShift] = useState<any>(null)
   const [closeCashAmount, setCloseCashAmount] = useState('')
@@ -173,6 +179,26 @@ export default function CashierDashboard() {
 
   useEffect(() => { fetchOrders() }, [activeTab])
   useEffect(() => { const iv = setInterval(fetchOrders, 30000); return () => clearInterval(iv) }, [activeTab])
+
+  const refreshAll = async () => {
+    setRefreshing(true)
+    try {
+      await Promise.allSettled([
+        fetchOrders(),
+        tablesApi.fetchTables().then((t) => {
+          const tData = Array.isArray(t) ? t : t?.tables || t
+          setTables(Array.isArray(tData) ? tData : [])
+        }),
+        tablesApi.fetchZones().then((z) => {
+          const zData = Array.isArray(z) ? z : z?.zones || z
+          setZones(Array.isArray(zData) ? zData : [])
+        }),
+      ])
+      if (activeTab === 'receipts') await fetchReceipts(1)
+    } finally {
+      setRefreshing(false)
+    }
+  }
 
   const fetchReceipts = async (pageToLoad = 1) => {
     setLoadingReceipts(true)
@@ -225,7 +251,8 @@ export default function CashierDashboard() {
   }
 
   const handleCloseShift = async () => {
-    if (!shift || !closeCashAmount) return
+    if (!shift || !closeCashAmount || closingShift) return
+    setClosingShift(true)
     try {
       const actualCash = parseFloat(closeCashAmount)
       const res = await paymentsApi.closeShift(shift.id, actualCash)
@@ -236,6 +263,7 @@ export default function CashierDashboard() {
       }
       setShift(null); setCloseCashAmount(''); setShowCloseShift(false)
     } catch { showErrorToast('Failed to close shift') }
+    finally { setClosingShift(false) }
   }
 
   const toggleFullscreen = () => {
@@ -332,14 +360,16 @@ export default function CashierDashboard() {
   }
 
   const handleVoidItem = async (itemId: string) => {
-    if (!selectedOrder) return
+    if (!selectedOrder || voiding) return
     if (!voidReason) { showErrorToast('Enter void reason'); return }
+    setVoiding(true)
     try {
       await ordersApi.refundOrder(selectedOrder.id, voidReason, [{ id: itemId }])
       showSuccessToast('Item voided')
       setShowVoidModal(false); setVoidReason('')
       fetchOrders()
     } catch { showErrorToast('Failed to void item') }
+    finally { setVoiding(false) }
   }
 
   const handleHoldOrder = () => {
@@ -356,8 +386,10 @@ export default function CashierDashboard() {
   }
 
   const handleCreateQuickOrder = async () => {
+    if (quickCreating) return
     if (!newOrderTable && !newOrderCustomer) { showErrorToast('Enter table or customer name'); return }
     if (newOrderItems.length === 0) { showErrorToast('Add at least one item'); return }
+    setQuickCreating(true)
     try {
       const res = await ordersApi.createPosOrder({
         tableNumber: parseInt(newOrderTable) || 0,
@@ -373,6 +405,7 @@ export default function CashierDashboard() {
       setNewOrderItems([]); setNewOrderSearch('')
       fetchOrders()
     } catch { showErrorToast('Failed to create order') }
+    finally { setQuickCreating(false) }
   }
 
   const formatKES = (v: number) => `KES ${v.toLocaleString('en-KE')}`
@@ -520,6 +553,7 @@ export default function CashierDashboard() {
                 <button onClick={() => setPlaySound(!playSound)} className={`p-1.5 rounded-lg ${playSound ? 'hover:bg-black/5' : 'text-text-secondary/40'}`}>
                   {playSound ? <Volume2 className="h-4 w-4" /> : <Music className="h-4 w-4" />}
                 </button>
+                <RefreshButton refreshing={refreshing} onClick={refreshAll} title="Refresh" className="w-8 h-8 bg-transparent border-0 shadow-none" />
                 <button onClick={() => setShowCreateModal(true)} className="p-1.5 rounded-lg hover:bg-black/5 text-secondary" title="Quick Order">
                   <Plus className="h-4 w-4" />
                 </button>
@@ -662,7 +696,21 @@ export default function CashierDashboard() {
                 )}
               </>
             ) : loading ? (
-              <div className="flex justify-center py-20"><Loader2 className="h-8 w-8 animate-spin text-secondary" /></div>
+              <div className="p-2 space-y-2">
+                {Array.from({ length: 6 }).map((_, i) => (
+                  <div key={i} className="rounded-xl border border-white/10 bg-white dark:bg-primary-light p-3 space-y-2">
+                    <div className="flex items-center justify-between">
+                      <Skeleton variant="text" className="w-24 h-4" />
+                      <Skeleton variant="text" className="w-16 h-4" />
+                    </div>
+                    <Skeleton variant="text" className="w-40 h-3" />
+                    <div className="flex gap-1.5">
+                      <Skeleton variant="text" className="w-16 h-5 rounded-full" />
+                      <Skeleton variant="text" className="w-16 h-5 rounded-full" />
+                    </div>
+                  </div>
+                ))}
+              </div>
             ) : isTableGrid ? (
               <FloorCanvas
                 tables={tables}
@@ -1089,7 +1137,7 @@ export default function CashierDashboard() {
               </div>
               <div className="flex gap-2">
                 <Button variant="ghost" fullWidth onClick={() => setShowCloseShift(false)}>Cancel</Button>
-                <Button fullWidth disabled={!closeCashAmount} onClick={handleCloseShift}>
+                <Button fullWidth loading={closingShift} disabled={!closeCashAmount || closingShift} onClick={handleCloseShift}>
                   <CheckCircle className="h-4 w-4" /> Confirm & Close
                 </Button>
               </div>
@@ -1147,7 +1195,7 @@ export default function CashierDashboard() {
                 placeholder="e.g. Customer changed mind" />
               <div className="flex gap-2 mt-4">
                 <Button variant="ghost" fullWidth onClick={() => setShowVoidModal(false)}>Cancel</Button>
-                <Button fullWidth variant="danger" disabled={!voidReason}
+                <Button fullWidth variant="danger" loading={voiding} disabled={!voidReason || voiding}
                   onClick={() => handleVoidItem(selectedOrder.id)}>
                   <Trash2 className="h-4 w-4" /> Confirm Void
                 </Button>
@@ -1264,7 +1312,7 @@ export default function CashierDashboard() {
               </div>
               <div className="flex gap-2 mt-4">
                 <Button variant="ghost" fullWidth onClick={() => setShowCreateModal(false)}>Cancel</Button>
-                <Button fullWidth onClick={handleCreateQuickOrder} disabled={newOrderItems.length === 0}>
+                <Button fullWidth loading={quickCreating} disabled={newOrderItems.length === 0 || quickCreating} onClick={handleCreateQuickOrder}>
                   <CheckCircle className="h-4 w-4" /> Create Order
                 </Button>
               </div>

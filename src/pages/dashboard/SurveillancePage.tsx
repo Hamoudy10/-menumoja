@@ -3,13 +3,15 @@ import { motion, AnimatePresence } from 'framer-motion'
 import {
   Camera, Maximize2, Minimize2, Bell, Plus, X, Shield,
   AlertTriangle, Clock, Monitor, Wifi, WifiOff,
-  RefreshCw, CheckCircle2, Server, Loader2, Webcam,
+  CheckCircle2, Server, Loader2, Webcam,
 } from 'lucide-react'
 import { useStore } from '@/store/useStore'
 import { Button } from '@/components/ui/Button'
 import { Input } from '@/components/ui/Input'
 import { Badge } from '@/components/ui/Badge'
 import { EmptyState } from '@/components/ui/EmptyState'
+import { Skeleton } from '@/components/ui/Skeleton'
+import { RefreshButton } from '@/components/ui/RefreshButton'
 import { showSuccessToast, showErrorToast } from '@/components/ui/Toast'
 
 interface LocalCam { id: string; name: string; stream: MediaStream; }
@@ -34,13 +36,15 @@ export default function SurveillancePage() {
   const [newCam, setNewCam] = useState<CameraForm>(defaultForm)
   const [testing, setTesting] = useState(false)
   const [testResult, setTestResult] = useState<'idle' | 'success' | 'fail'>('idle')
-  const [loading, setLoading] = useState(false)
+  const [loading, setLoading] = useState(true)
+  const [addingCamera, setAddingCamera] = useState(false)
+  const [startingWebcam, setStartingWebcam] = useState(false)
   const [imgErrors, setImgErrors] = useState<Record<string, boolean>>({})
   const [localCams, setLocalCams] = useState<LocalCam[]>([])
   const videoRefs = useRef<Record<string, HTMLVideoElement>>({})
   const [webcamError, setWebcamError] = useState<string | null>(null)
 
-  useEffect(() => { setLoading(true); Promise.all([fetchCameras(), fetchAlerts()]).finally(() => setLoading(false)) }, [])
+  useEffect(() => { Promise.all([fetchCameras(), fetchAlerts()]).finally(() => setLoading(false)) }, [])
 
   // attach local cam streams to video elements
   useEffect(() => {
@@ -52,6 +56,7 @@ export default function SurveillancePage() {
 
   const startWebcam = async () => {
     setWebcamError(null)
+    setStartingWebcam(true)
     try {
       const stream = await navigator.mediaDevices.getUserMedia({ video: true, audio: false })
       const id = `local-${++localCamIdCounter}`
@@ -60,6 +65,8 @@ export default function SurveillancePage() {
     } catch (err: any) {
       setWebcamError(err.message || 'Camera access denied')
       showErrorToast('Could not access webcam')
+    } finally {
+      setStartingWebcam(false)
     }
   }
 
@@ -122,7 +129,8 @@ export default function SurveillancePage() {
   }
 
   const handleAddCamera = async () => {
-    if (!newCam.name || !newCam.ipAddress) return
+    if (!newCam.name || !newCam.ipAddress || addingCamera) return
+    setAddingCamera(true)
     try {
       const payload: any = {
         name: newCam.name,
@@ -140,6 +148,8 @@ export default function SurveillancePage() {
       showSuccessToast('Camera added')
     } catch {
       showErrorToast('Failed to add camera')
+    } finally {
+      setAddingCamera(false)
     }
   }
 
@@ -212,10 +222,8 @@ export default function SurveillancePage() {
           <p className="font-body text-sm text-text-secondary dark:text-white/50">Monitor your restaurant cameras</p>
         </div>
         <div className="flex items-center gap-2">
-          <button onClick={() => { fetchCameras(); fetchAlerts() }} className="flex h-9 w-9 items-center justify-center rounded-xl bg-black/5 dark:bg-white/10 hover:bg-black/10 dark:hover:bg-white/20 transition-colors">
-            <RefreshCw className="h-4 w-4 text-text-secondary" />
-          </button>
-          <Button variant="outline" onClick={startWebcam} disabled={!!webcamError}>
+          <RefreshButton refreshing={loading} onClick={() => { fetchCameras(); fetchAlerts() }} />
+          <Button variant="outline" onClick={startWebcam} disabled={!!webcamError} loading={startingWebcam}>
             <Webcam className="h-4 w-4" /> Test Webcam
           </Button>
           <Button onClick={() => setShowSetup(true)}><Plus className="h-4 w-4" /> Add Camera</Button>
@@ -223,7 +231,14 @@ export default function SurveillancePage() {
       </div>
 
       <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-4">
-        {cameras.length === 0 && localCams.length === 0 ? (
+        {loading ? (
+          <>
+            <Skeleton variant="card" />
+            <Skeleton variant="card" />
+            <Skeleton variant="card" />
+            <Skeleton variant="card" />
+          </>
+        ) : cameras.length === 0 && localCams.length === 0 ? (
           <div className="sm:col-span-2 xl:col-span-3">
             <EmptyState
               icon={<Camera className="h-12 w-12" />}
@@ -463,7 +478,7 @@ export default function SurveillancePage() {
                     {testResult === 'fail' && <X className="h-5 w-5 text-red-500 shrink-0" />}
                   </div>
                   <div className="flex gap-3 pt-2">
-                    <Button fullWidth onClick={handleAddCamera} disabled={!newCam.name || !newCam.ipAddress}>
+                    <Button fullWidth onClick={handleAddCamera} disabled={!newCam.name || !newCam.ipAddress} loading={addingCamera}>
                       <Plus className="h-4 w-4" /> Add Camera
                     </Button>
                     <Button variant="ghost" fullWidth onClick={() => { setShowSetup(false); setNewCam(defaultForm); setTestResult('idle') }}>

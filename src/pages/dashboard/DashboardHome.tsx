@@ -1,10 +1,12 @@
-import { useEffect, useMemo, useCallback } from 'react'
+import { useEffect, useMemo, useCallback, useState } from 'react'
 import { motion } from 'framer-motion'
 import { Store, ShoppingCart, TrendingUp, Users, DollarSign, Clock, Bell, ArrowRight, UtensilsCrossed, CreditCard, AlertTriangle } from 'lucide-react'
 import { useStore } from '@/store/useStore'
 import { useNavigate } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
 import { format } from 'date-fns'
+import { Skeleton } from '@/components/ui/Skeleton'
+import { RefreshButton } from '@/components/ui/RefreshButton'
 
 export default function DashboardHome() {
   const { t } = useTranslation()
@@ -14,6 +16,8 @@ export default function DashboardHome() {
     fetchOrders, fetchTables, fetchPayments, fetchTodaySummary,
     notifications, fetchNotifications, unreadCount,
   } = useStore()
+  const [refreshing, setRefreshing] = useState(false)
+  const [loadedOnce, setLoadedOnce] = useState(false)
 
   const stats = useMemo(() => {
     const todayOrders = todaySummary?.orderCount ?? orders.length
@@ -30,13 +34,21 @@ export default function DashboardHome() {
     ]
   }, [orders, tables, transactions, todaySummary])
 
-  const refreshData = useCallback(() => {
-    fetchOrders()
-    fetchTables()
-    fetchPayments()
-    fetchTodaySummary()
-    fetchNotifications()
-  }, [])
+  const refreshData = useCallback(async () => {
+    setRefreshing(true)
+    try {
+      await Promise.allSettled([
+        fetchOrders(),
+        fetchTables(),
+        fetchPayments(),
+        fetchTodaySummary(),
+        fetchNotifications(),
+      ])
+      setLoadedOnce(true)
+    } finally {
+      setRefreshing(false)
+    }
+  }, [fetchOrders, fetchTables, fetchPayments, fetchTodaySummary, fetchNotifications])
 
   useEffect(() => {
     refreshData()
@@ -61,6 +73,7 @@ export default function DashboardHome() {
           <p className="text-sm text-text-secondary dark:text-white/50">Here's what's happening at {restaurant?.name || 'your restaurant'} today.</p>
         </div>
         <div className="flex items-center gap-2">
+          <RefreshButton refreshing={refreshing} onClick={() => refreshData()} />
           <div className="relative">
             <Bell className="h-5 w-5 text-text-secondary" />
             {unreadCount > 0 && (
@@ -74,7 +87,19 @@ export default function DashboardHome() {
       </div>
 
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
-        {stats.map((stat, i) => {
+        {!loadedOnce ? (
+          Array.from({ length: 4 }).map((_, i) => (
+            <div key={i} className="bg-white dark:bg-primary-light rounded-2xl p-4 border border-gray-100 dark:border-white/5">
+              <div className="flex items-center justify-between mb-3">
+                <Skeleton variant="circle" className="w-9 h-9" />
+                <Skeleton variant="text" className="w-16 h-3" />
+              </div>
+              <Skeleton variant="text" className="w-24 h-6 mb-1" />
+              <Skeleton variant="text" className="w-20 h-3" />
+            </div>
+          ))
+        ) : (
+        stats.map((stat, i) => {
           const Icon = stat.icon
           return (
             <motion.div
@@ -94,7 +119,8 @@ export default function DashboardHome() {
               <p className="text-xs text-text-secondary dark:text-white/50 mt-0.5">{stat.label}</p>
             </motion.div>
           )
-        })}
+        })
+        )}
       </div>
 
       <div className="grid lg:grid-cols-3 gap-6">
@@ -106,7 +132,23 @@ export default function DashboardHome() {
             </button>
           </div>
           <div className="space-y-3">
-            {orders.slice(0, 5).map((order) => (
+            {!loadedOnce ? (
+              <>
+                {Array.from({ length: 4 }).map((_, i) => (
+                  <div key={i} className="flex items-center justify-between py-2">
+                    <div className="space-y-1.5 w-1/2">
+                      <Skeleton variant="text" className="w-24 h-4" />
+                      <Skeleton variant="text" className="w-40 h-3" />
+                    </div>
+                    <div className="text-right space-y-1.5">
+                      <Skeleton variant="text" className="w-16 h-4 ml-auto" />
+                      <Skeleton variant="text" className="w-14 h-3 ml-auto" />
+                    </div>
+                  </div>
+                ))}
+              </>
+            ) : (
+            orders.slice(0, 5).map((order) => (
               <div key={order.id} className="flex items-center justify-between py-2 border-b border-gray-50 dark:border-white/5 last:border-0">
                 <div>
                   <p className="text-sm font-medium text-text-primary dark:text-white">{order.tableNumber > 0 ? `Table ${order.tableNumber}` : 'General'}</p>
@@ -124,8 +166,9 @@ export default function DashboardHome() {
                   </span>
                 </div>
               </div>
-            ))}
-            {orders.length === 0 && (
+            ))
+            )}
+            {loadedOnce && orders.length === 0 && (
               <p className="text-sm text-text-secondary dark:text-white/40 text-center py-4">No orders yet today</p>
             )}
           </div>

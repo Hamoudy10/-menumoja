@@ -1,10 +1,10 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useCallback } from 'react'
 import { motion } from 'framer-motion'
 import { useParams, useNavigate } from 'react-router-dom'
-import { ShoppingCart, Plus, Minus, ChefHat, MapPin, Star, Search, Loader2, CheckCircle, Megaphone, Gift, PartyPopper, Percent, Tag } from 'lucide-react'
+import { ShoppingCart, Plus, Minus, ChefHat, MapPin, Star, Search, Loader2, CheckCircle, Megaphone, Gift, PartyPopper, Percent, Tag, RotateCw } from 'lucide-react'
 import { useStore } from '@/store/useStore'
-import { Button } from '@/components/ui/Button'
 import { Badge } from '@/components/ui/Badge'
+import { BrandLoader } from '@/components/ui/BrandLoader'
 import { useTheme } from '@/components/theme/ThemeProvider'
 import * as menuApi from '@/api/menu'
 
@@ -28,69 +28,69 @@ export default function MenuView() {
   const [menuCategories, setMenuCategories] = useState<any[]>([])
   const [promotions, setPromotions] = useState<any[]>([])
   const [announcement, setAnnouncement] = useState('')
+  const [justAdded, setJustAdded] = useState<string | null>(null)
 
   const cartCount = cart.reduce((s, i) => s + i.quantity, 0)
 
   const activeOrder = JSON.parse(sessionStorage.getItem(`activeOrder_${restaurantSlug}`) || 'null')
   const showTrackOrder = activeOrder && (Date.now() - activeOrder.time < 7200000)
 
+  const loadMenu = useCallback(async () => {
+    if (!restaurantSlug) return
+    setLoading(true)
+    setError('')
+    try {
+      const data = await menuApi.getPublicMenu(restaurantSlug)
+      const restaurant = data.restaurant || data
+      const cats = (data.categories || []).map((cat: any) => ({
+        id: cat.id,
+        name: cat.name,
+        items: cat.items || [],
+      }))
+
+      setRestaurantInfo(restaurant)
+      setMenuCategories(cats)
+      setPromotions(data.promotions || [])
+      if (cats.length > 0) setActiveCategory(cats[0]?.id || '')
+      if (restaurant?.language) setLanguage(restaurant.language)
+
+      const settings = restaurant?.settings
+      if (settings?.announcementActive && settings?.announcement) {
+        setAnnouncement(settings.announcement)
+      }
+      if (settings) {
+        const patch: any = {}
+        if (settings.primaryColor) patch.brandColor = settings.primaryColor
+        if (settings.gradientStart) patch.gradientStart = settings.gradientStart
+        if (settings.gradientEnd) patch.gradientEnd = settings.gradientEnd
+        if (typeof settings.useGradient === 'boolean') patch.useGradient = settings.useGradient
+        if (settings.headingFont) patch.fontHeading = settings.headingFont
+        if (settings.bodyFont) patch.fontBody = settings.bodyFont
+        if (settings.accentFont) patch.fontAccent = settings.accentFont
+        if (Object.keys(patch).length) applyTheme(patch)
+      }
+    } catch (err: any) {
+      setError(err?.response?.data?.message || err?.message || 'Failed to load menu')
+    } finally {
+      setLoading(false)
+    }
+  }, [restaurantSlug, setLanguage, applyTheme])
+
   useEffect(() => {
     if (!restaurantSlug) return
     let cancelled = false
-
-    const loadMenu = async () => {
-      setLoading(true)
-      setError('')
-      try {
-        const data = await menuApi.getPublicMenu(restaurantSlug)
-        if (cancelled) return
-        const restaurant = data.restaurant || data
-        const cats = (data.categories || []).map((cat: any) => ({
-          id: cat.id,
-          name: cat.name,
-          items: cat.items || [],
-        }))
-
-        setRestaurantInfo(restaurant)
-        setMenuCategories(cats)
-        setPromotions(data.promotions || [])
-        if (cats.length > 0) setActiveCategory(cats[0]?.id || '')
-        if (restaurant?.language) setLanguage(restaurant.language)
-
-        const settings = restaurant?.settings
-        if (settings?.announcementActive && settings?.announcement) {
-          setAnnouncement(settings.announcement)
-        }
-        if (settings) {
-          const patch: any = {}
-          if (settings.primaryColor) patch.brandColor = settings.primaryColor
-          if (settings.gradientStart) patch.gradientStart = settings.gradientStart
-          if (settings.gradientEnd) patch.gradientEnd = settings.gradientEnd
-          if (typeof settings.useGradient === 'boolean') patch.useGradient = settings.useGradient
-          if (settings.headingFont) patch.fontHeading = settings.headingFont
-          if (settings.bodyFont) patch.fontBody = settings.bodyFont
-          if (settings.accentFont) patch.fontAccent = settings.accentFont
-          if (Object.keys(patch).length) applyTheme(patch)
-        }
-      } catch (err: any) {
-        if (cancelled) return
-        setError(err?.response?.data?.message || err?.message || 'Failed to load menu')
-      } finally {
-        if (!cancelled) setLoading(false)
-      }
+    const run = async () => {
+      if (cancelled) return
+      await loadMenu()
     }
-
-    loadMenu()
+    run()
     return () => { cancelled = true }
-  }, [restaurantSlug])
+  }, [loadMenu, restaurantSlug])
 
   if (loading) {
     return (
       <div className="min-h-screen bg-background-light flex items-center justify-center">
-        <div className="flex flex-col items-center gap-3">
-          <div className="w-8 h-8 border-2 border-secondary border-t-transparent rounded-full animate-spin" />
-          <p className="font-accent text-xs text-text-secondary">Loading menu...</p>
-        </div>
+        <BrandLoader label={`Loading ${restaurantInfo?.name || 'menu'}…`} />
       </div>
     )
   }
@@ -102,9 +102,14 @@ export default function MenuView() {
           <ChefHat className="w-12 h-12 mx-auto text-text-secondary/30 mb-4" />
           <h2 className="text-xl font-heading font-bold text-primary mb-2">Menu Unavailable</h2>
           <p className="text-text-secondary text-sm mb-6">{error}</p>
-          <Button variant="primary" onClick={() => window.location.reload()}>
-            Try Again
-          </Button>
+          <motion.button
+            whileHover={{ scale: 1.03 }}
+            whileTap={{ scale: 0.97 }}
+            onClick={() => loadMenu()}
+            className="inline-flex items-center gap-2 px-5 py-2.5 rounded-xl bg-secondary text-white text-sm font-medium hover:bg-secondary-dark transition-colors"
+          >
+            <RotateCw className="w-4 h-4" /> Try Again
+          </motion.button>
         </div>
       </div>
     )
@@ -243,12 +248,20 @@ export default function MenuView() {
                             </div>
                           </div>
                           {promoQty === 0 ? (
-                            <button
-                              onClick={() => addToCart({ ...linked, price: Number(promo.specialPrice ?? linked.price) })}
-                              className="flex items-center gap-1 px-3 py-1.5 rounded-xl bg-secondary text-white text-xs font-medium hover:bg-secondary-dark transition-all"
+                            <motion.button
+                              whileTap={{ scale: 0.9 }}
+                              onClick={() => {
+                                addToCart({ ...linked, price: Number(promo.specialPrice ?? linked.price) })
+                                setJustAdded(linked.id)
+                                window.setTimeout(() => setJustAdded((cur) => (cur === linked.id ? null : cur)), 900)
+                              }}
+                              className={`flex items-center gap-1 px-3 py-1.5 rounded-xl text-xs font-medium transition-all ${
+                                justAdded === linked.id ? 'bg-success text-white animate-pop-in' : 'bg-secondary text-white hover:bg-secondary-dark'
+                              }`}
                             >
-                              <Plus className="w-3.5 h-3.5" /> Add
-                            </button>
+                              {justAdded === linked.id ? <CheckCircle className="w-3.5 h-3.5" /> : <Plus className="w-3.5 h-3.5" />}
+                              {justAdded === linked.id ? 'Added' : 'Add'}
+                            </motion.button>
                           ) : (
                             <div className="flex items-center gap-1.5">
                               <button
@@ -317,27 +330,41 @@ export default function MenuView() {
 
                     <div className="flex items-center justify-end mt-3">
                       {qty === 0 ? (
-                        <button
-                          onClick={() => addToCart(item)}
-                          className="flex items-center gap-1.5 px-4 py-1.5 rounded-xl bg-secondary text-white text-sm font-medium hover:bg-secondary-dark transition-all"
+                        <motion.button
+                          whileTap={{ scale: 0.9 }}
+                          onClick={() => {
+                            addToCart(item)
+                            setJustAdded(item.id)
+                            window.setTimeout(() => setJustAdded((cur) => (cur === item.id ? null : cur)), 900)
+                          }}
+                          className={`flex items-center gap-1.5 px-4 py-1.5 rounded-xl text-sm font-medium transition-all ${
+                            justAdded === item.id ? 'bg-success text-white animate-pop-in' : 'bg-secondary text-white hover:bg-secondary-dark'
+                          }`}
                         >
-                          <Plus className="w-4 h-4" /> Add
-                        </button>
+                          {justAdded === item.id ? <CheckCircle className="w-4 h-4" /> : <Plus className="w-4 h-4" />}
+                          {justAdded === item.id ? 'Added' : 'Add'}
+                        </motion.button>
                       ) : (
                         <div className="flex items-center gap-2">
-                          <button
+                          <motion.button
+                            whileTap={{ scale: 0.9 }}
                             onClick={() => updateCartQuantity(item.id, qty - 1)}
                             className="w-8 h-8 rounded-xl border border-gray-200 flex items-center justify-center text-primary hover:bg-gray-50"
                           >
                             <Minus className="w-4 h-4" />
-                          </button>
-                          <span className="w-8 text-center font-semibold text-primary text-sm">{qty}</span>
-                          <button
-                            onClick={() => addToCart(item)}
+                          </motion.button>
+                          <motion.span key={qty} initial={{ scale: 1.4 }} animate={{ scale: 1 }} className="w-8 text-center font-semibold text-primary text-sm">{qty}</motion.span>
+                          <motion.button
+                            whileTap={{ scale: 0.9 }}
+                            onClick={() => {
+                              addToCart(item)
+                              setJustAdded(item.id)
+                              window.setTimeout(() => setJustAdded((cur) => (cur === item.id ? null : cur)), 900)
+                            }}
                             className="w-8 h-8 rounded-xl bg-secondary text-white flex items-center justify-center hover:bg-secondary-dark"
                           >
                             <Plus className="w-4 h-4" />
-                          </button>
+                          </motion.button>
                         </div>
                       )}
                     </div>

@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useCallback } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import {
   User, Palette, QrCode, Users, Bell, CreditCard, Globe, Crown, Trash2, Edit3,
@@ -13,6 +13,8 @@ import { Input } from '@/components/ui/Input'
 import { Toggle } from '@/components/ui/Toggle'
 import { Badge } from '@/components/ui/Badge'
 import { showSuccessToast, showErrorToast } from '@/components/ui/Toast'
+import { Skeleton } from '@/components/ui/Skeleton'
+import { RefreshButton } from '@/components/ui/RefreshButton'
 import { useTheme, googleFonts } from '@/components/theme/ThemeProvider'
 import * as restaurantApi from '@/api/restaurant'
 import * as qrcodesApi from '@/api/qrcodes'
@@ -84,6 +86,10 @@ export default function SettingsPage() {
   const [deleteConfirm, setDeleteConfirm] = useState('')
   const [deletePassword, setDeletePassword] = useState('')
   const [isGoogleUser, setIsGoogleUser] = useState(false)
+  const [refreshing, setRefreshing] = useState(false)
+  const [qrBusy, setQrBusy] = useState(false)
+  const [staffSaving, setStaffSaving] = useState(false)
+  const [loaded, setLoaded] = useState(false)
 
   const [paymentSettings, setPaymentSettings] = useState({
     mpesaEnabled: true,
@@ -109,10 +115,17 @@ export default function SettingsPage() {
   const [showBatchInput, setShowBatchInput] = useState(false)
   const [batchCount, setBatchCount] = useState('10')
 
+  const loadAll = useCallback(async () => {
+    try {
+      await Promise.all([fetchStaff(), fetchQrCodes(), fetchTables()])
+    } finally {
+      setRefreshing(false)
+      setLoaded(true)
+    }
+  }, [fetchStaff, fetchQrCodes, fetchTables])
+
   useEffect(() => {
-    fetchStaff()
-    fetchQrCodes()
-    fetchTables()
+    loadAll()
     const googleEmail = localStorage.getItem('google_email')
     if (googleEmail) setIsGoogleUser(true)
 
@@ -133,7 +146,7 @@ export default function SettingsPage() {
       })
       setFontStyle(restaurant.fontStyle || 'modern')
     }
-  }, [restaurant])
+  }, [restaurant, loadAll])
 
   const nameToFamily = (name: string) => googleFonts.find((f) => f.name === name)?.family || name
 
@@ -215,6 +228,7 @@ export default function SettingsPage() {
 
   const handleAddStaff = async () => {
     if (!newStaff.name || !newStaff.phone || !newStaff.pin) return
+    setStaffSaving(true)
     try {
       const payload: any = {}
       for (const [k, v] of Object.entries(newStaff)) {
@@ -234,7 +248,7 @@ export default function SettingsPage() {
       setNewStaff({ name: '', phone: '', role: 'waiter', pin: '', email: '', employeeNumber: '', nationalId: '', kraPin: '', nhifNumber: '', nssfNumber: '', dateOfBirth: '', address: '', emergencyName: '', emergencyPhone: '', emergencyRelation: '', nextOfKin: '', nextOfKinPhone: '', nextOfKinRelation: '', bankName: '', bankBranch: '', bankAccount: '', monthlySalary: '', hourlyRate: '', leaveDays: '', startDate: '', notes: '' })
       setShowAddStaff(false)
       setEditingStaffId(null)
-    } catch {}
+    } catch {} finally { setStaffSaving(false) }
   }
 
   const handleSaveNotifications = async () => {
@@ -254,15 +268,18 @@ export default function SettingsPage() {
   }
 
   const handleGenerateMainQR = async () => {
-    const qr = await generateQrCode({
-      label: `${restaurant?.name || 'Menu'} QR`,
-      type: 'GENERAL',
-      color: qrDesign.qrColor,
-      bgColor: qrDesign.qrBgColor,
-      shape: qrDesign.shape,
-      template: qrDesign.template,
-    })
-    if (qr) showSuccessToast('QR code generated!')
+    setQrBusy(true)
+    try {
+      const qr = await generateQrCode({
+        label: `${restaurant?.name || 'Menu'} QR`,
+        type: 'GENERAL',
+        color: qrDesign.qrColor,
+        bgColor: qrDesign.qrBgColor,
+        shape: qrDesign.shape,
+        template: qrDesign.template,
+      })
+      if (qr) showSuccessToast('QR code generated!')
+    } finally { setQrBusy(false) }
   }
 
   const handleGenerateTableQR = async () => {
@@ -270,35 +287,41 @@ export default function SettingsPage() {
       showErrorToast('Enter a valid table number')
       return
     }
-    const qr = await generateQrCode({
-      label: tableQRLabel || `Table ${tableQRNumber}`,
-      tableNumber: parseInt(tableQRNumber),
-      type: 'TABLE',
-      color: qrDesign.qrColor,
-      bgColor: qrDesign.qrBgColor,
-      shape: qrDesign.shape,
-      template: qrDesign.template,
-    })
-    if (qr) {
-      showSuccessToast(`QR for Table ${tableQRNumber} generated!`)
-      setShowTableQRInput(false)
-      setTableQRNumber('')
-      setTableQRLabel('')
-    }
+    setQrBusy(true)
+    try {
+      const qr = await generateQrCode({
+        label: tableQRLabel || `Table ${tableQRNumber}`,
+        tableNumber: parseInt(tableQRNumber),
+        type: 'TABLE',
+        color: qrDesign.qrColor,
+        bgColor: qrDesign.qrBgColor,
+        shape: qrDesign.shape,
+        template: qrDesign.template,
+      })
+      if (qr) {
+        showSuccessToast(`QR for Table ${tableQRNumber} generated!`)
+        setShowTableQRInput(false)
+        setTableQRNumber('')
+        setTableQRLabel('')
+      }
+    } finally { setQrBusy(false) }
   }
 
   const handleGenerateBatchQRs = async () => {
     const n = parseInt(batchCount)
     if (isNaN(n) || n < 1) { showErrorToast('Enter a valid number'); return }
-    await generateBatchQrCodes({
-      numberOfTables: n,
-      template: qrDesign.template,
-      color: qrDesign.qrColor,
-      bgColor: qrDesign.qrBgColor,
-      shape: qrDesign.shape,
-    })
-    setShowBatchInput(false)
-    setBatchCount('10')
+    setQrBusy(true)
+    try {
+      await generateBatchQrCodes({
+        numberOfTables: n,
+        template: qrDesign.template,
+        color: qrDesign.qrColor,
+        bgColor: qrDesign.qrBgColor,
+        shape: qrDesign.shape,
+      })
+      setShowBatchInput(false)
+      setBatchCount('10')
+    } finally { setQrBusy(false) }
   }
 
   const renderActiveSection = () => {
@@ -496,7 +519,7 @@ export default function SettingsPage() {
             </div>
 
             <div className="flex flex-wrap items-center gap-3">
-              <Button size="sm" onClick={handleGenerateMainQR}><Plus className="h-3.5 w-3.5" /> {t('qr.generateMainQR')}</Button>
+              <Button size="sm" onClick={handleGenerateMainQR} loading={qrBusy}><Plus className="h-3.5 w-3.5" /> {t('qr.generateMainQR')}</Button>
               <Button size="sm" variant="secondary" onClick={() => setShowTableQRInput(true)}>
                 <Plus className="h-3.5 w-3.5" /> {t('qr.generateTableQR')}
               </Button>
@@ -534,7 +557,7 @@ export default function SettingsPage() {
                     <Input label={t('qr.tableNumber')} type="number" value={tableQRNumber} onChange={(e) => setTableQRNumber(e.target.value)} placeholder="Or enter number manually" />
                     <Input label={t('qr.tableLabel')} value={tableQRLabel} onChange={(e) => setTableQRLabel(e.target.value)} placeholder="e.g., Window Table" />
                     <div className="flex gap-2">
-                      <Button size="sm" onClick={handleGenerateTableQR}><Plus className="h-3.5 w-3.5" /> Generate</Button>
+                      <Button size="sm" onClick={handleGenerateTableQR} loading={qrBusy}><Plus className="h-3.5 w-3.5" /> Generate</Button>
                       <Button variant="ghost" size="sm" onClick={() => setShowTableQRInput(false)}>Cancel</Button>
                     </div>
                   </div>
@@ -546,7 +569,7 @@ export default function SettingsPage() {
                     <h4 className="font-accent text-sm font-bold text-text-primary dark:text-white">{t('qr.generateTableQRs')}</h4>
                     <Input label={t('qr.numberOfTables')} type="number" value={batchCount} onChange={(e) => setBatchCount(e.target.value)} placeholder="10" />
                     <div className="flex gap-2">
-                      <Button size="sm" onClick={handleGenerateBatchQRs}><Plus className="h-3.5 w-3.5" /> Generate Batch</Button>
+                      <Button size="sm" onClick={handleGenerateBatchQRs} loading={qrBusy}><Plus className="h-3.5 w-3.5" /> Generate Batch</Button>
                       <Button variant="ghost" size="sm" onClick={() => setShowBatchInput(false)}>Cancel</Button>
                     </div>
                   </div>
@@ -555,7 +578,13 @@ export default function SettingsPage() {
             </AnimatePresence>
 
             <div className="space-y-2 max-h-80 overflow-y-auto">
-              {qrCodes.length === 0 ? (
+              {!loaded ? (
+                <div className="space-y-2">
+                  <Skeleton variant="card" className="h-16" />
+                  <Skeleton variant="card" className="h-16" />
+                  <Skeleton variant="card" className="h-16" />
+                </div>
+              ) : qrCodes.length === 0 ? (
                 <p className="text-center font-body text-sm text-text-secondary dark:text-white/40 py-8">{t('qr.noQRs')}</p>
               ) : (
                 qrCodes.map((qr: any) => (
@@ -625,6 +654,13 @@ export default function SettingsPage() {
       case 'staff':
         return (
           <div className="space-y-4">
+            {!loaded ? (
+              <div className="space-y-3">
+                <Skeleton variant="card" className="h-14" />
+                <Skeleton variant="card" className="h-14" />
+                <Skeleton variant="card" className="h-14" />
+              </div>
+            ) : (
             <div className="overflow-x-auto">
               <table className="w-full text-sm font-body">
                 <thead>
@@ -669,6 +705,7 @@ export default function SettingsPage() {
                 </tbody>
               </table>
             </div>
+            )}
             <AnimatePresence>
               {showAddStaff ? (
                 <motion.div initial={{ opacity: 0, height: 0 }} animate={{ opacity: 1, height: 'auto' }} exit={{ opacity: 0, height: 0 }} className="overflow-hidden">
@@ -747,7 +784,7 @@ export default function SettingsPage() {
                     </div>
 
                     <div className="flex gap-2 pt-2 border-t border-white/10">
-                      <Button size="sm" onClick={handleAddStaff}><Save className="h-3.5 w-3.5" /> {editingStaffId ? 'Update Staff' : t('staff.addStaff')}</Button>
+                      <Button size="sm" onClick={handleAddStaff} loading={staffSaving}><Save className="h-3.5 w-3.5" /> {editingStaffId ? 'Update Staff' : t('staff.addStaff')}</Button>
                       <Button variant="ghost" size="sm" onClick={() => { setShowAddStaff(false); setEditingStaffId(null) }}>{t('app.cancel')}</Button>
                     </div>
                   </div>
@@ -939,9 +976,12 @@ export default function SettingsPage() {
 
   return (
     <div className="space-y-6">
-      <div>
-        <h1 className="font-heading text-2xl font-bold text-text-primary dark:text-white">{t('settings.title')}</h1>
-        <p className="font-body text-sm text-text-secondary dark:text-white/50">{t('settings.subtitle')}</p>
+      <div className="flex items-center justify-between">
+        <div>
+          <h1 className="font-heading text-2xl font-bold text-text-primary dark:text-white">{t('settings.title')}</h1>
+          <p className="font-body text-sm text-text-secondary dark:text-white/50">{t('settings.subtitle')}</p>
+        </div>
+        <RefreshButton refreshing={refreshing} onClick={() => { setRefreshing(true); loadAll() }} />
       </div>
 
       <div className="flex flex-col lg:flex-row gap-6">

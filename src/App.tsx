@@ -5,6 +5,7 @@ import { AnimatePresence, motion } from 'framer-motion'
 import { Toaster } from 'react-hot-toast'
 import { GoogleOAuthProvider } from '@react-oauth/google'
 import ThemeProvider from '@/components/theme/ThemeProvider'
+import { BrandLoader } from '@/components/ui/BrandLoader'
 
 const ProtectedRoute = lazy(() => import('@/components/layout/ProtectedRoute'))
 const DashboardLayout = lazy(() => import('@/components/layout/DashboardLayout'))
@@ -70,10 +71,7 @@ function AppRoutes() {
     <AnimatePresence mode="wait">
       <Suspense fallback={
         <div className="min-h-screen bg-background-light dark:bg-background-dark flex items-center justify-center">
-          <div className="flex flex-col items-center gap-3">
-            <div className="w-8 h-8 border-2 border-secondary border-t-transparent rounded-full animate-spin" />
-            <p className="font-accent text-xs text-text-secondary">Loading...</p>
-          </div>
+          <BrandLoader />
         </div>
       }>
         <Routes location={location} key={location.pathname}>

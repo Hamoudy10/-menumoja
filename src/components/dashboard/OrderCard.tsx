@@ -1,10 +1,11 @@
 import { motion } from 'framer-motion'
-import { Clock, ChefHat, CheckCircle2, CookingPot } from 'lucide-react'
+import { Clock, ChefHat, CheckCircle2, CookingPot, Loader2 } from 'lucide-react'
 import type { Order } from '@/types'
 
 interface OrderCardProps {
   order: Order
   onStatusChange: (id: string, status: "new" | "preparing" | "ready" | "served") => void
+  busy?: boolean
 }
 
 type OrderStatus = 'new' | 'preparing' | 'ready' | 'served'
@@ -16,7 +17,7 @@ const statusConfig: Record<OrderStatus, { label: string; icon: any; color: strin
   served: { label: 'Served', icon: CheckCircle2, color: 'bg-gray-100 text-gray-600 dark:bg-white/10 dark:text-white/60', next: '' },
 }
 
-export function OrderCard({ order, onStatusChange }: OrderCardProps) {
+export function OrderCard({ order, onStatusChange, busy = false }: OrderCardProps) {
   const config = statusConfig[order.status as OrderStatus] || statusConfig.new
   const StatusIcon = config.icon
 
@@ -26,7 +27,7 @@ export function OrderCard({ order, onStatusChange }: OrderCardProps) {
       initial={{ opacity: 0, scale: 0.95 }}
       animate={{ opacity: 1, scale: 1 }}
       exit={{ opacity: 0, scale: 0.95 }}
-      className="rounded-xl border border-white/10 bg-white dark:bg-primary-light p-4 space-y-3"
+      className={`rounded-xl border border-white/10 bg-white dark:bg-primary-light p-4 space-y-3 transition-opacity ${busy ? 'opacity-60' : ''}`}
     >
       <div className="flex items-center justify-between">
         <span className="font-accent text-xs font-bold text-text-primary dark:text-white">
@@ -60,12 +61,18 @@ export function OrderCard({ order, onStatusChange }: OrderCardProps) {
           KES {order.total.toLocaleString()}
         </span>
         {config.next && (
-          <button
+          <motion.button
+            whileHover={{ scale: 1.04 }}
+            whileTap={{ scale: 0.95 }}
             onClick={() => onStatusChange(order.id, config.next as OrderStatus)}
-            className="rounded-lg bg-secondary/10 px-3 py-1 text-[10px] font-accent font-medium text-secondary hover:bg-secondary/20 transition-colors"
+            disabled={busy}
+            className={`flex items-center gap-1.5 rounded-lg px-3 py-1 text-[10px] font-accent font-medium transition-colors disabled:cursor-not-allowed ${
+              busy ? 'bg-secondary/5 text-text-secondary' : 'bg-secondary/10 text-secondary hover:bg-secondary/20'
+            }`}
           >
-            Move to {config.next}
-          </button>
+            {busy ? <Loader2 className="h-3 w-3 animate-spin" /> : null}
+            {busy ? 'Updating…' : `Move to ${config.next}`}
+          </motion.button>
         )}
       </div>
     </motion.div>

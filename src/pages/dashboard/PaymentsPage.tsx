@@ -1,4 +1,4 @@
-import { useMemo } from 'react'
+import { useMemo, useState, useEffect, useCallback } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import { DollarSign, Smartphone, Banknote, Clock, ArrowUpRight, ArrowDownRight } from 'lucide-react'
 import {
@@ -7,6 +7,8 @@ import {
 import { useStore } from '@/store/useStore'
 import { Badge } from '@/components/ui/Badge'
 import { StatCard } from '@/components/dashboard/StatCard'
+import { Skeleton } from '@/components/ui/Skeleton'
+import { RefreshButton } from '@/components/ui/RefreshButton'
 
 function CustomTooltip({ active, payload, label }: any) {
   if (!active || !payload) return null
@@ -25,6 +27,22 @@ function CustomTooltip({ active, payload, label }: any) {
 
 export default function PaymentsPage() {
   const transactions = useStore((s) => s.transactions)
+  const fetchPayments = useStore((s) => s.fetchPayments)
+  const fetchTodaySummary = useStore((s) => s.fetchTodaySummary)
+
+  const [refreshing, setRefreshing] = useState(false)
+  const [loaded, setLoaded] = useState(false)
+
+  const refresh = useCallback(async () => {
+    try {
+      await Promise.all([fetchPayments(), fetchTodaySummary()])
+    } finally {
+      setRefreshing(false)
+      setLoaded(true)
+    }
+  }, [fetchPayments, fetchTodaySummary])
+
+  useEffect(() => { refresh() }, [refresh])
 
   const totals = useMemo(() => {
     const mpesaTotal = transactions.filter((t) => t.method === 'mpesa' && t.status === 'confirmed').reduce((s, t) => s + t.amount, 0)
@@ -56,22 +74,41 @@ export default function PaymentsPage() {
 
   return (
     <div className="space-y-6">
-      <div>
-        <h1 className="font-heading text-2xl font-bold text-text-primary dark:text-white">Payments</h1>
-        <p className="font-body text-sm text-text-secondary dark:text-white/50">Track transactions and reconcile payments</p>
+      <div className="flex items-center justify-between">
+        <div>
+          <h1 className="font-heading text-2xl font-bold text-text-primary dark:text-white">Payments</h1>
+          <p className="font-body text-sm text-text-secondary dark:text-white/50">Track transactions and reconcile payments</p>
+        </div>
+        <RefreshButton refreshing={refreshing} onClick={() => { setRefreshing(true); refresh() }} />
       </div>
 
+      {!loaded ? (
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+          <Skeleton variant="card" className="h-32" />
+          <Skeleton variant="card" className="h-32" />
+          <Skeleton variant="card" className="h-32" />
+        </div>
+      ) : (
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
         <StatCard icon={<DollarSign className="h-6 w-6" />} label="Today's Total" value={totals.total} prefix="KES " trend={15} trendLabel="vs yesterday" color="secondary" />
         <StatCard icon={<Smartphone className="h-6 w-6" />} label="M-Pesa Total" value={totals.mpesaTotal} prefix="KES " trend={22} trendLabel="vs yesterday" color="success" />
         <StatCard icon={<Banknote className="h-6 w-6" />} label="Cash Total" value={totals.cashTotal} prefix="KES " trend={-5} trendLabel="vs yesterday" color="primary" />
         <StatCard icon={<Clock className="h-6 w-6" />} label="Pending" value={totals.pending} prefix="KES " trend={0} trendLabel="vs yesterday" color="accent" />
       </div>
+      )}
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         <div className="rounded-2xl bg-white dark:bg-primary-light border border-white/10 p-4">
           <h3 className="font-heading text-lg font-bold text-text-primary dark:text-white mb-4">Live Transactions</h3>
           <div className="space-y-2 max-h-[400px] overflow-y-auto">
+            {!loaded ? (
+              <div className="space-y-2">
+                <Skeleton variant="card" className="h-16" />
+                <Skeleton variant="card" className="h-16" />
+                <Skeleton variant="card" className="h-16" />
+                <Skeleton variant="card" className="h-16" />
+              </div>
+            ) : (
             <AnimatePresence>
               {transactions.length === 0 ? (
                 <p className="text-center font-body text-sm text-text-secondary dark:text-white/40 py-8">No transactions</p>
@@ -106,6 +143,7 @@ export default function PaymentsPage() {
                 ))
               )}
             </AnimatePresence>
+            )}
           </div>
         </div>
 

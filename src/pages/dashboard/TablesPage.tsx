@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo } from 'react'
+import { useState, useEffect, useMemo, useCallback } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import {
   Plus, X, Save, Square, Circle, RectangleHorizontal, Armchair,
@@ -9,6 +9,8 @@ import { useStore } from '@/store/useStore'
 import FloorCanvas, { resolveTableStatus } from '@/components/floor/FloorCanvas'
 import { Button } from '@/components/ui/Button'
 import { Input } from '@/components/ui/Input'
+import { RefreshButton } from '@/components/ui/RefreshButton'
+import { Skeleton } from '@/components/ui/Skeleton'
 import { showSuccessToast, showErrorToast } from '@/components/ui/Toast'
 import type { FloorTable, FloorZone, TableShape } from '@/types'
 
@@ -37,6 +39,10 @@ export default function TablesPage() {
   const { tables, zones, orders, fetchTables, fetchZones, fetchOrders, updateTable, removeTable, createTable, setTableStatus, createZone, updateZone, removeZone } = useStore()
 
   const [loading, setLoading] = useState(true)
+  const [refreshing, setRefreshing] = useState(false)
+  const [saving, setSaving] = useState(false)
+  const [bulkSaving, setBulkSaving] = useState(false)
+  const [zoneSaving, setZoneSaving] = useState(false)
   const [view, setView] = useState<'floor' | 'list'>('floor')
   const [selectedId, setSelectedId] = useState<string | null>(null)
   const [drawMode, setDrawMode] = useState(false)
@@ -63,7 +69,14 @@ export default function TablesPage() {
     }
   }
 
-  const refresh = () => { fetchTables(); fetchZones(); fetchOrders() }
+  const refresh = useCallback(async () => {
+    setRefreshing(true)
+    try {
+      await Promise.all([fetchTables(), fetchZones(), fetchOrders()])
+    } finally {
+      setRefreshing(false)
+    }
+  }, [fetchTables, fetchZones, fetchOrders])
 
   const openCreateTable = () => {
     setEditTable(null)
@@ -94,6 +107,7 @@ export default function TablesPage() {
       shape: form.shape,
       zoneId: form.zoneId || undefined,
     }
+    setSaving(true)
     try {
       if (editTable) {
         await updateTable(editTable.id, payload)
@@ -106,7 +120,7 @@ export default function TablesPage() {
       }
       setShowTableForm(false)
       setSelectedId(editTable?.id ?? null)
-    } catch { showErrorToast('Failed to save table') }
+    } catch { showErrorToast('Failed to save table') } finally { setSaving(false) }
   }
 
   const handleDeleteTable = async (id: string) => {
@@ -122,6 +136,7 @@ export default function TablesPage() {
     const count = parseInt(bulkForm.count)
     const start = parseInt(bulkForm.startNumber)
     if (!count || count < 1 || count > 50 || !start || start < 1) { showErrorToast('Invalid bulk add values'); return }
+    setBulkSaving(true)
     const width = bulkForm.shape === 'ROUND' || bulkForm.shape === 'SQUARE' ? 2 : bulkForm.shape === 'OVAL' ? 3 : 4
     const height = bulkForm.shape === 'ROUND' || bulkForm.shape === 'SQUARE' ? 2 : bulkForm.shape === 'OVAL' ? 2 : 2
     const perRow = 7
@@ -146,7 +161,7 @@ export default function TablesPage() {
       showSuccessToast(`${count} tables created`)
       setShowBulk(false)
       refresh()
-    } catch { showErrorToast('Failed to create tables') }
+    } catch { showErrorToast('Failed to create tables') } finally { setBulkSaving(false) }
   }
 
   const handleZoneDrawn = (draft: { positionX: number; positionY: number; width: number; height: number }) => {
@@ -157,6 +172,7 @@ export default function TablesPage() {
 
   const handleSaveZone = async () => {
     if (!zoneModal) return
+    setZoneSaving(true)
     try {
       if (zoneModal.mode === 'edit' && zoneModal.zone) {
         await updateZone(zoneModal.zone.id, { name: zoneForm.name, color: zoneForm.color })
@@ -171,7 +187,7 @@ export default function TablesPage() {
       }
       setZoneModal(null)
       refresh()
-    } catch { showErrorToast('Failed to save zone') }
+    } catch { showErrorToast('Failed to save zone') } finally { setZoneSaving(false) }
   }
 
   const handleDeleteZone = async (id: string) => {
@@ -201,6 +217,7 @@ export default function TablesPage() {
               <List className="w-3.5 h-3.5" /> List
             </button>
           </div>
+          <RefreshButton refreshing={refreshing} onClick={refresh} />
           <Button variant="outline" onClick={() => setShowBulk(true)}><Grid3X3 className="h-4 w-4" /> Bulk Add</Button>
           <Button onClick={openCreateTable}><Plus className="h-4 w-4" /> Add Table</Button>
         </div>
@@ -250,6 +267,10 @@ export default function TablesPage() {
         </>
       ) : (
         <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-4">
+          {loading ? (
+            [0, 1, 2, 3, 4, 5].map((i) => <Skeleton key={i} variant="card" />)
+          ) : (
+            <>
           {tables.map((table) => {
             const st = resolveTableStatus(table, orders)
             const ShapeIcon = SHAPE_OPTIONS.find((s) => s.value === (table.shape || 'ROUND'))?.icon || Circle
@@ -283,6 +304,8 @@ export default function TablesPage() {
                 <Button variant="outline" onClick={() => setShowBulk(true)}><Grid3X3 className="h-4 w-4" /> Bulk Add</Button>
               </div>
             </div>
+          )}
+            </>
           )}
         </div>
       )}
@@ -456,7 +479,7 @@ export default function TablesPage() {
                 </div>
 
                 <div className="flex gap-3 pt-4 border-t border-gray-100 dark:border-white/10">
-                  <Button fullWidth onClick={handleSaveTable}><Save className="h-4 w-4" /> {editTable ? 'Update' : 'Create'}</Button>
+                  <Button fullWidth loading={saving} disabled={saving} onClick={handleSaveTable}><Save className="h-4 w-4" /> {editTable ? 'Update' : 'Create'}</Button>
                   {editTable && (
                     <Button fullWidth variant="ghost" className="text-red-500 border-red-500/30 hover:bg-red-500/10" onClick={() => handleDeleteTable(editTable.id)}>
                       <Trash2 className="h-4 w-4" /> Delete
@@ -482,27 +505,27 @@ export default function TablesPage() {
                 <button onClick={() => setShowBulk(false)} className="p-1.5 rounded-lg hover:bg-black/5 dark:hover:bg-white/10"><X className="h-4 w-4 text-text-secondary" /></button>
               </div>
               <div className="grid grid-cols-2 gap-3 mb-3">
-                <Input label="Start Number" type="number" value={bulkForm.startNumber} onChange={(e) => setBulkForm({ ...bulkForm, startNumber: e.target.value })} />
-                <Input label="How Many" type="number" value={bulkForm.count} onChange={(e) => setBulkForm({ ...bulkForm, count: e.target.value })} />
-                <Input label="Capacity" type="number" value={bulkForm.capacity} onChange={(e) => setBulkForm({ ...bulkForm, capacity: e.target.value })} />
+                <Input label="Start Number" type="number" value={bulkForm.startNumber} onChange={(e) => setBulkForm({ ...bulkForm, startNumber: e.target.value })} disabled={bulkSaving} />
+                <Input label="How Many" type="number" value={bulkForm.count} onChange={(e) => setBulkForm({ ...bulkForm, count: e.target.value })} disabled={bulkSaving} />
+                <Input label="Capacity" type="number" value={bulkForm.capacity} onChange={(e) => setBulkForm({ ...bulkForm, capacity: e.target.value })} disabled={bulkSaving} />
                 <div>
                   <label className="mb-2 block font-accent text-sm font-medium text-text-primary dark:text-white/90">Shape</label>
-                  <select value={bulkForm.shape} onChange={(e) => setBulkForm({ ...bulkForm, shape: e.target.value as TableShape })}
-                    className="w-full rounded-xl border border-gray-200 dark:border-white/10 bg-white dark:bg-primary-light px-3 py-2 text-sm text-text-primary focus:outline-none focus:ring-2 focus:ring-secondary/20">
+                  <select value={bulkForm.shape} onChange={(e) => setBulkForm({ ...bulkForm, shape: e.target.value as TableShape })} disabled={bulkSaving}
+                    className="w-full rounded-xl border border-gray-200 dark:border-white/10 bg-white dark:bg-primary-light px-3 py-2 text-sm text-text-primary focus:outline-none focus:ring-2 focus:ring-secondary/20 disabled:cursor-not-allowed disabled:opacity-50">
                     {SHAPE_OPTIONS.map((s) => <option key={s.value} value={s.value}>{s.label}</option>)}
                   </select>
                 </div>
               </div>
               <div className="mb-4">
                 <label className="mb-2 block font-accent text-sm font-medium text-text-primary dark:text-white/90">Zone</label>
-                <select value={bulkForm.zoneId} onChange={(e) => setBulkForm({ ...bulkForm, zoneId: e.target.value })}
-                  className="w-full rounded-xl border border-gray-200 dark:border-white/10 bg-white dark:bg-primary-light px-3 py-2 text-sm text-text-primary focus:outline-none focus:ring-2 focus:ring-secondary/20">
+                <select value={bulkForm.zoneId} onChange={(e) => setBulkForm({ ...bulkForm, zoneId: e.target.value })} disabled={bulkSaving}
+                  className="w-full rounded-xl border border-gray-200 dark:border-white/10 bg-white dark:bg-primary-light px-3 py-2 text-sm text-text-primary focus:outline-none focus:ring-2 focus:ring-secondary/20 disabled:cursor-not-allowed disabled:opacity-50">
                   <option value="">No zone</option>
                   {zones.map((z) => <option key={z.id} value={z.id}>{z.name}</option>)}
                 </select>
               </div>
               <p className="text-xs text-text-secondary mb-4">Tables are auto-arranged on the floor plan — drag them where you want afterwards.</p>
-              <Button fullWidth onClick={handleBulkAdd}><Grid3X3 className="h-4 w-4" /> Create {bulkForm.count || 0} Tables</Button>
+              <Button fullWidth loading={bulkSaving} disabled={bulkSaving} onClick={handleBulkAdd}><Grid3X3 className="h-4 w-4" /> Create {bulkForm.count || 0} Tables</Button>
             </motion.div>
           </>
         )}
@@ -532,7 +555,7 @@ export default function TablesPage() {
                     ))}
                   </div>
                 </div>
-                <Button fullWidth onClick={handleSaveZone}><Save className="h-4 w-4" /> Create Zone</Button>
+                <Button fullWidth loading={zoneSaving} disabled={zoneSaving} onClick={handleSaveZone}><Save className="h-4 w-4" /> Create Zone</Button>
               </div>
             </motion.div>
           </>

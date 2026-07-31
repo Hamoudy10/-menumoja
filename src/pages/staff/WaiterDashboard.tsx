@@ -50,6 +50,7 @@ export default function WaiterDashboard() {
   const [activeTab, setActiveTab] = useState<'active' | 'served' | 'floor'>('active')
   const [selectedOrder, setSelectedOrder] = useState<any | null>(null)
   const [showComplaint, setShowComplaint] = useState(false)
+  const [submittingComplaint, setSubmittingComplaint] = useState(false)
   const [complaintForm, setComplaintForm] = useState<ComplaintForm>({ orderId: '', type: 'complaint', description: '', evidence: [] })
   const [updatingId, setUpdatingId] = useState<string | null>(null)
   const [servedOrders, setServedOrders] = useState<any[]>([])
@@ -117,7 +118,8 @@ export default function WaiterDashboard() {
   }
 
   const handleSubmitComplaint = async () => {
-    if (!complaintForm.description) return
+    if (!complaintForm.description || submittingComplaint) return
+    setSubmittingComplaint(true)
     try {
       await api.post(`/orders/${complaintForm.orderId}/complaint`, {
         type: complaintForm.type,
@@ -129,6 +131,8 @@ export default function WaiterDashboard() {
       setComplaintForm({ orderId: '', type: 'complaint', description: '', evidence: [] })
     } catch {
       showErrorToast('Failed to submit complaint')
+    } finally {
+      setSubmittingComplaint(false)
     }
   }
 
@@ -436,7 +440,7 @@ export default function WaiterDashboard() {
 
                 <div className="flex gap-3 pt-2">
                   <Button variant="outline" fullWidth onClick={() => setShowComplaint(false)}>Cancel</Button>
-                  <Button variant="primary" fullWidth disabled={!complaintForm.description} onClick={handleSubmitComplaint}>
+                  <Button variant="primary" fullWidth loading={submittingComplaint} disabled={!complaintForm.description || submittingComplaint} onClick={handleSubmitComplaint}>
                     Submit
                   </Button>
                 </div>

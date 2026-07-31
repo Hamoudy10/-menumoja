@@ -10,6 +10,8 @@ import { OrderCard } from '@/components/dashboard/OrderCard'
 import { Badge } from '@/components/ui/Badge'
 import { SearchBar } from '@/components/ui/SearchBar'
 import { EmptyState } from '@/components/ui/EmptyState'
+import { Skeleton } from '@/components/ui/Skeleton'
+import { RefreshButton } from '@/components/ui/RefreshButton'
 import { showSuccessToast, showErrorToast } from '@/components/ui/Toast'
 import type { Order } from '@/types'
 
@@ -17,10 +19,16 @@ type Tab = 'live' | 'history' | 'kitchen'
 
 export default function OrdersPage() {
   const [activeTab, setActiveTab] = useState<Tab>('live')
+  const [refreshing, setRefreshing] = useState(false)
   const orders = useStore((s) => s.orders)
   const liveOrders = useStore((s) => s.liveOrders)
   const fetchLiveOrders = useStore((s) => s.fetchLiveOrders)
   const updateOrderStatus = useStore((s) => s.updateOrderStatus)
+
+  const refresh = async () => {
+    setRefreshing(true)
+    try { await fetchLiveOrders() } finally { setRefreshing(false) }
+  }
 
   useEffect(() => {
     if (activeTab === 'live') {
@@ -32,9 +40,12 @@ export default function OrdersPage() {
 
   return (
     <div className="space-y-6">
-      <div>
-        <h1 className="font-heading text-2xl font-bold text-text-primary dark:text-white">Orders</h1>
-        <p className="font-body text-sm text-text-secondary dark:text-white/50">Manage and track all orders</p>
+      <div className="flex items-start justify-between">
+        <div>
+          <h1 className="font-heading text-2xl font-bold text-text-primary dark:text-white">Orders</h1>
+          <p className="font-body text-sm text-text-secondary dark:text-white/50">Manage and track all orders</p>
+        </div>
+        <RefreshButton refreshing={refreshing} onClick={refresh} />
       </div>
 
       <div className="flex gap-1 rounded-xl bg-black/5 dark:bg-white/10 p-1 w-fit">
@@ -62,10 +73,22 @@ export default function OrdersPage() {
   )
 }
 
-function LiveOrdersView({ orders, updateOrderStatus }: { orders: Order[]; updateOrderStatus: (id: string, status: Order['status']) => void }) {
+function LiveOrdersView({ orders, updateOrderStatus }: { orders: Order[]; updateOrderStatus: (id: string, status: string) => Promise<void> }) {
   const columns: Order['status'][] = ['new', 'preparing', 'ready', 'served']
   const [showAll, setShowAll] = useState<Record<string, boolean>>({})
+  const [busyId, setBusyId] = useState<string | null>(null)
+  const [loaded, setLoaded] = useState(false)
   const MAX_VISIBLE = 12
+
+  useEffect(() => {
+    const t = window.setTimeout(() => setLoaded(true), 350)
+    return () => window.clearTimeout(t)
+  }, [])
+
+  const handleStatusChange = async (id: string, status: Order['status']) => {
+    setBusyId(id)
+    try { await updateOrderStatus(id, status) } finally { setBusyId(null) }
+  }
 
   const columnLabels: Record<string, { label: string; icon: any; color: string; bg: string }> = {
     new: { label: 'New / Pending', icon: Clock, color: 'text-blue-500', bg: 'bg-blue-50 dark:bg-blue-900/20' },
@@ -94,15 +117,22 @@ function LiveOrdersView({ orders, updateOrderStatus }: { orders: Order[]; update
               <Badge size="sm" variant="default">{colOrders.length}</Badge>
             </div>
             <div className="flex-1 overflow-y-auto p-2 space-y-2">
+              {!loaded && orders.length === 0 ? (
+                <>
+                  <Skeleton variant="card" className="h-24" />
+                  <Skeleton variant="card" className="h-24" />
+                </>
+              ) : (
               <AnimatePresence>
                 {colOrders.length === 0 ? (
                   <p className="text-center font-body text-xs text-text-secondary/50 py-8">No orders</p>
                 ) : (
                   visible.map((order) => (
-                    <OrderCard key={order.id} order={order} onStatusChange={updateOrderStatus} />
+                    <OrderCard key={order.id} order={order} onStatusChange={handleStatusChange} busy={busyId === order.id} />
                   ))
                 )}
               </AnimatePresence>
+              )}
             </div>
             {colOrders.length > MAX_VISIBLE && (
               <button
@@ -127,13 +157,18 @@ function OrderHistory({ orders }: { orders: Order[] }) {
   const [historyOrders, setHistoryOrders] = useState<any[]>([])
   const [loading, setLoading] = useState(false)
 
-  useEffect(() => {
-    setLoading(true)
-    getOrderHistory({ perPage: 100 })
-      .then((data) => setHistoryOrders(Array.isArray(data) ? data : []))
-      .catch(() => showErrorToast('Failed to load order history'))
-      .finally(() => setLoading(false))
-  }, [])
+  const loadHistory = async () => {
+    try {
+      const data = await getOrderHistory({ perPage: 100 })
+      setHistoryOrders(Array.isArray(data) ? data : [])
+    } catch {
+      showErrorToast('Failed to load order history')
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  useEffect(() => { loadHistory() }, [])
 
   const sourceOrders = historyOrders.length > 0 ? historyOrders : orders
 
@@ -148,6 +183,7 @@ function OrderHistory({ orders }: { orders: Order[] }) {
     <div>
       <div className="flex items-center gap-3 mb-4 flex-wrap">
         <SearchBar placeholder="Search by order ID or item name..." value={search} onChange={setSearch} className="flex-1 max-w-sm" />
+        <RefreshButton refreshing={loading} onClick={() => { setLoading(true); loadHistory() }} />
         <input
           type="text" value={tableSearch} onChange={(e) => setTableSearch(e.target.value)}
           placeholder="Filter by table #..."
@@ -170,7 +206,15 @@ function OrderHistory({ orders }: { orders: Order[] }) {
 
       <div className="space-y-2">
         {loading ? (
-          <div className="flex items-center justify-center py-16"><Loader2 className="w-8 h-8 animate-spin text-secondary" /></div>
+          <div className="space-y-3">
+            {Array.from({ length: 5 }).map((_, i) => (
+              <div key={i} className="rounded-2xl bg-white dark:bg-primary-light border border-white/10 p-4 flex items-center gap-4">
+                <Skeleton variant="text" className="w-12 h-6" />
+                <Skeleton variant="text" className="flex-1 h-4" />
+                <Skeleton variant="text" className="w-20 h-5" />
+              </div>
+            ))}
+          </div>
         ) : filtered.length === 0 ? (
           <EmptyState icon={<Search className="h-12 w-12" />} title="No orders found" description="Try a different search or filter" />
         ) : (
@@ -251,11 +295,12 @@ function OrderHistory({ orders }: { orders: Order[] }) {
   )
 }
 
-function KitchenDisplay({ orders, updateOrderStatus }: { orders: Order[]; updateOrderStatus: (id: string, status: Order['status']) => void }) {
+function KitchenDisplay({ orders, updateOrderStatus }: { orders: Order[]; updateOrderStatus: (id: string, status: Order['status']) => Promise<void> }) {
   const kitchenOrders = useMemo(() =>
     orders.filter((o) => o.status === 'new' || o.status === 'preparing'),
   [orders])
   const [timers, setTimers] = useState<Record<string, string>>({})
+  const [busyId, setBusyId] = useState<string | null>(null)
   const timerRef = useRef<ReturnType<typeof setInterval> | null>(null)
 
   useEffect(() => {
@@ -334,18 +379,21 @@ function KitchenDisplay({ orders, updateOrderStatus }: { orders: Order[]; update
                 <motion.button
                   whileHover={{ scale: 1.03 }}
                   whileTap={{ scale: 0.97 }}
-                  onClick={() => {
+                  disabled={busyId !== null}
+                  onClick={async () => {
                     const nextStatus = order.status === 'new' ? 'preparing' : 'ready'
-                    updateOrderStatus(order.id, nextStatus)
-                    showSuccessToast(`Order moved to ${nextStatus}`)
+                    setBusyId(order.id)
+                    try { await updateOrderStatus(order.id, nextStatus); showSuccessToast(`Order moved to ${nextStatus}`) }
+                    finally { setBusyId(null) }
                   }}
-                  className={`w-full rounded-xl py-3 font-accent font-bold text-base transition-all ${
+                  className={`w-full rounded-xl py-3 font-accent font-bold text-base transition-all flex items-center justify-center gap-2 disabled:opacity-60 ${
                     order.status === 'new'
                       ? 'bg-amber-500 text-white hover:bg-amber-600'
                       : 'bg-success text-white hover:bg-green-600'
                   }`}
                 >
-                  {order.status === 'new' ? 'START PREPARING' : 'MARK READY'}
+                  {busyId === order.id ? <Loader2 className="h-5 w-5 animate-spin" /> : null}
+                  {busyId === order.id ? 'Updating…' : order.status === 'new' ? 'START PREPARING' : 'MARK READY'}
                 </motion.button>
               </motion.div>
             )

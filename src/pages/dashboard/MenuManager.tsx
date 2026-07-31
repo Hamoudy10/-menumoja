@@ -1,8 +1,8 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useCallback } from 'react'
 import { motion, AnimatePresence, Reorder } from 'framer-motion'
 import {
   Plus, Grid3X3, List, Image, X, Check, Search,
-  Edit3, Trash2, Eye, EyeOff, GripVertical, Tag, Sparkles, RefreshCw,
+  Edit3, Trash2, Eye, EyeOff, GripVertical, Tag, Sparkles, RefreshCw, Loader2,
 } from 'lucide-react'
 import { useStore } from '@/store/useStore'
 import { useTranslation } from 'react-i18next'
@@ -11,6 +11,8 @@ import { Input } from '@/components/ui/Input'
 import { Badge } from '@/components/ui/Badge'
 import { EmptyState } from '@/components/ui/EmptyState'
 import { SearchBar } from '@/components/ui/SearchBar'
+import { RefreshButton } from '@/components/ui/RefreshButton'
+import { Skeleton } from '@/components/ui/Skeleton'
 import { showSuccessToast } from '@/components/ui/Toast'
 import type { MenuCategory, MenuItem } from '@/types'
 
@@ -25,10 +27,26 @@ export default function MenuManager() {
   const { categories, fetchCategories, addCategory, updateCategory, removeCategory, addItem, updateItem, removeItem } = useStore()
   const [viewMode, setViewMode] = useState<'grid' | 'list'>('grid')
   const [selectedCat, setSelectedCat] = useState('')
+  const [loaded, setLoaded] = useState(false)
+  const [refreshing, setRefreshing] = useState(false)
+
+  const loadData = useCallback(async () => {
+    await fetchCategories()
+    setLoaded(true)
+  }, [fetchCategories])
 
   useEffect(() => {
-    fetchCategories()
-  }, [])
+    loadData()
+  }, [loadData])
+
+  const handleRefresh = async () => {
+    setRefreshing(true)
+    try {
+      await fetchCategories()
+    } finally {
+      setRefreshing(false)
+    }
+  }
 
   useEffect(() => {
     if (categories.length > 0 && !selectedCat) {
@@ -53,6 +71,10 @@ export default function MenuManager() {
   const [showAiOptions, setShowAiOptions] = useState(false)
   const [aiOptions, setAiOptions] = useState<Array<{ id: string; description: string; descriptionSw: string }>>([])
   const [generatingOptions, setGeneratingOptions] = useState(false)
+  const [aiGenerating, setAiGenerating] = useState(false)
+  const [itemSaving, setItemSaving] = useState(false)
+  const [quickSaving, setQuickSaving] = useState(false)
+  const [bulkDeleting, setBulkDeleting] = useState(false)
 
   const handleAddCategory = () => {
     if (!newCatName.trim()) return
@@ -72,17 +94,22 @@ export default function MenuManager() {
   }
 
   const handleBulkDelete = async () => {
+    setBulkDeleting(true)
     let deleted = 0
-    for (const id of selectedItems) {
-      const cat = categories.find((c) => c.items.some((i) => i.id === id))
-      if (cat) {
-        try {
-          await removeItem(cat.id, id)
-          deleted++
-        } catch {}
+    try {
+      for (const id of selectedItems) {
+        const cat = categories.find((c) => c.items.some((i) => i.id === id))
+        if (cat) {
+          try {
+            await removeItem(cat.id, id)
+            deleted++
+          } catch {}
+        }
       }
+    } finally {
+      setSelectedItems([])
+      setBulkDeleting(false)
     }
-    setSelectedItems([])
     if (deleted > 0) showSuccessToast(`${deleted} items deleted`)
   }
 
@@ -123,6 +150,7 @@ export default function MenuManager() {
         setGeneratingOptions(false)
       }
     } else {
+      setAiGenerating(true)
       try {
         const { generateDescription } = await import('@/api/ai')
         const data = await generateDescription({
@@ -141,6 +169,8 @@ export default function MenuManager() {
           description: `A delicious ${editForm.name} prepared with fresh ingredients, combining traditional flavors with modern presentation.`
         })
         showSuccessToast(t('menu.aiGenerated'))
+      } finally {
+        setAiGenerating(false)
       }
     }
   }
@@ -158,6 +188,7 @@ export default function MenuManager() {
           <p className="font-body text-sm text-text-secondary dark:text-white/50">{t('menu.subtitle')}</p>
         </div>
         <div className="flex items-center gap-2">
+          <RefreshButton refreshing={refreshing} onClick={handleRefresh} />
           <Button variant="ghost" size="sm" icon={viewMode === 'grid' ? <Grid3X3 className="h-4 w-4" /> : <List className="h-4 w-4" />} onClick={() => setViewMode(viewMode === 'grid' ? 'list' : 'grid')}>
             {viewMode === 'grid' ? 'Grid' : 'List'}
           </Button>
@@ -167,7 +198,7 @@ export default function MenuManager() {
       {selectedItems.length > 0 && (
         <motion.div initial={{ opacity: 0, y: -10 }} animate={{ opacity: 1, y: 0 }} className="flex items-center gap-3 rounded-2xl bg-secondary/10 border border-secondary/20 p-3">
           <span className="font-accent text-sm text-secondary font-medium">{selectedItems.length} selected</span>
-          <Button variant="ghost" size="sm" className="text-red-500 hover:bg-red-500/10" onClick={handleBulkDelete}>
+          <Button variant="ghost" size="sm" className="text-red-500 hover:bg-red-500/10" onClick={handleBulkDelete} loading={bulkDeleting} disabled={bulkDeleting}>
             <Trash2 className="h-3.5 w-3.5" /> {t('common.bulkDelete')}
           </Button>
           <Button variant="ghost" size="sm" onClick={() => setSelectedItems([])}>
@@ -180,6 +211,14 @@ export default function MenuManager() {
         <div className="w-full lg:w-64 shrink-0 space-y-3">
           <SearchBar placeholder={t('app.search') + '...'} value={search} onChange={setSearch} className="flex-1" />
 
+          {!loaded ? (
+            <div className="space-y-3">
+              {[0, 1, 2, 3].map((i) => (
+                <Skeleton key={i} variant="card" className="h-12" />
+              ))}
+            </div>
+          ) : (
+            <>
           <div className="space-y-1">
             <Reorder.Group axis="y" values={categoriesOrder} onReorder={async (newOrder) => {
               setCategoriesOrder(newOrder)
@@ -263,22 +302,37 @@ export default function MenuManager() {
           </AnimatePresence>
 
           {categories.length > 0 && (
-            <Button variant="ghost" size="sm" fullWidth onClick={async () => {
-              const last = categories[categories.length - 1]
-              const newItem = defaultItem(last.id, last.items.length)
-              const created = await addItem(last.id, newItem)
-              if (created) {
-                setEditingItem(created)
-                setEditForm({ ...created })
+            <Button variant="ghost" size="sm" fullWidth loading={quickSaving} disabled={quickSaving} onClick={async () => {
+              setQuickSaving(true)
+              try {
+                const last = categories[categories.length - 1]
+                const newItem = defaultItem(last.id, last.items.length)
+                const created = await addItem(last.id, newItem)
+                if (created) {
+                  setEditingItem(created)
+                  setEditForm({ ...created })
+                }
+                showSuccessToast(t('menu.itemAdded'))
+              } finally {
+                setQuickSaving(false)
               }
-              showSuccessToast(t('menu.itemAdded'))
             }}>
               <Plus className="h-4 w-4" /> {t('menu.quickAdd')}
             </Button>
           )}
+            </>
+          )}
         </div>
 
         <div className="flex-1">
+          {!loaded ? (
+            <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-4">
+              {[0, 1, 2, 3, 4, 5].map((i) => (
+                <Skeleton key={i} variant="card" />
+              ))}
+            </div>
+          ) : (
+            <>
           {!currentCat ? (
             <EmptyState
               icon={<Tag className="h-12 w-12" />}
@@ -393,22 +447,30 @@ export default function MenuManager() {
           )}
 
           <motion.button
-            whileHover={{ scale: 1.02 }}
-            whileTap={{ scale: 0.98 }}
+            whileHover={quickSaving ? undefined : { scale: 1.02 }}
+            whileTap={quickSaving ? undefined : { scale: 0.98 }}
+            disabled={quickSaving}
             onClick={async () => {
               if (!currentCat) return
-              const newItem = defaultItem(currentCat.id, currentCat.items.length)
-              const created = await addItem(currentCat.id, newItem)
-              if (created) {
-                setEditingItem(created)
-                setEditForm({ ...created })
+              setQuickSaving(true)
+              try {
+                const newItem = defaultItem(currentCat.id, currentCat.items.length)
+                const created = await addItem(currentCat.id, newItem)
+                if (created) {
+                  setEditingItem(created)
+                  setEditForm({ ...created })
+                }
+              } finally {
+                setQuickSaving(false)
               }
             }}
-            className="mt-4 flex w-full items-center justify-center gap-2 rounded-2xl border-2 border-dashed border-white/20 p-6 text-text-secondary hover:border-secondary/50 hover:text-secondary transition-colors"
+            className="mt-4 flex w-full items-center justify-center gap-2 rounded-2xl border-2 border-dashed border-white/20 p-6 text-text-secondary hover:border-secondary/50 hover:text-secondary transition-colors disabled:cursor-not-allowed disabled:opacity-50"
           >
-            <Plus className="h-5 w-5" />
+            {quickSaving ? <Loader2 className="h-5 w-5 animate-spin" /> : <Plus className="h-5 w-5" />}
             <span className="font-accent font-medium">{t('menu.addItem')}</span>
           </motion.button>
+            </>
+          )}
         </div>
       </div>
 
@@ -523,10 +585,11 @@ export default function MenuManager() {
                   <div className="flex gap-2">
                     <button
                       onClick={() => generateAIDescription(false)}
-                      className="flex-1 rounded-lg bg-secondary/10 text-secondary hover:bg-secondary/20 px-3 py-2 text-xs font-accent font-medium transition-colors"
+                      disabled={aiGenerating}
+                      className="flex-1 rounded-lg bg-secondary/10 text-secondary hover:bg-secondary/20 px-3 py-2 text-xs font-accent font-medium transition-colors disabled:opacity-50"
                     >
-                      <RefreshCw className="h-3 w-3 inline mr-1" />
-                      {t('menu.writeWithAI')}
+                      <RefreshCw className={`h-3 w-3 inline mr-1 ${aiGenerating ? 'animate-spin' : ''}`} />
+                      {aiGenerating ? 'Writing...' : t('menu.writeWithAI')}
                     </button>
                     <button
                       onClick={() => generateAIDescription(true)}
@@ -609,20 +672,25 @@ export default function MenuManager() {
                 </div>
 
                 <div className="flex gap-3 pt-4 border-t border-white/10">
-                  <Button fullWidth onClick={async () => {
+                  <Button fullWidth loading={itemSaving} disabled={itemSaving} onClick={async () => {
                     if (!currentCat) return
-                    if (editingItem && editForm.name) {
-                      await updateItem(currentCat.id, editingItem.id, {
-                        name: editForm.name, price: editForm.price, description: editForm.description,
-                        photo: editForm.photo, dietaryTags: editForm.dietaryTags || [],
-                        prepTime: editForm.prepTime, available: editForm.available !== false,
-                        isSpecial: !!editForm.isSpecial, isPopular: !!editForm.isPopular,
-                        isNew: editForm.isNew !== false, isPromoted: !!editForm.isPromoted,
-                        ingredients: editForm.ingredients || [], allergens: editForm.allergens || [],
-                      })
+                    setItemSaving(true)
+                    try {
+                      if (editingItem && editForm.name) {
+                        await updateItem(currentCat.id, editingItem.id, {
+                          name: editForm.name, price: editForm.price, description: editForm.description,
+                          photo: editForm.photo, dietaryTags: editForm.dietaryTags || [],
+                          prepTime: editForm.prepTime, available: editForm.available !== false,
+                          isSpecial: !!editForm.isSpecial, isPopular: !!editForm.isPopular,
+                          isNew: editForm.isNew !== false, isPromoted: !!editForm.isPromoted,
+                          ingredients: editForm.ingredients || [], allergens: editForm.allergens || [],
+                        })
+                      }
+                      setEditingItem(null)
+                      showSuccessToast(t('menu.itemUpdated'))
+                    } finally {
+                      setItemSaving(false)
                     }
-                    setEditingItem(null)
-                    showSuccessToast(t('menu.itemUpdated'))
                   }}>
                     <Check className="h-4 w-4" /> {t('app.done')}
                   </Button>
