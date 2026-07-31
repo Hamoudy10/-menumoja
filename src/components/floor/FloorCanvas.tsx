@@ -1,4 +1,4 @@
-import { useRef, useState, useCallback } from 'react'
+import { useRef, useState, useCallback, useEffect } from 'react'
 import { ZoomIn, ZoomOut, Maximize2, Pencil } from 'lucide-react'
 import type { FloorTable, FloorZone } from '@/types'
 
@@ -154,7 +154,7 @@ export default function FloorCanvas({
 
   const clampX = (x: number, w: number) => Math.min(Math.max(x, 0), MAX_UNITS_X - w)
   const clampY = (y: number, h: number) => Math.min(Math.max(y, 0), MAX_UNITS_Y - h)
-  const snap = (v: number) => Math.round(v * 2) / 2
+  const snap = (v: number) => Math.round(v)
 
   const beginDrag = (e: React.PointerEvent, kind: DragState['kind'], id: string | undefined, baseX: number, baseY: number, baseW: number, baseH: number) => {
     e.preventDefault()
@@ -187,8 +187,8 @@ export default function FloorCanvas({
     } else if (drag.kind === 'draw') {
       const x = Math.min(drag.baseX, p.x)
       const y = Math.min(drag.baseY, p.y)
-      const w = Math.max(Math.abs(p.x - drag.baseX), 0.5)
-      const h = Math.max(Math.abs(p.y - drag.baseY), 0.5)
+      const w = Math.max(1, snap(Math.abs(p.x - drag.baseX)))
+      const h = Math.max(1, snap(Math.abs(p.y - drag.baseY)))
       setDrawRect({ x: clampX(x, 0), y: clampY(y, 0), w: Math.min(w, MAX_UNITS_X), h: Math.min(h, MAX_UNITS_Y) })
     }
   }
@@ -240,7 +240,7 @@ export default function FloorCanvas({
         return next
       })
     } else if (drag.kind === 'draw') {
-      if (drawRect && drawRect.w >= 1.5 && drawRect.h >= 1.5 && onZoneDrawn) {
+      if (drawRect && drawRect.w >= 1 && drawRect.h >= 1 && onZoneDrawn) {
         onZoneDrawn({ positionX: drawRect.x, positionY: drawRect.y, width: drawRect.w, height: drawRect.h })
       }
       setDrawRect(null)
@@ -257,14 +257,23 @@ export default function FloorCanvas({
     }
   }
 
-  const fitZoom = () => {
+  const fitZoom = useCallback(() => {
     const el = containerRef.current
     if (!el) return
     const w = el.clientWidth - 32
     const h = el.clientHeight - 32
     const z = Math.min(Math.max(Math.min(w / CANVAS_W, h / CANVAS_H), 0.4), 1)
     setZoom(z)
-  }
+  }, [])
+
+  useEffect(() => {
+    const el = containerRef.current
+    if (!el) return
+    fitZoom()
+    const ro = new ResizeObserver(() => fitZoom())
+    ro.observe(el)
+    return () => ro.disconnect()
+  }, [fitZoom])
 
   const renderedTables = tables.map((t) => {
     const d = drafts[t.id]

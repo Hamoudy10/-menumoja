@@ -5,7 +5,7 @@ import { prisma } from '@/config/database';
 import { authenticate, enforceRestaurantScope, validate, validateQuery, validateParams, mpesaLimiter, auditLog, asyncHandler } from '@/middleware';
 import { AppError, NotFoundError, ValidationError } from '@/utils/errors';
 import { formatKES, buildPaginationMeta } from '@/utils/helpers';
-import { initiateMpesaSchema, recordCashSchema } from '@/utils/validation';
+import { initiateMpesaSchema, recordCashSchema, receiptListQuerySchema } from '@/utils/validation';
 import { mpesaService } from '@/services';
 import { freeTableIfLastOrder } from '@/services/table.service';
 import * as mpesa from '@/integrations/mpesa';
@@ -445,6 +445,105 @@ router.get('/',
         changeGiven: p.changeGiven ? Number(p.changeGiven) : null,
       })),
       meta: buildPaginationMeta(total, page, perPage),
+    });
+  })
+);
+
+// GET /receipts - Receipt history with filters (for cashier receipt tracking)
+router.get(
+  '/receipts',
+  authenticate,
+  enforceRestaurantScope,
+  validateQuery(receiptListQuerySchema),
+  asyncHandler(async (req, res) => {
+    const restaurantId = (req as any).restaurantId;
+    const { dateFrom, dateTo, method, tableNumber, q, page, perPage } = req.query as any;
+
+    const where: any = { restaurantId, status: 'PAID' };
+    if (method) where.paymentMethod = method;
+    if (dateFrom || dateTo) {
+      where.processedAt = {};
+      if (dateFrom) where.processedAt.gte = new Date(dateFrom);
+      if (dateTo) where.processedAt.lte = new Date(dateTo);
+    }
+
+    const orderWhere: any = {};
+    if (tableNumber) orderWhere.tableNumber = tableNumber;
+    if (q) {
+      orderWhere.OR = [
+        { orderNumber: { contains: q, mode: 'insensitive' } },
+        { items: { some: { itemName: { contains: q, mode: 'insensitive' } } } },
+      ];
+    }
+    if (Object.keys(orderWhere).length > 0) {
+      where.order = { is: orderWhere };
+    }
+
+    const safePage = Math.max(1, Number(page) || 1);
+    const safePerPage = Math.min(100, Math.max(1, Number(perPage) || 20));
+    const [total, payments] = await Promise.all([
+      prisma.payment.count({ where }),
+      prisma.payment.findMany({
+        where,
+        orderBy: { processedAt: 'desc' },
+        skip: (safePage - 1) * safePerPage,
+        take: safePerPage,
+        select: {
+          id: true,
+          paymentMethod: true,
+          amount: true,
+          status: true,
+          mpesaReceiptNumber: true,
+          cashReceived: true,
+          changeGiven: true,
+          processedAt: true,
+          createdAt: true,
+          order: {
+            select: {
+              id: true,
+              orderNumber: true,
+              tableNumber: true,
+              subtotal: true,
+              serviceCharge: true,
+              taxAmount: true,
+              tipAmount: true,
+              totalAmount: true,
+              items: {
+                select: { itemName: true, itemPrice: true, quantity: true },
+                orderBy: { createdAt: 'asc' },
+              },
+            },
+          },
+          cashier: {
+            select: { id: true, fullName: true },
+          },
+        },
+      }),
+    ]);
+
+    res.json({
+      success: true,
+      data: payments.map((p) => ({
+        ...p,
+        amount: Number(p.amount),
+        cashReceived: p.cashReceived ? Number(p.cashReceived) : null,
+        changeGiven: p.changeGiven ? Number(p.changeGiven) : null,
+        order: p.order
+          ? {
+              ...p.order,
+              subtotal: Number(p.order.subtotal || 0),
+              serviceCharge: Number(p.order.serviceCharge || 0),
+              taxAmount: Number(p.order.taxAmount || 0),
+              tipAmount: Number(p.order.tipAmount || 0),
+              totalAmount: Number(p.order.totalAmount || 0),
+              items: (p.order.items || []).map((i: any) => ({
+                ...i,
+                itemPrice: Number(i.itemPrice || 0),
+              })),
+            }
+          : null,
+      })),
+      meta: buildPaginationMeta(total, safePage, safePerPage),
     });
   })
 );

@@ -541,6 +541,16 @@ export const paymentQuerySchema = z.object({
   perPage: z.coerce.number().int().min(1).max(100).default(20),
 });
 
+export const receiptListQuerySchema = z.object({
+  dateFrom: z.string().optional(),
+  dateTo: z.string().optional(),
+  method: z.enum(['CASH', 'CARD', 'MPESA']).optional(),
+  tableNumber: z.coerce.number().int().min(1).optional(),
+  q: z.string().max(100).optional(),
+  page: z.coerce.number().int().min(1).default(1),
+  perPage: z.coerce.number().int().min(1).max(100).default(20),
+});
+
 export const reportQuerySchema = z.object({
   startDate: z.string().datetime().optional(),
   endDate: z.string().datetime().optional(),

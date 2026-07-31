@@ -48,7 +48,7 @@ export default function CashierDashboard() {
   const [cashReceived, setCashReceived] = useState('')
   const [mpesaPhone, setMpesaPhone] = useState('')
   const [processing, setProcessing] = useState(false)
-  const [activeTab, setActiveTab] = useState<'pending' | 'paid'>('pending')
+  const [activeTab, setActiveTab] = useState<'pending' | 'paid' | 'receipts'>('pending')
   const [paymentMethod, setPaymentMethod] = useState<'cash' | 'card' | 'mpesa'>('cash')
   const [discount, setDiscount] = useState('')
   const [showReceipt, setShowReceipt] = useState(false)
@@ -74,6 +74,16 @@ export default function CashierDashboard() {
   const [newOrderSearch, setNewOrderSearch] = useState('')
   const [customerDisplayOpen, setCustomerDisplayOpen] = useState(false)
   const [searchHighlight, setSearchHighlight] = useState('')
+  const [receipts, setReceipts] = useState<any[]>([])
+  const [loadingReceipts, setLoadingReceipts] = useState(false)
+  const [receiptFrom, setReceiptFrom] = useState('')
+  const [receiptTo, setReceiptTo] = useState('')
+  const [receiptMethod, setReceiptMethod] = useState('')
+  const [receiptTable, setReceiptTable] = useState('')
+  const [receiptQuery, setReceiptQuery] = useState('')
+  const [receiptSearchInput, setReceiptSearchInput] = useState('')
+  const [receiptPage, setReceiptPage] = useState(1)
+  const [receiptHasMore, setReceiptHasMore] = useState(false)
 
   const soundRef = useRef<HTMLAudioElement | null>(null)
   const posRef = useRef<HTMLDivElement>(null)
@@ -163,6 +173,37 @@ export default function CashierDashboard() {
 
   useEffect(() => { fetchOrders() }, [activeTab])
   useEffect(() => { const iv = setInterval(fetchOrders, 30000); return () => clearInterval(iv) }, [activeTab])
+
+  const fetchReceipts = async (pageToLoad = 1) => {
+    setLoadingReceipts(true)
+    try {
+      const params: any = { page: pageToLoad, perPage: 20 }
+      if (receiptFrom) params.dateFrom = new Date(receiptFrom).toISOString()
+      if (receiptTo) {
+        const d = new Date(receiptTo)
+        d.setHours(23, 59, 59, 999)
+        params.dateTo = d.toISOString()
+      }
+      if (receiptMethod) params.method = receiptMethod
+      if (receiptTable) params.tableNumber = Number(receiptTable)
+      if (receiptQuery.trim()) params.q = receiptQuery.trim()
+      const res = await paymentsApi.fetchReceipts(params)
+      const list = Array.isArray(res) ? res : Array.isArray(res?.data) ? res.data : []
+      setReceipts((prev) => (pageToLoad === 1 ? list : [...prev, ...list]))
+      setReceiptHasMore((pageToLoad * 20) < (res?.meta?.total ?? list.length))
+    } catch {
+      showErrorToast('Failed to load receipts')
+    } finally {
+      setLoadingReceipts(false)
+    }
+  }
+
+  useEffect(() => {
+    if (activeTab !== 'receipts') return
+    setReceiptPage(1)
+    fetchReceipts(1)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [activeTab, receiptFrom, receiptTo, receiptMethod, receiptTable, receiptQuery])
 
   useEffect(() => {
     paymentsApi.getShifts().then((data: any) => {
@@ -356,8 +397,90 @@ export default function CashierDashboard() {
   }
 
   const handlePrint = useCallback(() => {
-    window.print()
-  }, [])
+    if (!lastPayment) return
+    const esc = (s: any) => String(s ?? '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;')
+    const r: any = restaurant || { name: 'MenuMoja' }
+    const lp = lastPayment
+    const itemsHtml = (lp.items || [])
+      .map((i: any) => `<tr><td>${esc(i.name)}</td><td class="c">${i.quantity}</td><td class="r">${formatKES(Number(i.price || 0) * Number(i.quantity || 1))}</td></tr>`)
+      .join('')
+    const lines: string[] = []
+    lines.push(`<div class="h"><div class="b">${esc(r.name || 'MenuMoja')}</div>`)
+    if (r.address) lines.push(`<div>${esc(r.address)}</div>`)
+    lines.push(`<div>PIN: ${esc(r.kraPin || 'P051234567X')}</div>`)
+    if (r.phone) lines.push(`<div>Tel: ${esc(r.phone)}</div>`)
+    lines.push(`</div>`)
+    lines.push(`<div class="h"><div class="b">ETR RECEIPT</div><div>Serial: ${esc(lp.receiptNo)}</div><div>${esc(lp.date)} ${esc(lp.time)}</div></div>`)
+    lines.push(`<div class="meta"><div><span>Order:</span><span>#${esc(lp.orderNumber)}</span></div>`)
+    lines.push(`<div><span>Table:</span><span>${lp.table > 0 ? `T${lp.table}` : 'Takeaway'}</span></div>`)
+    lines.push(`<div><span>Payment:</span><span>${esc(String(lp.method || '').toUpperCase())}</span></div>`)
+    if (lp.staffName) lines.push(`<div><span>Cashier:</span><span>${esc(lp.staffName)}</span></div>`)
+    lines.push(`</div>`)
+    lines.push(`<table><thead><tr><th>Item</th><th class="c">Qty</th><th class="r">Amount</th></tr></thead><tbody>${itemsHtml}</tbody></table>`)
+    lines.push(`<div class="totals"><div><span>Subtotal</span><span>${formatKES(lp.subtotal || 0)}</span></div>`)
+    if ((lp.discount || 0) > 0) lines.push(`<div><span>Discount</span><span>-${formatKES(lp.discount)}</span></div>`)
+    if ((lp.serviceCharge || 0) > 0) lines.push(`<div><span>Service Charge</span><span>${formatKES(lp.serviceCharge)}</span></div>`)
+    if ((lp.tip || 0) > 0) lines.push(`<div><span>Tip</span><span>${formatKES(lp.tip)}</span></div>`)
+    lines.push(`<div><span>VAT (16% incl.)</span><span>${formatKES(Math.round((lp.total || 0) * 0.16 / 1.16))}</span></div>`)
+    lines.push(`<div class="total"><span>TOTAL</span><span>${formatKES(lp.total || 0)}</span></div></div>`)
+    if (String(lp.method) === 'cash') {
+      lines.push(`<div class="totals"><div><span>Cash Received</span><span>${formatKES(lp.cashReceived || 0)}</span></div>`)
+      lines.push(`<div class="change"><span>Change Due</span><span>${formatKES(lp.change || 0)}</span></div></div>`)
+    }
+    lines.push(`<div class="foot">** Prices inclusive of VAT **<br/>Goods once sold cannot be returned<br/>Thank you for your business!<br/>Served by: ${esc(lp.staffName || 'Cashier')}</div>`)
+
+    const html = `<!DOCTYPE html><html><head><meta charset="utf-8"/><title>Receipt ${esc(lp.orderNumber)}</title>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body { font-family: 'Courier New', monospace; font-size: 12px; width: 80mm; margin: 0 auto; color: #000; }
+  .h { text-align: center; border-bottom: 1px dashed #000; padding: 6px 0; }
+  .h .b { font-weight: bold; text-transform: uppercase; }
+  .meta { padding: 6px 0; border-bottom: 1px dashed #000; }
+  .meta div { display: flex; justify-content: space-between; }
+  table { width: 100%; border-bottom: 1px dashed #000; border-collapse: collapse; }
+  th { text-align: left; font-weight: normal; padding: 3px 0; border-bottom: 1px solid #000; }
+  td { padding: 3px 0; border-bottom: 1px dotted #ccc; }
+  td.c, th.c { text-align: center; }
+  td.r, th.r { text-align: right; }
+  .totals { padding: 6px 0; border-bottom: 1px dashed #000; }
+  .totals div { display: flex; justify-content: space-between; }
+  .total { font-weight: bold; }
+  .change { font-weight: bold; }
+  .foot { text-align: center; padding: 8px 0; font-size: 10px; }
+  @media print { body { width: 80mm; } }
+</style></head><body>${lines.join('')}</body></html>`
+
+    const win = window.open('', '_blank', 'width=420,height=640')
+    if (!win) { showErrorToast('Pop-up blocked — please allow pop-ups to print receipts'); return }
+    win.document.open()
+    win.document.write(html)
+    win.document.close()
+    win.focus()
+    setTimeout(() => { win.print() }, 250)
+  }, [lastPayment, restaurant])
+
+  const openReceipt = (p: any) => {
+    const o = p.order || {}
+    const items = (o.items || []).map((i: any) => ({ name: i.itemName || 'Item', quantity: i.quantity || 1, price: Number(i.itemPrice || 0) }))
+    setLastPayment({
+      receiptNo: p.mpesaReceiptNumber ? `MP-${p.mpesaReceiptNumber}` : `ETR-${String(p.id || '').slice(0, 8).toUpperCase()}`,
+      orderNumber: o.orderNumber || '',
+      table: o.tableNumber || 0,
+      items,
+      subtotal: Number(o.subtotal ?? items.reduce((s: number, it: any) => s + it.price * it.quantity, 0)),
+      discount: 0,
+      total: Number(o.totalAmount || p.amount || 0),
+      method: String(p.paymentMethod || 'CASH').toLowerCase(),
+      cashReceived: p.cashReceived != null ? Number(p.cashReceived) : 0,
+      change: p.changeGiven != null ? Number(p.changeGiven) : 0,
+      tip: Number(o.tipAmount || 0),
+      serviceCharge: Number(o.serviceCharge || 0),
+      date: p.processedAt ? new Date(p.processedAt).toLocaleDateString('en-KE') : '',
+      time: p.processedAt ? new Date(p.processedAt).toLocaleString('en-KE', { hour12: true }) : '',
+      staffName: p.cashier?.fullName || 'Cashier',
+    })
+    setShowReceipt(true)
+  }
 
   const itemTotal = (order: any) => order?.items?.reduce((s: number, i: any) => s + i.price * i.quantity, 0) || 0
 
@@ -439,14 +562,14 @@ export default function CashierDashboard() {
               />
             </div>
             <div className="flex gap-2 mt-2">
-              {(['pending', 'paid'] as const).map((tab) => (
+              {(['pending', 'paid', 'receipts'] as const).map((tab) => (
                 <button key={tab} onClick={() => { setActiveTab(tab); setPage(1); setSelectedOrder(null) }}
                   className={`px-4 py-1.5 rounded-xl text-xs font-medium transition-colors ${
                     activeTab === tab ? 'bg-secondary text-white shadow-sm' : 'bg-black/5 dark:bg-white/10 text-text-secondary hover:bg-black/10'
                   }`}>
-                  {tab === 'pending' ? 'Unpaid' : 'Paid Today'}
+                  {tab === 'pending' ? 'Unpaid' : tab === 'paid' ? 'Paid Today' : 'Receipts'}
                   <span className="ml-1.5 text-[10px] opacity-70">
-                    ({tab === 'pending' ? stats.pendingCount : orders.length})
+                    ({tab === 'pending' ? stats.pendingCount : tab === 'paid' ? orders.length : receipts.length})
                   </span>
                 </button>
               ))}
@@ -454,7 +577,91 @@ export default function CashierDashboard() {
           </header>
 
           <div className="flex-1 min-h-0 overflow-y-auto touch-pan-y">
-            {loading ? (
+            {activeTab === 'receipts' ? (
+              <>
+                <div className="p-2 space-y-2 border-b border-white/10 bg-black/[0.02] dark:bg-white/[0.03]">
+                  <div className="flex gap-1.5">
+                    <div className="flex-1 min-w-0">
+                      <label className="block text-[9px] font-medium text-text-secondary mb-0.5">From</label>
+                      <input type="date" value={receiptFrom} onChange={(e) => setReceiptFrom(e.target.value)}
+                        className="w-full rounded-lg border border-gray-200 dark:border-white/20 bg-transparent px-2 py-1.5 text-xs text-text-primary focus:border-secondary focus:outline-none" />
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <label className="block text-[9px] font-medium text-text-secondary mb-0.5">To</label>
+                      <input type="date" value={receiptTo} onChange={(e) => setReceiptTo(e.target.value)}
+                        className="w-full rounded-lg border border-gray-200 dark:border-white/20 bg-transparent px-2 py-1.5 text-xs text-text-primary focus:border-secondary focus:outline-none" />
+                    </div>
+                  </div>
+                  <div className="flex gap-1.5">
+                    <select value={receiptMethod} onChange={(e) => setReceiptMethod(e.target.value)}
+                      className="flex-1 rounded-lg border border-gray-200 dark:border-white/20 bg-transparent px-2 py-1.5 text-xs text-text-primary focus:border-secondary focus:outline-none">
+                      <option value="">All methods</option>
+                      <option value="CASH">Cash</option>
+                      <option value="CARD">Card</option>
+                      <option value="MPESA">M-Pesa</option>
+                    </select>
+                    <input value={receiptTable} onChange={(e) => setReceiptTable(e.target.value)} placeholder="Table #" type="number"
+                      className="w-20 rounded-lg border border-gray-200 dark:border-white/20 bg-transparent px-2 py-1.5 text-xs text-text-primary focus:border-secondary focus:outline-none" />
+                    <button onClick={() => { setReceiptQuery(receiptSearchInput); setReceiptPage(1) }}
+                      className="px-3 rounded-lg bg-secondary text-white text-xs font-medium hover:bg-secondary-dark transition-colors">
+                      Search
+                    </button>
+                  </div>
+                  <div className="relative">
+                    <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-text-secondary" />
+                    <input value={receiptSearchInput}
+                      onChange={(e) => setReceiptSearchInput(e.target.value)}
+                      onKeyDown={(e) => { if (e.key === 'Enter') { setReceiptQuery(receiptSearchInput); setReceiptPage(1) } }}
+                      placeholder="Search order # or item..."
+                      className="w-full pl-8 pr-3 py-1.5 rounded-lg border border-gray-200 dark:border-white/20 bg-transparent text-xs text-text-primary focus:border-secondary focus:outline-none" />
+                  </div>
+                </div>
+                {loadingReceipts && receipts.length === 0 ? (
+                  <div className="flex justify-center py-16"><Loader2 className="h-8 w-8 animate-spin text-secondary" /></div>
+                ) : receipts.length === 0 ? (
+                  <div className="text-center py-16 text-text-secondary/50">
+                    <Receipt className="h-12 w-12 mx-auto mb-3 opacity-20" />
+                    <p className="font-accent text-sm">No receipts found</p>
+                    <p className="text-xs mt-1">Adjust filters or search to find previous receipts</p>
+                  </div>
+                ) : (
+                  <>
+                    <div className="divide-y divide-white/5">
+                      {receipts.map((p: any) => (
+                        <div key={p.id} onClick={() => openReceipt(p)}
+                          className="cursor-pointer px-3 py-2.5 hover:bg-black/5 dark:hover:bg-white/5 transition-all">
+                          <div className="flex items-start justify-between mb-1">
+                            <div className="flex items-center gap-2 min-w-0">
+                              <Receipt className="w-3.5 h-3.5 text-text-secondary shrink-0" />
+                              <span className="font-mono text-sm font-bold text-text-primary dark:text-white truncate">
+                                #{p.order?.orderNumber || p.id?.slice(0, 8).toUpperCase()}
+                              </span>
+                              <Badge size="sm" variant={p.paymentMethod === 'MPESA' ? 'info' : p.paymentMethod === 'CARD' ? 'warning' : 'default'}>
+                                {p.paymentMethod}
+                              </Badge>
+                            </div>
+                            <span className="text-sm font-bold text-secondary shrink-0 ml-2">{formatKES(Number(p.amount))}</span>
+                          </div>
+                          <div className="flex items-center gap-2 text-xs text-text-secondary">
+                            <span>{p.order?.tableNumber > 0 ? `Table ${p.order.tableNumber}` : 'Takeaway'}</span>
+                            <span>·</span>
+                            <span>{p.processedAt ? new Date(p.processedAt).toLocaleString('en-KE', { hour12: true }) : ''}</span>
+                            {p.cashier?.fullName && <><span>·</span><span>{p.cashier.fullName}</span></>}
+                            {p.mpesaReceiptNumber && <span className="text-success ml-auto font-mono text-[10px]">MP: {p.mpesaReceiptNumber}</span>}
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                    {receiptHasMore && (
+                      <button onClick={() => { setReceiptPage((p) => p + 1); fetchReceipts(receiptPage + 1) }}
+                        className="w-full py-3 text-xs text-secondary hover:bg-secondary/5 font-medium border-t border-white/10">
+                        <ChevronDown className="h-3 w-3 inline mr-1" /> Load More Receipts
+                      </button>
+                    )}
+                  </>
+                )}
+              </>
+            ) : loading ? (
               <div className="flex justify-center py-20"><Loader2 className="h-8 w-8 animate-spin text-secondary" /></div>
             ) : isTableGrid ? (
               <FloorCanvas

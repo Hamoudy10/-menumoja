@@ -5,6 +5,12 @@ const unwrap = (r: any) => r.data?.data || r.data
 export const fetchPayments = (params?: any) =>
   api.get('/payments', { params }).then(unwrap)
 
+export const fetchReceipts = (params?: any) =>
+  api.get('/payments/receipts', { params }).then((r: any) => ({
+    data: r.data?.data || r.data,
+    meta: r.data?.meta,
+  }))
+
 export const getPayment = (id: string) =>
   api.get(`/payments/${id}`).then(unwrap)
 
