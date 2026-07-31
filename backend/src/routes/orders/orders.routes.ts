@@ -624,7 +624,7 @@ router.get('/kitchen',
     const orders = await prisma.order.findMany({
       where: {
         restaurantId,
-        status: { in: ['CONFIRMED', 'PREPARING'] },
+        status: { in: ['PENDING', 'CONFIRMED', 'PREPARING', 'READY'] },
       },
       orderBy: { confirmedAt: 'asc' },
       select: {

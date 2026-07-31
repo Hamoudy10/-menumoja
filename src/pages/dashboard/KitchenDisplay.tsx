@@ -65,10 +65,18 @@ export default function KitchenDisplay() {
   }
 
   const allOrders = [...liveOrders, ...orders.filter((o: any) => !liveOrders.find((l: any) => l.id === o.id))]
-  const pendingOrders = allOrders.filter((o: any) => {
-    const s = (o.status || '').toUpperCase()
-    return ['PENDING', 'CONFIRMED', 'PREPARING', 'NEW'].includes(s)
-  })
+  const activeStatuses = ['PENDING', 'CONFIRMED', 'PREPARING', 'NEW', 'READY']
+  const statusRank: Record<string, number> = { READY: 0, PREPARING: 1, NEW: 2, PENDING: 3, CONFIRMED: 4 }
+  const pendingOrders = allOrders
+    .filter((o: any) => {
+      const s = (o.status || '').toUpperCase()
+      return activeStatuses.includes(s)
+    })
+    .sort((a: any, b: any) => {
+      const rankDiff = (statusRank[(b.status || '').toUpperCase()] ?? 9) - (statusRank[(a.status || '').toUpperCase()] ?? 9)
+      if (rankDiff !== 0) return rankDiff
+      return new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime()
+    })
 
   if (loading) {
     return (

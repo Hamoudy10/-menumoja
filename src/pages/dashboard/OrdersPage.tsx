@@ -296,8 +296,15 @@ function OrderHistory({ orders }: { orders: Order[] }) {
 }
 
 function KitchenDisplay({ orders, updateOrderStatus }: { orders: Order[]; updateOrderStatus: (id: string, status: Order['status']) => Promise<void> }) {
+  const statusRank: Record<string, number> = { ready: 0, preparing: 1, new: 2 }
   const kitchenOrders = useMemo(() =>
-    orders.filter((o) => o.status === 'new' || o.status === 'preparing'),
+    orders
+      .filter((o) => o.status === 'new' || o.status === 'preparing' || o.status === 'ready')
+      .sort((a, b) => {
+        const rankDiff = (statusRank[b.status] ?? 9) - (statusRank[a.status] ?? 9)
+        if (rankDiff !== 0) return rankDiff
+        return new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime()
+      }),
   [orders])
   const [timers, setTimers] = useState<Record<string, string>>({})
   const [busyId, setBusyId] = useState<string | null>(null)
@@ -307,7 +314,7 @@ function KitchenDisplay({ orders, updateOrderStatus }: { orders: Order[]; update
     timerRef.current = setInterval(() => {
       setTimers(() => {
         const newTimers: Record<string, string> = {}
-        const currentOrders = orders.filter((o) => o.status === 'new' || o.status === 'preparing')
+        const currentOrders = orders.filter((o) => o.status === 'new' || o.status === 'preparing' || o.status === 'ready')
         currentOrders.forEach((o) => {
           const diff = Date.now() - new Date(o.createdAt).getTime()
           const mins = Math.floor(diff / 60000)
@@ -347,7 +354,7 @@ function KitchenDisplay({ orders, updateOrderStatus }: { orders: Order[]; update
                 initial={{ opacity: 0, scale: 0.95 }}
                 animate={{ opacity: 1, scale: 1 }}
                 className={`rounded-2xl border-2 bg-white dark:bg-primary-light p-5 ${
-                  isOverdue ? 'border-red-500 animate-pulse' : order.status === 'new' ? 'border-blue-500' : 'border-amber-500'
+                  isOverdue ? 'border-red-500 animate-pulse' : order.status === 'new' ? 'border-blue-500' : order.status === 'ready' ? 'border-green-500' : 'border-amber-500'
                 }`}
               >
                 <div className="flex items-center justify-between mb-3">
@@ -381,7 +388,7 @@ function KitchenDisplay({ orders, updateOrderStatus }: { orders: Order[]; update
                   whileTap={{ scale: 0.97 }}
                   disabled={busyId !== null}
                   onClick={async () => {
-                    const nextStatus = order.status === 'new' ? 'preparing' : 'ready'
+                    const nextStatus = order.status === 'new' ? 'preparing' : order.status === 'preparing' ? 'ready' : 'served'
                     setBusyId(order.id)
                     try { await updateOrderStatus(order.id, nextStatus); showSuccessToast(`Order moved to ${nextStatus}`) }
                     finally { setBusyId(null) }
@@ -389,11 +396,13 @@ function KitchenDisplay({ orders, updateOrderStatus }: { orders: Order[]; update
                   className={`w-full rounded-xl py-3 font-accent font-bold text-base transition-all flex items-center justify-center gap-2 disabled:opacity-60 ${
                     order.status === 'new'
                       ? 'bg-amber-500 text-white hover:bg-amber-600'
-                      : 'bg-success text-white hover:bg-green-600'
+                      : order.status === 'ready'
+                        ? 'bg-blue-500 text-white hover:bg-blue-600'
+                        : 'bg-success text-white hover:bg-green-600'
                   }`}
                 >
                   {busyId === order.id ? <Loader2 className="h-5 w-5 animate-spin" /> : null}
-                  {busyId === order.id ? 'Updating…' : order.status === 'new' ? 'START PREPARING' : 'MARK READY'}
+                  {busyId === order.id ? 'Updating…' : order.status === 'new' ? 'START PREPARING' : order.status === 'ready' ? 'MARK SERVED' : 'MARK READY'}
                 </motion.button>
               </motion.div>
             )
