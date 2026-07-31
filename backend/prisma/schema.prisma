@@ -254,11 +254,14 @@ model Restaurant {
   menuCategories         MenuCategory[]
   menuItems              MenuItem[]
   dailySpecials          DailySpecialSchedule[]
+  promotions             Promotion[]
   qrCodes                QrCode[]
   qrScans                QrScan[]
   staff                  Staff[]
   staffShifts            StaffShift[]
   tables                 RestaurantTable[]
+  tableZones             TableZone[]
+  tableSessions          TableSession[]
   orders                 Order[]
   payments               Payment[]
   cashReconciliations    CashReconciliation[]
@@ -410,6 +413,7 @@ model MenuItem {
   suggestions       MenuItemSuggestion[]  @relation("MenuItemSuggestions")
   suggestedBy       MenuItemSuggestion[]  @relation("SuggestedByMenuItems")
   dailySpecials     DailySpecialSchedule[]
+  promotions        Promotion[]
   orderItems        OrderItem[]
   menuItemAnalytics MenuItemAnalytics[]
 
@@ -449,6 +453,38 @@ model DailySpecialSchedule {
   @@index([restaurantId])
   @@index([itemId])
   @@map("daily_specials_schedule")
+}
+
+enum PromotionType {
+  SPECIAL
+  OFFER
+  EVENT
+  GIVEAWAY
+}
+
+model Promotion {
+  id            String        @id @default(uuid()) @db.Uuid
+  restaurantId  String        @map("restaurant_id") @db.Uuid
+  type          PromotionType @map("type")
+  title         String        @map("title")
+  description   String?       @map("description")
+  descriptionSw String?       @map("description_sw")
+  menuItemId    String?       @map("menu_item_id") @db.Uuid
+  specialPrice  Decimal?      @map("special_price") @db.Decimal(10, 2)
+  imageUrl      String?       @map("image_url")
+  startsAt      DateTime?     @map("starts_at")
+  endsAt        DateTime?     @map("ends_at")
+  isActive      Boolean       @default(true) @map("is_active")
+  createdAt     DateTime      @default(now()) @map("created_at")
+  updatedAt     DateTime      @updatedAt @map("updated_at")
+
+  restaurant Restaurant @relation(fields: [restaurantId], references: [id], onDelete: Cascade)
+  menuItem   MenuItem?  @relation(fields: [menuItemId], references: [id])
+
+  @@index([restaurantId])
+  @@index([menuItemId])
+  @@index([isActive])
+  @@map("promotions")
 }
 
 model QrCode {
@@ -571,19 +607,60 @@ model RestaurantTable {
   positionY        Int          @default(0) @map("position_y")
   width            Int          @default(2) @map("width")
   height           Int          @default(2) @map("height")
+  rotation         Int          @default(0) @map("rotation")
+  zoneId           String?      @map("zone_id") @db.Uuid
   currentSessionId String?      @map("current_session_id")
   qrCodeId         String?      @map("qr_code_id") @db.Uuid
   createdAt        DateTime     @default(now()) @map("created_at")
   updatedAt        DateTime     @updatedAt @map("updated_at")
 
   restaurant Restaurant      @relation(fields: [restaurantId], references: [id], onDelete: Cascade)
+  zone       TableZone?      @relation(fields: [zoneId], references: [id], onDelete: SetNull)
   qrCode     QrCode?         @relation(fields: [qrCodeId], references: [id])
   orders     Order[]
+  sessions   TableSession[]
 
   @@unique([restaurantId, tableNumber])
   @@index([restaurantId])
+  @@index([zoneId])
   @@index([qrCodeId])
   @@map("restaurant_tables")
+}
+
+model TableZone {
+  id           String            @id @default(uuid()) @db.Uuid
+  restaurantId String            @map("restaurant_id") @db.Uuid
+  name         String
+  color        String            @default("#E2E8F0")
+  positionX    Int               @default(0) @map("position_x")
+  positionY    Int               @default(0) @map("position_y")
+  width        Int               @default(12) @map("width")
+  height       Int               @default(8) @map("height")
+  createdAt    DateTime          @default(now()) @map("created_at")
+  updatedAt    DateTime          @updatedAt @map("updated_at")
+
+  restaurant Restaurant        @relation(fields: [restaurantId], references: [id], onDelete: Cascade)
+  tables     RestaurantTable[]
+
+  @@index([restaurantId])
+  @@map("table_zones")
+}
+
+model TableSession {
+  id           String     @id @default(uuid()) @db.Uuid
+  restaurantId String     @map("restaurant_id") @db.Uuid
+  tableId      String     @map("table_id") @db.Uuid
+  guestCount   Int?       @map("guest_count")
+  startedAt    DateTime   @default(now()) @map("started_at")
+  endedAt      DateTime?  @map("ended_at")
+  createdAt    DateTime   @default(now()) @map("created_at")
+
+  restaurant Restaurant      @relation(fields: [restaurantId], references: [id], onDelete: Cascade)
+  table      RestaurantTable @relation(fields: [tableId], references: [id], onDelete: Cascade)
+
+  @@index([tableId])
+  @@index([endedAt])
+  @@map("table_sessions")
 }
 
 model Order {

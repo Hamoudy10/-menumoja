@@ -167,6 +167,8 @@ export const createItemSchema = z
     image: z.string().optional(),
     isAvailable: z.boolean().default(true),
     isPopular: z.boolean().default(false),
+    isSpecial: z.boolean().default(false),
+    isNew: z.boolean().default(false),
     preparationTime: z.number().int().min(0).optional(),
     calories: z.number().int().min(0).optional(),
     ingredients: z.array(z.string()).max(100).optional(),
@@ -423,15 +425,54 @@ export const createTableSchema = z.object({
   tableNumber: z.number().int().min(1),
   label: z.string().min(1).max(50),
   capacity: z.number().int().min(1).optional(),
-  area: z.string().optional(),
-  shape: z.string().optional(),
+  area: z.string().max(50).optional(),
+  shape: z.enum(['ROUND', 'SQUARE', 'RECTANGLE', 'OVAL', 'BOOTH']).optional(),
   positionX: z.number().int().optional(),
   positionY: z.number().int().optional(),
-  width: z.number().int().optional(),
-  height: z.number().int().optional(),
+  width: z.number().int().min(1).max(20).optional(),
+  height: z.number().int().min(1).max(20).optional(),
+  rotation: z.number().int().min(-360).max(360).optional(),
+  zoneId: z.string().uuid().optional().nullable(),
 }).strict();
 
 export const updateTableSchema = createTableSchema.partial().strict();
+
+export const updateTableStatusSchema = z.object({
+  status: z.enum(['FREE', 'OCCUPIED', 'RESERVED', 'UNAVAILABLE']),
+}).strict();
+
+export const updateTableSessionSchema = z.object({
+  action: z.enum(['START', 'END']),
+  guestCount: z.number().int().min(1).max(100).optional(),
+}).strict();
+
+export const createZoneSchema = z.object({
+  name: z.string().min(1).max(50),
+  color: z.string().min(3).max(9),
+  positionX: z.number().int().optional(),
+  positionY: z.number().int().optional(),
+  width: z.number().int().min(2).max(100).optional(),
+  height: z.number().int().min(2).max(100).optional(),
+}).strict();
+
+export const updateZoneSchema = createZoneSchema.partial().strict();
+
+export const createPromotionSchema = z
+  .object({
+    type: z.enum(['SPECIAL', 'OFFER', 'EVENT', 'GIVEAWAY']),
+    title: z.string().min(1, 'Title is required').max(120),
+    description: z.string().max(2000).optional(),
+    descriptionSw: z.string().max(2000).optional(),
+    menuItemId: z.string().uuid('Invalid menu item ID').optional(),
+    specialPrice: z.number().positive().optional(),
+    imageUrl: z.string().max(1000).optional(),
+    startsAt: z.coerce.date().optional(),
+    endsAt: z.coerce.date().optional(),
+    isActive: z.boolean().default(true),
+  })
+  .strict();
+
+export const updatePromotionSchema = createPromotionSchema.partial().strict();
 
 export const openShiftSchema = z.object({
   cashierId: z.string().uuid(),

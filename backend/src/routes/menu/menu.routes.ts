@@ -10,7 +10,7 @@ import {
   bulkUpdateSchema as bulkUpdateItemsSchema,
 } from '@/utils/validation';
 import { prisma } from '@/config/database';
-import { redis } from '@/config/redis';
+import { invalidateMenuCache } from '@/utils/cache';
 import logger from '@/utils/logger';
 
 const router = Router();
@@ -81,7 +81,7 @@ router.post(
       },
     });
 
-    await redis.del(`menu:${restaurantId}`);
+    await invalidateMenuCache(restaurantId);
 
     res.status(201).json({
       success: true,
@@ -127,7 +127,7 @@ router.put(
       data: updateData,
     });
 
-    await redis.del(`menu:${restaurantId}`);
+    await invalidateMenuCache(restaurantId);
 
     res.json({
       success: true,
@@ -173,7 +173,7 @@ router.delete(
     }
 
     await prisma.menuCategory.delete({ where: { id } });
-    await redis.del(`menu:${restaurantId}`);
+    await invalidateMenuCache(restaurantId);
 
     logger.info('Category deleted', { restaurantId, categoryId: id });
 
@@ -202,7 +202,7 @@ router.put(
       )
     );
 
-    await redis.del(`menu:${restaurantId}`);
+    await invalidateMenuCache(restaurantId);
 
     const categories = await prisma.menuCategory.findMany({
       where: { restaurantId },
@@ -326,7 +326,9 @@ router.post(
         price: data.price,
         currency: 'KES',
         isAvailable: data.isAvailable ?? true,
-        isTodaysSpecial: false,
+        isTodaysSpecial: data.isSpecial ?? false,
+        isFeatured: data.isPopular ?? false,
+        isNew: data.isNew ?? false,
         photoUrl: data.image,
         preparationTimeMinutes: data.preparationTime,
         calories: data.calories,
@@ -336,7 +338,7 @@ router.post(
       },
     });
 
-    await redis.del(`menu:${restaurantId}`);
+    await invalidateMenuCache(restaurantId);
 
     res.status(201).json({
       success: true,
@@ -368,6 +370,8 @@ router.put(
     if (data.price !== undefined) updateData.price = data.price;
     if (data.isAvailable !== undefined) updateData.isAvailable = data.isAvailable;
     if (data.isPopular !== undefined) updateData.isFeatured = data.isPopular;
+    if (data.isSpecial !== undefined) updateData.isTodaysSpecial = data.isSpecial;
+    if (data.isNew !== undefined) updateData.isNew = data.isNew;
     if (data.preparationTime !== undefined) updateData.preparationTimeMinutes = data.preparationTime;
     if (data.calories !== undefined) updateData.calories = data.calories;
     if (data.ingredients !== undefined) updateData.ingredients = data.ingredients;
@@ -392,7 +396,7 @@ router.put(
       },
     });
 
-    await redis.del(`menu:${restaurantId}`);
+    await invalidateMenuCache(restaurantId);
 
     res.json({
       success: true,
@@ -417,7 +421,7 @@ router.delete(
     }
 
     await prisma.menuItem.delete({ where: { id } });
-    await redis.del(`menu:${restaurantId}`);
+    await invalidateMenuCache(restaurantId);
 
     logger.info('Menu item deleted', { restaurantId, itemId: id });
 
@@ -451,7 +455,7 @@ router.put(
       })
     );
 
-    await redis.del(`menu:${restaurantId}`);
+    await invalidateMenuCache(restaurantId);
 
     res.json({
       success: true,
@@ -480,7 +484,7 @@ router.put(
       data: { isAvailable: !item.isAvailable },
     });
 
-    await redis.del(`menu:${restaurantId}`);
+    await invalidateMenuCache(restaurantId);
 
     res.json({
       success: true,
@@ -535,7 +539,7 @@ router.post(
       }
     }
 
-    await redis.del(`menu:${restaurantId}`);
+    await invalidateMenuCache(restaurantId);
 
     logger.info('Bulk update completed', { restaurantId, updated: results.updated, failed: results.failed });
 
@@ -593,7 +597,7 @@ router.post(
       },
     });
 
-    await redis.del(`menu:${restaurantId}`);
+    await invalidateMenuCache(restaurantId);
 
     res.status(201).json({
       success: true,

@@ -1,9 +1,11 @@
 import { Router } from 'express';
 import { asyncHandler, AppError, generateSlug, hashPassword, generatePin } from '@/utils';
 import { authenticate, enforceRestaurantScope, validate, auditLog } from '@/middleware';
-import { updateRestaurantSchema, updateSettingsSchema, openingHoursSchema, createBranchSchema, createTableSchema, updateTableSchema, createStaffSchema, updateStaffSchema } from '@/utils/validation';
+import { updateRestaurantSchema, updateSettingsSchema, openingHoursSchema, createBranchSchema, createTableSchema, updateTableSchema, updateTableStatusSchema, updateTableSessionSchema, createZoneSchema, updateZoneSchema, createPromotionSchema, updatePromotionSchema, createStaffSchema, updateStaffSchema } from '@/utils/validation';
 import { prisma } from '@/config/database';
 import logger from '@/utils/logger';
+import { emitTableStatusChanged } from '@/hooks/socket';
+import { invalidateMenuCache } from '@/utils/cache';
 
 const router = Router();
 
@@ -289,6 +291,8 @@ router.get(
       where: { restaurantId },
       orderBy: { tableNumber: 'asc' },
       include: {
+        zone: { select: { id: true, name: true, color: true, positionX: true, positionY: true, width: true, height: true } },
+        sessions: { where: { endedAt: null }, orderBy: { startedAt: 'desc' }, take: 1 },
         qrCode: { select: { id: true, label: true, qrImageUrl: true, scanCount: true } },
         _count: { select: { orders: true } },
       },
@@ -308,7 +312,7 @@ router.post(
   validate(createTableSchema),
   asyncHandler(async (req, res) => {
     const restaurantId = (req as any).restaurantId;
-    const { tableNumber, label, capacity } = req.body;
+    const { tableNumber, label, capacity, shape, positionX, positionY, width, height, rotation, zoneId } = req.body;
 
     const existing = await prisma.restaurantTable.findUnique({
       where: { restaurantId_tableNumber: { restaurantId, tableNumber } },
@@ -317,12 +321,26 @@ router.post(
       throw new AppError(409, 'TABLE_EXISTS', `Table ${tableNumber} already exists`, `Meza namba ${tableNumber} tayari ipo`);
     }
 
+    if (zoneId) {
+      const zone = await prisma.tableZone.findFirst({ where: { id: zoneId, restaurantId } });
+      if (!zone) {
+        throw new AppError(400, 'ZONE_NOT_FOUND', 'Zone not found', 'Eneo halikupatikana');
+      }
+    }
+
     const table = await prisma.restaurantTable.create({
       data: {
         restaurantId,
         tableNumber,
         label: label || `Table ${tableNumber}`,
         capacity: capacity || 4,
+        shape: shape || 'ROUND',
+        positionX: positionX ?? 0,
+        positionY: positionY ?? 0,
+        width: width ?? 2,
+        height: height ?? 2,
+        rotation: rotation ?? 0,
+        zoneId: zoneId || null,
       },
     });
 
@@ -356,6 +374,13 @@ router.put(
       });
       if (conflict) {
         throw new AppError(409, 'TABLE_EXISTS', `Table ${data.tableNumber} already exists`, `Meza namba ${data.tableNumber} tayari ipo`);
+      }
+    }
+
+    if (data.zoneId) {
+      const zone = await prisma.tableZone.findFirst({ where: { id: data.zoneId, restaurantId } });
+      if (!zone) {
+        throw new AppError(400, 'ZONE_NOT_FOUND', 'Zone not found', 'Eneo halikupatikana');
       }
     }
 
@@ -408,6 +433,319 @@ router.delete(
       success: true,
       data: { message: 'Table deleted successfully', messageSwahili: 'Meza imefutwa kwa mafanikio' },
     });
+  })
+);
+
+// PUT /me/tables/:tableId/status - Manually set table status (waiter/floor actions)
+router.put(
+  '/me/tables/:tableId/status',
+  auditLog,
+  validate(updateTableStatusSchema),
+  asyncHandler(async (req, res) => {
+    const restaurantId = (req as any).restaurantId;
+    const { tableId } = req.params;
+    const { status } = req.body;
+
+    const table = await prisma.restaurantTable.findFirst({ where: { id: tableId, restaurantId } });
+    if (!table) {
+      throw new AppError(404, 'TABLE_NOT_FOUND', 'Table not found', 'Meza haikupatikana');
+    }
+
+    const updated = await prisma.restaurantTable.update({
+      where: { id: tableId },
+      data: { status },
+    });
+
+    if (status === 'FREE') {
+      await prisma.tableSession.updateMany({
+        where: { tableId, endedAt: null },
+        data: { endedAt: new Date() },
+      });
+    }
+
+    try {
+      emitTableStatusChanged(restaurantId, String(tableId), status);
+    } catch (socketError) {
+      logger.error('Failed to emit table status change', { error: socketError, tableId });
+    }
+
+    res.json({ success: true, data: updated });
+  })
+);
+
+// PUT /me/tables/:tableId/session - Start or end a table seating session
+router.put(
+  '/me/tables/:tableId/session',
+  auditLog,
+  validate(updateTableSessionSchema),
+  asyncHandler(async (req, res) => {
+    const restaurantId = (req as any).restaurantId;
+    const { tableId } = req.params;
+    const { action, guestCount } = req.body;
+
+    const table = await prisma.restaurantTable.findFirst({ where: { id: tableId, restaurantId } });
+    if (!table) {
+      throw new AppError(404, 'TABLE_NOT_FOUND', 'Table not found', 'Meza haikupatikana');
+    }
+
+    let session;
+    if (action === 'START') {
+      const active = await prisma.tableSession.findFirst({ where: { tableId, endedAt: null } });
+      if (active) {
+        session = await prisma.tableSession.update({
+          where: { id: active.id },
+          data: { guestCount: guestCount ?? active.guestCount },
+        });
+      } else {
+        session = await prisma.tableSession.create({
+          data: { restaurantId, tableId, guestCount: guestCount ?? null },
+        });
+      }
+      const updated = await prisma.restaurantTable.update({
+        where: { id: tableId },
+        data: { status: table.status === 'FREE' ? 'OCCUPIED' : table.status },
+      });
+      if (updated.status !== table.status) {
+        try {
+          emitTableStatusChanged(restaurantId, String(tableId), updated.status);
+        } catch (socketError) {
+          logger.error('Failed to emit table status change', { error: socketError, tableId });
+        }
+      }
+      res.json({ success: true, data: { session, table: updated } });
+      return;
+    }
+
+    session = await prisma.tableSession.updateMany({
+      where: { tableId, endedAt: null },
+      data: { endedAt: new Date() },
+    });
+
+    res.json({ success: true, data: { closed: session.count } });
+  })
+);
+
+// GET /me/zones - List floor plan zones
+router.get(
+  '/me/zones',
+  asyncHandler(async (req, res) => {
+    const restaurantId = (req as any).restaurantId;
+
+    const zones = await prisma.tableZone.findMany({
+      where: { restaurantId },
+      orderBy: { createdAt: 'asc' },
+      include: { _count: { select: { tables: true } } },
+    });
+
+    res.json({ success: true, data: zones });
+  })
+);
+
+// POST /me/zones - Create zone
+router.post(
+  '/me/zones',
+  auditLog,
+  validate(createZoneSchema),
+  asyncHandler(async (req, res) => {
+    const restaurantId = (req as any).restaurantId;
+    const { name, color, positionX, positionY, width, height } = req.body;
+
+    const zone = await prisma.tableZone.create({
+      data: {
+        restaurantId,
+        name,
+        color: color || '#E2E8F0',
+        positionX: positionX ?? 0,
+        positionY: positionY ?? 0,
+        width: width ?? 12,
+        height: height ?? 8,
+      },
+    });
+
+    res.status(201).json({ success: true, data: zone });
+  })
+);
+
+// PUT /me/zones/:zoneId - Update zone
+router.put(
+  '/me/zones/:zoneId',
+  auditLog,
+  validate(updateZoneSchema),
+  asyncHandler(async (req, res) => {
+    const restaurantId = (req as any).restaurantId;
+    const { zoneId } = req.params;
+
+    const zone = await prisma.tableZone.findFirst({ where: { id: zoneId, restaurantId } });
+    if (!zone) {
+      throw new AppError(404, 'ZONE_NOT_FOUND', 'Zone not found', 'Eneo halikupatikana');
+    }
+
+    const updated = await prisma.tableZone.update({
+      where: { id: zoneId },
+      data: req.body,
+    });
+
+    res.json({ success: true, data: updated });
+  })
+);
+
+// DELETE /me/zones/:zoneId - Delete zone (tables keep their area label)
+router.delete(
+  '/me/zones/:zoneId',
+  auditLog,
+  asyncHandler(async (req, res) => {
+    const restaurantId = (req as any).restaurantId;
+    const { zoneId } = req.params;
+
+    const zone = await prisma.tableZone.findFirst({ where: { id: zoneId, restaurantId } });
+    if (!zone) {
+      throw new AppError(404, 'ZONE_NOT_FOUND', 'Zone not found', 'Eneo halikupatikana');
+    }
+
+    await prisma.$transaction([
+      prisma.restaurantTable.updateMany({
+        where: { zoneId },
+        data: { zoneId: null },
+      }),
+      prisma.tableZone.delete({ where: { id: zoneId } }),
+    ]);
+
+    res.json({ success: true, data: { message: 'Zone deleted successfully', messageSwahili: 'Eneo limefutwa kwa mafanikio' } });
+  })
+);
+
+// ── Promotions (Specials / Offers / Events / Giveaways) ──
+
+// GET /me/promotions - List promotions
+router.get(
+  '/me/promotions',
+  asyncHandler(async (req, res) => {
+    const restaurantId = (req as any).restaurantId;
+
+    const promotions = await prisma.promotion.findMany({
+      where: { restaurantId },
+      orderBy: [{ isActive: 'desc' }, { createdAt: 'desc' }],
+      include: {
+        menuItem: { select: { id: true, name: true, price: true, photoUrl: true } },
+      },
+    });
+
+    res.json({
+      success: true,
+      data: promotions.map((p) => ({
+        ...p,
+        specialPrice: p.specialPrice ? Number(p.specialPrice) : null,
+        menuItem: p.menuItem ? { ...p.menuItem, price: Number(p.menuItem.price) } : null,
+      })),
+    });
+  })
+);
+
+// POST /me/promotions - Create promotion
+router.post(
+  '/me/promotions',
+  auditLog,
+  validate(createPromotionSchema),
+  asyncHandler(async (req, res) => {
+    const restaurantId = (req as any).restaurantId;
+    const { type, title, description, descriptionSw, menuItemId, specialPrice, imageUrl, startsAt, endsAt, isActive } = req.body;
+
+    if (menuItemId) {
+      const item = await prisma.menuItem.findFirst({ where: { id: menuItemId, restaurantId } });
+      if (!item) {
+        throw new AppError(404, 'ITEM_NOT_FOUND', 'Menu item not found', 'Kipengee cha menyu hakikupatikana');
+      }
+    }
+
+    const promotion = await prisma.promotion.create({
+      data: {
+        restaurantId,
+        type,
+        title,
+        description: description || null,
+        descriptionSw: descriptionSw || null,
+        menuItemId: menuItemId || null,
+        specialPrice: specialPrice ?? null,
+        imageUrl: imageUrl || null,
+        startsAt: startsAt ?? null,
+        endsAt: endsAt ?? null,
+        isActive: isActive ?? true,
+      },
+      include: {
+        menuItem: { select: { id: true, name: true, price: true, photoUrl: true } },
+      },
+    });
+
+    await invalidateMenuCache(restaurantId);
+
+    res.status(201).json({
+      success: true,
+      data: { ...promotion, specialPrice: promotion.specialPrice ? Number(promotion.specialPrice) : null },
+    });
+  })
+);
+
+// PUT /me/promotions/:promotionId - Update promotion
+router.put(
+  '/me/promotions/:promotionId',
+  auditLog,
+  validate(updatePromotionSchema),
+  asyncHandler(async (req, res) => {
+    const restaurantId = (req as any).restaurantId;
+    const { promotionId } = req.params;
+    const data = req.body;
+
+    const promotion = await prisma.promotion.findFirst({ where: { id: promotionId, restaurantId } });
+    if (!promotion) {
+      throw new AppError(404, 'PROMOTION_NOT_FOUND', 'Promotion not found', 'Ukuzaji haukupatikana');
+    }
+
+    if (data.menuItemId) {
+      const item = await prisma.menuItem.findFirst({ where: { id: data.menuItemId, restaurantId } });
+      if (!item) {
+        throw new AppError(404, 'ITEM_NOT_FOUND', 'Menu item not found', 'Kipengee cha menyu hakikupatikana');
+      }
+    }
+
+    const updateData: any = { ...data };
+    if (updateData.description === '') updateData.description = null;
+    if (updateData.descriptionSw === '') updateData.descriptionSw = null;
+    if (updateData.imageUrl === '') updateData.imageUrl = null;
+
+    const updated = await prisma.promotion.update({
+      where: { id: promotionId },
+      data: updateData,
+      include: {
+        menuItem: { select: { id: true, name: true, price: true, photoUrl: true } },
+      },
+    });
+
+    await invalidateMenuCache(restaurantId);
+
+    res.json({
+      success: true,
+      data: { ...updated, specialPrice: updated.specialPrice ? Number(updated.specialPrice) : null },
+    });
+  })
+);
+
+// DELETE /me/promotions/:promotionId - Delete promotion
+router.delete(
+  '/me/promotions/:promotionId',
+  auditLog,
+  asyncHandler(async (req, res) => {
+    const restaurantId = (req as any).restaurantId;
+    const { promotionId } = req.params;
+
+    const promotion = await prisma.promotion.findFirst({ where: { id: promotionId, restaurantId } });
+    if (!promotion) {
+      throw new AppError(404, 'PROMOTION_NOT_FOUND', 'Promotion not found', 'Ukuzaji haukupatikana');
+    }
+
+    await prisma.promotion.delete({ where: { id: promotionId } });
+    await invalidateMenuCache(restaurantId);
+
+    res.json({ success: true, data: { message: 'Promotion deleted successfully', messageSwahili: 'Ukuzaji umefutwa kwa mafanikio' } });
   })
 );
 

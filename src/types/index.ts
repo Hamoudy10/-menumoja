@@ -119,6 +119,41 @@ export interface TableInfo {
   orderId?: string
 }
 
+export type TableStatus = 'FREE' | 'OCCUPIED' | 'RESERVED' | 'UNAVAILABLE'
+
+export type TableShape = 'ROUND' | 'SQUARE' | 'RECTANGLE' | 'OVAL' | 'BOOTH'
+
+export interface FloorZone {
+  id: string
+  name: string
+  color: string
+  positionX: number
+  positionY: number
+  width: number
+  height: number
+  _count?: { tables: number }
+}
+
+export interface FloorTable {
+  id: string
+  tableNumber: number
+  label: string
+  capacity: number | null
+  status: TableStatus
+  area: string | null
+  shape: TableShape | string
+  positionX: number
+  positionY: number
+  width: number
+  height: number
+  rotation: number
+  zoneId: string | null
+  zone?: FloorZone | null
+  sessions?: Array<{ id: string; startedAt: string; endedAt: string | null; guestCount: number | null }>
+  qrCode?: { id: string; label?: string; qrImageUrl?: string; scanCount?: number } | null
+  _count?: { orders: number }
+}
+
 export interface Transaction {
   id: string
   tableNumber: number

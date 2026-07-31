@@ -30,6 +30,7 @@ const OnboardingQR = lazy(() => import('@/pages/onboarding/OnboardingQR'))
 
 const DashboardHome = lazy(() => import('@/pages/dashboard/DashboardHome'))
 const MenuManager = lazy(() => import('@/pages/dashboard/MenuManager'))
+const PromotionsPage = lazy(() => import('@/pages/dashboard/PromotionsPage'))
 const TablesPage = lazy(() => import('@/pages/dashboard/TablesPage'))
 const OrdersPage = lazy(() => import('@/pages/dashboard/OrdersPage'))
 const PaymentsPage = lazy(() => import('@/pages/dashboard/PaymentsPage'))
@@ -123,6 +124,7 @@ function AppRoutes() {
             <Route index element={<PageTransition><DashboardHome /></PageTransition>} />
             <Route path="tables" element={<PageTransition><TablesPage /></PageTransition>} />
             <Route path="menu" element={<PageTransition><MenuManager /></PageTransition>} />
+            <Route path="promotions" element={<PageTransition><PromotionsPage /></PageTransition>} />
             <Route path="orders" element={<PageTransition><OrdersPage /></PageTransition>} />
             <Route path="payments" element={<PageTransition><PaymentsPage /></PageTransition>} />
             <Route path="analytics" element={<PageTransition><AnalyticsPage /></PageTransition>} />

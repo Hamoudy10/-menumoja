@@ -11,7 +11,7 @@ import * as surveillanceApi from '@/api/surveillance'
 import * as notificationsApi from '@/api/notifications'
 import * as qrcodesApi from '@/api/qrcodes'
 import type {
-  MenuCategory, Order, Staff, TableInfo,
+  MenuCategory, Order, Staff, FloorTable, FloorZone,
   Transaction, Camera, Customer, OnboardingData, CartItem,
 } from '@/types'
 import type { Restaurant } from '@/types'
@@ -58,9 +58,17 @@ interface AppState {
   placeOrder: (data: any) => Promise<any>
   addOrder: (order: any) => void
 
-  tables: TableInfo[]
+  tables: FloorTable[]
+  zones: FloorZone[]
   fetchTables: () => Promise<void>
   createTable: (data: any) => Promise<void>
+  updateTable: (id: string, data: any) => Promise<void>
+  removeTable: (id: string) => Promise<void>
+  setTableStatus: (id: string, status: string) => Promise<void>
+  fetchZones: () => Promise<void>
+  createZone: (data: any) => Promise<void>
+  updateZone: (id: string, data: any) => Promise<void>
+  removeZone: (id: string) => Promise<void>
 
   transactions: Transaction[]
   todaySummary: any
@@ -355,6 +363,8 @@ export const useStore = create<AppState>((set) => ({
         categoryId,
         isAvailable: data.available !== false,
         isPopular: !!data.isPopular,
+        isSpecial: !!data.isSpecial,
+        isNew: !!data.isNew,
         preparationTime: data.prepTime || 10,
         ingredients: data.ingredients || [],
         allergens: data.allergens || [],
@@ -399,6 +409,8 @@ export const useStore = create<AppState>((set) => ({
       if (data.description !== undefined) mapped.description = data.description
       if (data.available !== undefined) mapped.isAvailable = data.available
       if (data.isPopular !== undefined) mapped.isPopular = data.isPopular
+      if (data.isSpecial !== undefined) mapped.isSpecial = data.isSpecial
+      if (data.isNew !== undefined) mapped.isNew = data.isNew
       if (data.prepTime !== undefined) mapped.preparationTime = data.prepTime
       if (data.ingredients !== undefined) mapped.ingredients = data.ingredients
       if (data.allergens !== undefined) mapped.allergens = data.allergens
@@ -572,7 +584,29 @@ export const useStore = create<AppState>((set) => ({
   fetchTables: async () => {
     try {
       const data = await tablesApi.fetchTables()
-      set({ tables: data.tables || data })
+      const raw = data.tables || data
+      const normalized: FloorTable[] = Array.isArray(raw)
+        ? raw.map((t: any) => ({
+            id: t.id,
+            tableNumber: t.tableNumber ?? t.number ?? 0,
+            label: t.label || `Table ${t.tableNumber ?? t.number ?? ''}`,
+            capacity: t.capacity ?? null,
+            status: (t.status || 'FREE').toUpperCase(),
+            area: t.area ?? null,
+            shape: (t.shape || 'ROUND').toUpperCase(),
+            positionX: t.positionX ?? t.position_x ?? 0,
+            positionY: t.positionY ?? t.position_y ?? 0,
+            width: t.width ?? 2,
+            height: t.height ?? 2,
+            rotation: t.rotation ?? 0,
+            zoneId: t.zoneId ?? t.zone_id ?? null,
+            zone: t.zone ?? null,
+            sessions: t.sessions ?? [],
+            qrCode: t.qrCode ?? null,
+            _count: t._count ?? { orders: 0 },
+          }))
+        : []
+      set({ tables: normalized as any })
     } catch (err: any) {
       toast.error(err?.response?.data?.message || 'Failed to load tables')
     }
@@ -584,6 +618,73 @@ export const useStore = create<AppState>((set) => ({
       toast.success('Table created')
     } catch (err: any) {
       toast.error(err?.response?.data?.message || 'Failed to create table')
+      throw err
+    }
+  },
+  updateTable: async (id, data) => {
+    try {
+      const res = await tablesApi.updateTable(id, data)
+      set((s) => ({ tables: s.tables.map((t: any) => (t.id === id ? { ...t, ...data, ...res } : t)) }))
+    } catch (err: any) {
+      toast.error(err?.response?.data?.message || 'Failed to update table')
+      throw err
+    }
+  },
+  removeTable: async (id) => {
+    try {
+      await tablesApi.deleteTable(id)
+      set((s) => ({ tables: s.tables.filter((t: any) => t.id !== id) }))
+      toast.success('Table deleted')
+    } catch (err: any) {
+      toast.error(err?.response?.data?.message || 'Failed to delete table')
+      throw err
+    }
+  },
+  setTableStatus: async (id, status) => {
+    try {
+      await tablesApi.setTableStatus(id, status)
+      set((s) => ({ tables: s.tables.map((t: any) => (t.id === id ? { ...t, status } : t)) }))
+    } catch (err: any) {
+      toast.error(err?.response?.data?.message || 'Failed to update table status')
+      throw err
+    }
+  },
+  zones: [],
+  fetchZones: async () => {
+    try {
+      const data = await tablesApi.fetchZones()
+      const raw = data.zones || data
+      set({ zones: Array.isArray(raw) ? raw : [] })
+    } catch (err: any) {
+      toast.error(err?.response?.data?.message || 'Failed to load zones')
+    }
+  },
+  createZone: async (data) => {
+    try {
+      const res = await tablesApi.createZone(data)
+      set((s) => ({ zones: [...s.zones, res.zone || res] }))
+      toast.success('Zone created')
+    } catch (err: any) {
+      toast.error(err?.response?.data?.message || 'Failed to create zone')
+      throw err
+    }
+  },
+  updateZone: async (id, data) => {
+    try {
+      const res = await tablesApi.updateZone(id, data)
+      set((s) => ({ zones: s.zones.map((z) => (z.id === id ? { ...z, ...data, ...res } : z)) }))
+    } catch (err: any) {
+      toast.error(err?.response?.data?.message || 'Failed to update zone')
+      throw err
+    }
+  },
+  removeZone: async (id) => {
+    try {
+      await tablesApi.deleteZone(id)
+      set((s) => ({ zones: s.zones.filter((z) => z.id !== id) }))
+      toast.success('Zone deleted')
+    } catch (err: any) {
+      toast.error(err?.response?.data?.message || 'Failed to delete zone')
       throw err
     }
   },

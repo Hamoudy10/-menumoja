@@ -1,12 +1,20 @@
 import { useState, useEffect } from 'react'
 import { motion } from 'framer-motion'
 import { useParams, useNavigate } from 'react-router-dom'
-import { ShoppingCart, Plus, Minus, ChefHat, MapPin, Star, Search, Loader2, CheckCircle } from 'lucide-react'
+import { ShoppingCart, Plus, Minus, ChefHat, MapPin, Star, Search, Loader2, CheckCircle, Megaphone, Gift, PartyPopper, Percent, Tag } from 'lucide-react'
 import { useStore } from '@/store/useStore'
 import { Button } from '@/components/ui/Button'
 import { Badge } from '@/components/ui/Badge'
 import { useTheme } from '@/components/theme/ThemeProvider'
 import * as menuApi from '@/api/menu'
+
+const PROMO_ICONS: Record<string, any> = { SPECIAL: Star, OFFER: Percent, EVENT: PartyPopper, GIVEAWAY: Gift }
+const PROMO_BADGE: Record<string, string> = {
+  SPECIAL: 'bg-orange-100 text-orange-700',
+  OFFER: 'bg-emerald-100 text-emerald-700',
+  EVENT: 'bg-violet-100 text-violet-700',
+  GIVEAWAY: 'bg-rose-100 text-rose-700',
+}
 
 export default function MenuView() {
   const { restaurantSlug } = useParams()
@@ -18,6 +26,8 @@ export default function MenuView() {
   const [error, setError] = useState('')
   const [restaurantInfo, setRestaurantInfo] = useState<any>(null)
   const [menuCategories, setMenuCategories] = useState<any[]>([])
+  const [promotions, setPromotions] = useState<any[]>([])
+  const [announcement, setAnnouncement] = useState('')
 
   const cartCount = cart.reduce((s, i) => s + i.quantity, 0)
 
@@ -43,10 +53,14 @@ export default function MenuView() {
 
         setRestaurantInfo(restaurant)
         setMenuCategories(cats)
+        setPromotions(data.promotions || [])
         if (cats.length > 0) setActiveCategory(cats[0]?.id || '')
         if (restaurant?.language) setLanguage(restaurant.language)
 
         const settings = restaurant?.settings
+        if (settings?.announcementActive && settings?.announcement) {
+          setAnnouncement(settings.announcement)
+        }
         if (settings) {
           const patch: any = {}
           if (settings.primaryColor) patch.brandColor = settings.primaryColor
@@ -171,6 +185,97 @@ export default function MenuView() {
       </header>
 
       <main className="max-w-lg mx-auto px-4 py-4 space-y-4">
+        {announcement && (
+          <div className="flex items-center gap-2 bg-secondary/10 text-secondary rounded-2xl px-4 py-3 text-sm font-medium">
+            <Megaphone className="w-4 h-4 shrink-0" />
+            <span>{announcement}</span>
+          </div>
+        )}
+
+        {promotions.length > 0 && (
+          <section className="space-y-3">
+            <h2 className="font-heading font-bold text-primary text-lg flex items-center gap-2">
+              <Star className="w-4 h-4 text-secondary" /> Specials & Offers
+            </h2>
+            <div className="flex gap-3 overflow-x-auto pb-2 -mx-4 px-4 snap-x">
+              {promotions.map((promo) => {
+                const Icon = PROMO_ICONS[promo.type] || Tag
+                const badgeCls = PROMO_BADGE[promo.type] || PROMO_BADGE.SPECIAL
+                const linked = promo.menuItem
+                const promoQty = linked ? cart.find((c) => c.item.id === linked.id)?.quantity || 0 : 0
+                return (
+                  <motion.div
+                    key={promo.id}
+                    layout
+                    className="w-[280px] shrink-0 snap-start bg-white rounded-2xl border border-gray-100 shadow-soft overflow-hidden"
+                  >
+                    {promo.imageUrl && (
+                      <div className="h-28 overflow-hidden bg-gray-100">
+                        <img src={promo.imageUrl} alt={promo.title} className="w-full h-full object-cover" onError={(e) => { (e.target as HTMLImageElement).style.display = 'none' }} />
+                      </div>
+                    )}
+                    <div className="p-4">
+                      <span className={`inline-flex items-center gap-1 text-[10px] font-bold uppercase px-2 py-0.5 rounded-full ${badgeCls}`}>
+                        <Icon className="w-3 h-3" /> {promo.type}
+                      </span>
+                      <h3 className="font-heading font-bold text-primary mt-2">{promo.title}</h3>
+                      {promo.description && (
+                        <p className="text-xs text-text-secondary mt-1 line-clamp-3">{promo.description}</p>
+                      )}
+                      {(promo.startsAt || promo.endsAt) && (
+                        <p className="text-[10px] text-text-secondary/70 mt-1.5">
+                          {promo.startsAt ? new Date(promo.startsAt).toLocaleDateString() : ''}
+                          {promo.startsAt && promo.endsAt ? ' → ' : ''}
+                          {promo.endsAt ? new Date(promo.endsAt).toLocaleDateString() : ''}
+                        </p>
+                      )}
+                      {linked && (
+                        <div className="flex items-center justify-between mt-3 pt-3 border-t border-gray-50">
+                          <div>
+                            <p className="text-xs font-medium text-text-primary truncate">{linked.name}</p>
+                            <div className="flex items-center gap-2 mt-0.5">
+                              {promo.specialPrice != null && (
+                                <span className="text-xs text-text-secondary line-through">KES {Number(linked.price).toLocaleString()}</span>
+                              )}
+                              <span className="font-bold text-secondary">
+                                KES {Number(promo.specialPrice ?? linked.price).toLocaleString()}
+                              </span>
+                            </div>
+                          </div>
+                          {promoQty === 0 ? (
+                            <button
+                              onClick={() => addToCart({ ...linked, price: Number(promo.specialPrice ?? linked.price) })}
+                              className="flex items-center gap-1 px-3 py-1.5 rounded-xl bg-secondary text-white text-xs font-medium hover:bg-secondary-dark transition-all"
+                            >
+                              <Plus className="w-3.5 h-3.5" /> Add
+                            </button>
+                          ) : (
+                            <div className="flex items-center gap-1.5">
+                              <button
+                                onClick={() => updateCartQuantity(linked.id, promoQty - 1)}
+                                className="w-7 h-7 rounded-lg border border-gray-200 flex items-center justify-center text-primary hover:bg-gray-50"
+                              >
+                                <Minus className="w-3.5 h-3.5" />
+                              </button>
+                              <span className="w-6 text-center font-semibold text-primary text-sm">{promoQty}</span>
+                              <button
+                                onClick={() => addToCart({ ...linked, price: Number(promo.specialPrice ?? linked.price) })}
+                                className="w-7 h-7 rounded-lg bg-secondary text-white flex items-center justify-center hover:bg-secondary-dark"
+                              >
+                                <Plus className="w-3.5 h-3.5" />
+                              </button>
+                            </div>
+                          )}
+                        </div>
+                      )}
+                    </div>
+                  </motion.div>
+                )
+              })}
+            </div>
+          </section>
+        )}
+
         {displayCategories.map((category) => (
           <div key={category.id}>
             <h2 className="font-heading font-bold text-primary text-lg mb-3">{category.name}</h2>
@@ -193,6 +298,7 @@ export default function MenuView() {
                       <div className="flex-1 min-w-0">
                         <div className="flex items-center gap-1.5 flex-wrap">
                           <h3 className="font-semibold text-primary text-sm">{item.name}</h3>
+                          {item.isTodaysSpecial && <Badge variant="warning" size="sm">Today's Special</Badge>}
                           {item.isFeatured && <Badge variant="success" size="sm">Popular</Badge>}
                           {item.isNew && <Badge variant="info" size="sm">New</Badge>}
                         </div>

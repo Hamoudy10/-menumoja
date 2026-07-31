@@ -2,15 +2,15 @@ import { useState, useEffect } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import { useNavigate } from 'react-router-dom'
 import { 
-  ClipboardList, Clock, CheckCircle2, AlertTriangle, AlertCircle,
-  UtensilsCrossed, ArrowLeft, Loader2, X, MessageSquare,
-  ThumbsUp, FileText, Camera, Upload, Image, User
+  ClipboardList, CheckCircle2, AlertTriangle, AlertCircle,
+  ArrowLeft, Loader2, X, Camera, Upload, Image, User, Map, DoorOpen
 } from 'lucide-react'
 import { fetchLiveOrders, updateOrderStatus } from '@/api/orders'
 import api from '@/api/client'
 import { Button } from '@/components/ui/Button'
 import { Badge } from '@/components/ui/Badge'
 import { showSuccessToast, showErrorToast } from '@/components/ui/Toast'
+import FloorCanvas, { resolveTableStatus } from '@/components/floor/FloorCanvas'
 
 const statusLabels: Record<string, string> = {
   PENDING: 'New',
@@ -47,26 +47,36 @@ export default function WaiterDashboard() {
   const navigate = useNavigate()
   const [orders, setOrders] = useState<any[]>([])
   const [loading, setLoading] = useState(true)
-  const [activeTab, setActiveTab] = useState<'active' | 'served'>('active')
+  const [activeTab, setActiveTab] = useState<'active' | 'served' | 'floor'>('active')
   const [selectedOrder, setSelectedOrder] = useState<any | null>(null)
   const [showComplaint, setShowComplaint] = useState(false)
   const [complaintForm, setComplaintForm] = useState<ComplaintForm>({ orderId: '', type: 'complaint', description: '', evidence: [] })
   const [updatingId, setUpdatingId] = useState<string | null>(null)
   const [servedOrders, setServedOrders] = useState<any[]>([])
   const [loadError, setLoadError] = useState<string | null>(null)
+  const [tables, setTables] = useState<any[]>([])
+  const [zones, setZones] = useState<any[]>([])
+  const [selectedTable, setSelectedTable] = useState<string | null>(null)
+  const [freeingId, setFreeingId] = useState<string | null>(null)
 
   const loadOrders = async () => {
     setLoading(true)
     setLoadError(null)
     try {
-      const [live, historyRes] = await Promise.all([
+      const [live, historyRes, tablesRes, zonesRes] = await Promise.all([
         fetchLiveOrders(),
         api.get('/orders/history', { params: { perPage: 50 } }),
+        api.get('/restaurant/me/tables'),
+        api.get('/restaurant/me/zones'),
       ])
       setOrders(Array.isArray(live) ? live : [])
       const histData = historyRes.data
       const hist = histData?.data || histData || []
       setServedOrders(Array.isArray(hist) ? hist : [])
+      const tableData = tablesRes.data
+      setTables(Array.isArray(tableData?.data || tableData) ? (tableData?.data || tableData) : [])
+      const zoneData = zonesRes.data
+      setZones(Array.isArray(zoneData?.data || zoneData) ? (zoneData?.data || zoneData) : [])
     } catch (err: any) {
       const msg = err?.response?.data?.error?.message || err?.response?.data?.message || err?.message || 'Failed to load orders'
       setLoadError(msg)
@@ -88,6 +98,21 @@ export default function WaiterDashboard() {
       showErrorToast('Failed to mark as served')
     } finally {
       setUpdatingId(null)
+    }
+  }
+
+  const handleFreeTable = async (tableId: string) => {
+    if (!confirm('Mark this table as free?')) return
+    setFreeingId(tableId)
+    try {
+      await api.put(`/restaurant/me/tables/${tableId}/status`, { status: 'FREE' })
+      showSuccessToast('Table marked as free')
+      setSelectedTable(null)
+      loadOrders()
+    } catch {
+      showErrorToast('Failed to free table')
+    } finally {
+      setFreeingId(null)
     }
   }
 
@@ -127,7 +152,7 @@ export default function WaiterDashboard() {
           <div className="flex items-start justify-between">
             <div>
               <div className="flex items-center gap-2">
-                <h3 className="font-bold text-primary">Table {order.tableNumber || '?'}</h3>
+                <h3 className="font-bold text-primary">{order.tableNumber > 0 ? `Table ${order.tableNumber}` : 'Takeaway'}</h3>
                 <span className="text-xs text-text-secondary">#{order.orderNumber}</span>
               </div>
               <p className="text-xs text-text-secondary mt-0.5">
@@ -217,11 +242,14 @@ export default function WaiterDashboard() {
           </button>
         </div>
         <div className="max-w-3xl mx-auto px-4 pb-2 flex items-center gap-2">
-          <button onClick={() => setActiveTab('active')} className={`px-4 py-1.5 rounded-full text-sm font-medium transition-colors ${activeTab === 'active' ? 'bg-secondary text-white' : 'bg-gray-100 text-text-secondary'}`}>
+          <button onClick={() => { setActiveTab('active'); setSelectedTable(null) }} className={`px-4 py-1.5 rounded-full text-sm font-medium transition-colors ${activeTab === 'active' ? 'bg-secondary text-white' : 'bg-gray-100 text-text-secondary'}`}>
             Active ({orders.length})
           </button>
-          <button onClick={() => setActiveTab('served')} className={`px-4 py-1.5 rounded-full text-sm font-medium transition-colors ${activeTab === 'served' ? 'bg-secondary text-white' : 'bg-gray-100 text-text-secondary'}`}>
+          <button onClick={() => { setActiveTab('served'); setSelectedTable(null) }} className={`px-4 py-1.5 rounded-full text-sm font-medium transition-colors ${activeTab === 'served' ? 'bg-secondary text-white' : 'bg-gray-100 text-text-secondary'}`}>
             Served ({servedOrders.length})
+          </button>
+          <button onClick={() => { setActiveTab('floor'); setSelectedTable(null) }} className={`flex items-center gap-1.5 px-4 py-1.5 rounded-full text-sm font-medium transition-colors ${activeTab === 'floor' ? 'bg-secondary text-white' : 'bg-gray-100 text-text-secondary'}`}>
+            <Map className="w-4 h-4" /> Floor
           </button>
         </div>
       </header>
@@ -237,7 +265,114 @@ export default function WaiterDashboard() {
       )}
 
       <main className="max-w-3xl mx-auto px-4 py-4 space-y-3">
-        {loading && orders.length === 0 ? (
+        {activeTab === 'floor' ? (
+          <>
+            {loading && tables.length === 0 ? (
+              <div className="flex items-center justify-center py-16"><Loader2 className="w-8 h-8 animate-spin text-secondary" /></div>
+            ) : (
+              <FloorCanvas
+                tables={tables}
+                zones={zones}
+                orders={orders}
+                mode="view"
+                selectedId={selectedTable}
+                onSelect={setSelectedTable}
+                className="h-[calc(100vh-180px)]"
+                emptyHint="No tables on the floor plan yet — ask the manager to add them"
+              />
+            )}
+
+            <AnimatePresence>
+              {selectedTable && (() => {
+                const table = tables.find((t) => t.id === selectedTable)
+                if (!table) return null
+                const st = resolveTableStatus(table, orders)
+                const tableOrders = [...orders, ...servedOrders]
+                  .filter((o) => (o.tableId === table.id || Number(o.tableNumber) === table.tableNumber) && o.status !== 'CANCELLED')
+                const active = tableOrders.filter((o) => String(o.paymentStatus || 'UNPAID').toUpperCase() !== 'PAID')
+                const showFree = active.length === 0
+
+                return (
+                  <motion.div
+                    key={selectedTable}
+                    initial={{ opacity: 0, y: 30 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: 30 }}
+                    className="fixed bottom-0 left-0 right-0 z-40 mx-auto max-w-3xl rounded-t-3xl bg-white border-t border-gray-100 shadow-2xl"
+                  >
+                    <div className="p-4 sm:p-5">
+                      <div className="flex items-center justify-between mb-3">
+                        <div className="flex items-center gap-3">
+                          <div className="w-11 h-11 rounded-xl flex items-center justify-center font-heading font-bold text-lg"
+                            style={{ background: st.fill, border: `2px solid ${st.border}`, color: st.text }}>
+                            {table.tableNumber}
+                          </div>
+                          <div>
+                            <h3 className="font-heading font-bold text-primary">{table.label || `Table ${table.tableNumber}`}</h3>
+                            <p className="text-xs text-text-secondary" style={{ color: st.text }}>
+                              {st.label}{table.zone?.name ? ` · ${table.zone.name}` : ''}
+                            </p>
+                          </div>
+                        </div>
+                        <div className="flex items-center gap-2">
+                          {showFree && (
+                            <Button size="sm" variant="outline" loading={freeingId === table.id} onClick={() => handleFreeTable(table.id)}>
+                              <DoorOpen className="w-4 h-4" /> Free Table
+                            </Button>
+                          )}
+                          <button onClick={() => setSelectedTable(null)} className="w-9 h-9 rounded-xl bg-gray-100 flex items-center justify-center">
+                            <X className="w-5 h-5 text-text-secondary" />
+                          </button>
+                        </div>
+                      </div>
+
+                      {active.length === 0 ? (
+                        <div className="text-center py-6 text-text-secondary text-sm">
+                          {tableOrders.length === 0 ? 'No orders at this table yet' : 'All bills settled — table is ready to be freed'}
+                        </div>
+                      ) : (
+                        <div className="space-y-2.5 max-h-[45vh] overflow-y-auto pr-1">
+                          {active.map((order) => (
+                            <div key={order.id} className="rounded-2xl border border-gray-100 bg-gray-50/60 p-3.5">
+                              <div className="flex items-center justify-between mb-2">
+                                <div className="flex items-center gap-2">
+                                  <span className="font-bold text-primary text-sm">#{order.orderNumber}</span>
+                                  <Badge className={statusColors[order.status] || 'bg-gray-100'}>{statusLabels[order.status] || order.status}</Badge>
+                                  <Badge className={paymentStatusColors[String(order.paymentStatus || 'UNPAID')] || 'bg-gray-100'}>{order.paymentStatus || 'UNPAID'}</Badge>
+                                </div>
+                                <span className="text-xs text-text-secondary">{order.createdAt ? new Date(order.createdAt).toLocaleTimeString() : ''}</span>
+                              </div>
+                              <div className="space-y-1 mb-2">
+                                {(order.items || []).map((item: any, i: number) => (
+                                  <div key={i} className="flex justify-between text-sm">
+                                    <span className="text-text-secondary">{item.quantity}x <span className="text-primary font-medium">{item.itemName || item.name}</span></span>
+                                    <span className="text-text-secondary">KES {Number(item.itemPrice || item.price || 0).toLocaleString()}</span>
+                                  </div>
+                                ))}
+                              </div>
+                              {order.specialNotes && <p className="text-xs text-amber-600 bg-amber-50 rounded-lg p-2 mb-2">📝 {order.specialNotes}</p>}
+                              <div className="flex items-center justify-between pt-2 border-t border-gray-100">
+                                <span className="font-bold text-secondary">KES {Number(order.totalAmount || order.total || 0).toLocaleString()}</span>
+                                <div className="flex items-center gap-2">
+                                  {order.status === 'READY' && (
+                                    <Button size="sm" variant="primary" loading={updatingId === order.id} onClick={() => handleMarkServed(order.id)}>
+                                      <CheckCircle2 className="w-4 h-4" /> Serve
+                                    </Button>
+                                  )}
+                                  <button onClick={() => openComplaint(order)} className="w-8 h-8 rounded-lg flex items-center justify-center text-red-400 hover:bg-red-50" title="Complaint / Refund">
+                                    <AlertTriangle className="w-4 h-4" />
+                                  </button>
+                                </div>
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+                  </motion.div>
+                )
+              })()}
+            </AnimatePresence>
+          </>
+        ) : loading && orders.length === 0 ? (
           <div className="flex items-center justify-center py-16"><Loader2 className="w-8 h-8 animate-spin text-secondary" /></div>
         ) : displayedOrders.length === 0 ? (
           <div className="text-center py-16">

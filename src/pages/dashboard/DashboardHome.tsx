@@ -17,7 +17,7 @@ export default function DashboardHome() {
 
   const stats = useMemo(() => {
     const todayOrders = todaySummary?.orderCount ?? orders.length
-    const activeTables = tables.filter((t) => t.status === 'occupied' || t.status === 'order-pending').length
+    const activeTables = tables.filter((t: any) => t.status === 'OCCUPIED').length
     const totalTables = tables.length || 12
     const todayRevenue = todaySummary?.totalRevenue ?? transactions.reduce((s, t) => s + t.amount, 0)
     const avgOrder = todayOrders > 0 ? Math.round(todayRevenue / todayOrders) : 0

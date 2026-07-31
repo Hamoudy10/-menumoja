@@ -7,6 +7,7 @@ import { AppError, NotFoundError, ValidationError } from '@/utils/errors';
 import { formatKES, buildPaginationMeta } from '@/utils/helpers';
 import { initiateMpesaSchema, recordCashSchema } from '@/utils/validation';
 import { mpesaService } from '@/services';
+import { freeTableIfLastOrder } from '@/services/table.service';
 import * as mpesa from '@/integrations/mpesa';
 import { io } from '@/hooks/socket';
 import logger from '@/utils/logger';
@@ -287,6 +288,7 @@ router.post('/cash/record',
         totalAmount: true,
         paymentStatus: true,
         status: true,
+        tableId: true,
       },
     });
 
@@ -362,6 +364,8 @@ router.post('/cash/record',
     } catch (socketError) {
       logger.error('Failed to emit payment socket event', { error: socketError });
     }
+
+    await freeTableIfLastOrder(restaurantId, orderId, order.tableId);
 
     logger.info('Cash payment recorded', { orderId, amount, cashierId });
 
@@ -745,7 +749,7 @@ router.post('/card/record',
 
     const order = await prisma.order.findFirst({
       where: { id: orderId, restaurantId },
-      select: { id: true, totalAmount: true, paymentStatus: true },
+      select: { id: true, totalAmount: true, paymentStatus: true, tableId: true },
     });
 
     if (!order) throw new NotFoundError('Order not found', 'Agizo halikupatikana');
@@ -767,6 +771,8 @@ router.post('/card/record',
         data: { paymentStatus: 'PAID' },
       }),
     ]);
+
+    await freeTableIfLastOrder(restaurantId, orderId, order.tableId);
 
     res.status(201).json({ success: true, data: payment });
   })
@@ -981,12 +987,21 @@ function createOrderService() {
       };
     },
     updateOrderPayment: async (orderId: string, paymentData: { paymentId: string; status: string; mpesaReceipt?: string }) => {
+      const order = await prisma.order.findUnique({
+        where: { id: orderId },
+        select: { restaurantId: true, tableId: true },
+      });
+
       await prisma.order.update({
         where: { id: orderId },
         data: {
           paymentStatus: paymentData.status === 'paid' ? 'PAID' : 'UNPAID',
         },
       });
+
+      if (order && paymentData.status === 'paid') {
+        await freeTableIfLastOrder(order.restaurantId, orderId, order.tableId);
+      }
     },
     updateOrderStatus: async (orderId: string, status: string) => {
       await prisma.order.update({

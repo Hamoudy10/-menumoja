@@ -131,6 +131,22 @@ router.get(
       (c) => c.menuItems.length > 0
     );
 
+    const now = new Date();
+    const promotions = await prisma.promotion.findMany({
+      where: {
+        restaurantId: restaurant.id,
+        isActive: true,
+        AND: [
+          { OR: [{ startsAt: null }, { startsAt: { lte: now } }] },
+          { OR: [{ endsAt: null }, { endsAt: { gte: now } }] },
+        ],
+      },
+      orderBy: { createdAt: 'desc' },
+      include: {
+        menuItem: { select: { id: true, name: true, price: true, photoUrl: true } },
+      },
+    });
+
     const responseData = {
       restaurant: {
         id: restaurant.id,
@@ -149,6 +165,25 @@ router.get(
       },
       settings: restaurant.settings,
       openingHours: restaurant.openingHours,
+      promotions: promotions.map((p) => ({
+        id: p.id,
+        type: p.type,
+        title: p.title,
+        description: p.description,
+        descriptionSw: p.descriptionSw,
+        imageUrl: p.imageUrl,
+        specialPrice: p.specialPrice ? Number(p.specialPrice) : null,
+        startsAt: p.startsAt,
+        endsAt: p.endsAt,
+        menuItem: p.menuItem
+          ? {
+              id: p.menuItem.id,
+              name: p.menuItem.name,
+              price: Number(p.menuItem.price),
+              photoUrl: p.menuItem.photoUrl,
+            }
+          : null,
+      })),
       categories: activeCategories.map((c) => ({
         id: c.id,
         name: c.name,

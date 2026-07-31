@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useMemo } from 'react'
 import { motion } from 'framer-motion'
 import { ChefHat, Clock, CheckCircle, Timer, LogOut } from 'lucide-react'
 import { useStore } from '@/store/useStore'
@@ -16,7 +16,18 @@ const statusColors: Record<string, string> = {
 
 export default function KitchenDisplay() {
   const navigate = useNavigate()
-  const { orders, liveOrders, fetchOrders, fetchLiveOrders, updateOrderStatus } = useStore()
+  const { orders, liveOrders, fetchOrders, fetchLiveOrders, updateOrderStatus, tables, fetchTables } = useStore()
+
+  const tableInfo = useMemo(() => {
+    const map = new Map<string, { label: string; zone: string }>()
+    tables.forEach((t) => {
+      map.set(t.id, {
+        label: t.label || `Table ${t.tableNumber}`,
+        zone: t.zone?.name || t.area || '',
+      })
+    })
+    return map
+  }, [tables])
 
   const staffName = localStorage.getItem('staffName') || 'Staff'
 
@@ -33,11 +44,11 @@ export default function KitchenDisplay() {
 
   useEffect(() => {
     const load = async () => {
-      await Promise.all([fetchOrders(), fetchLiveOrders()])
+      await Promise.all([fetchOrders(), fetchLiveOrders(), fetchTables()])
       setLoading(false)
     }
     load()
-    const interval = setInterval(() => { fetchOrders(); fetchLiveOrders() }, 15000)
+    const interval = setInterval(() => { fetchOrders(); fetchLiveOrders(); fetchTables() }, 15000)
     return () => clearInterval(interval)
   }, [])
 
@@ -116,6 +127,15 @@ export default function KitchenDisplay() {
                     <p className="text-xs text-text-secondary mt-0.5">
                       {order.tableNumber > 0 ? `Table ${order.tableNumber}` : 'Takeaway'} · <Clock className="w-3 h-3 inline" />{' '}
                       {order.createdAt ? Math.floor((Date.now() - new Date(order.createdAt).getTime()) / 60000) : 0} min ago
+                      {(() => {
+                        const info = order.tableId ? tableInfo.get(order.tableId) : null
+                        if (!info) return null
+                        return (
+                          <span className="ml-1.5 text-[10px] px-1.5 py-0.5 rounded-full bg-black/5 dark:bg-white/10 font-medium">
+                            {info.zone || info.label}
+                          </span>
+                        )
+                      })()}
                     </p>
                   </div>
                 </div>

@@ -5,7 +5,7 @@ import {
   Receipt, Calculator, ShoppingBag, X, ChevronDown, LogOut, Coffee, ArrowRight,
   Loader2, Hash, User, Printer, Plus, Minus, Trash2, RotateCcw,
   GripVertical, Fullscreen, SplitSquareVertical, MessageSquare, Sparkles,
-  HeartHandshake, Percent, AlertTriangle, Undo2, Eye, Grid3x3, List,
+  HeartHandshake, Percent, AlertTriangle, Undo2, Eye, List, Map,
   Music, Volume2, Settings2, Star, ScrollText
 } from 'lucide-react'
 import { Button } from '@/components/ui/Button'
@@ -16,8 +16,9 @@ import { useStore } from '@/store/useStore'
 import { useNavigate } from 'react-router-dom'
 import * as ordersApi from '@/api/orders'
 import * as paymentsApi from '@/api/payments'
+import * as tablesApi from '@/api/tables'
 import NumberPad from '@/components/pos/NumberPad'
-import TableGridView from '@/components/pos/TableGridView'
+import FloorCanvas from '@/components/floor/FloorCanvas'
 
 const ITEMS_PER_PAGE = 20
 
@@ -131,6 +132,34 @@ export default function CashierDashboard() {
   const [shift, setShift] = useState<any>(null)
   const [closeCashAmount, setCloseCashAmount] = useState('')
   const [showCloseShift, setShowCloseShift] = useState(false)
+  const [tables, setTables] = useState<any[]>([])
+  const [zones, setZones] = useState<any[]>([])
+
+  useEffect(() => {
+    Promise.all([
+      tablesApi.fetchTables().catch(() => []),
+      tablesApi.fetchZones().catch(() => []),
+    ]).then(([t, z]) => {
+      const tData = Array.isArray(t) ? t : t?.tables || t
+      const zData = Array.isArray(z) ? z : z?.zones || z
+      setTables(Array.isArray(tData) ? tData : [])
+      setZones(Array.isArray(zData) ? zData : [])
+    })
+  }, [])
+
+  const handleFloorTableClick = (tableId: string | null) => {
+    if (!tableId) return
+    const table = tables.find((t) => t.id === tableId)
+    const atTable = allOrders
+      .filter((o: any) => (o.tableId === tableId || Number(o.tableNumber) === table?.tableNumber) && o.paymentStatus !== 'PAID')
+      .sort((a: any, b: any) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())
+    if (atTable.length > 0) {
+      setSelectedOrder(atTable[0])
+      return
+    }
+    setNewOrderTable(String(table?.tableNumber || ''))
+    setShowCreateModal(true)
+  }
 
   useEffect(() => { fetchOrders() }, [activeTab])
   useEffect(() => { const iv = setInterval(fetchOrders, 30000); return () => clearInterval(iv) }, [activeTab])
@@ -334,9 +363,9 @@ export default function CashierDashboard() {
 
   return (
     <div ref={posRef} className="min-h-screen bg-background-light dark:bg-background-dark">
-      <div className="flex h-screen overflow-hidden">
+      <div className="flex h-dvh overflow-hidden">
         {/* LEFT: Order List */}
-        <div className="flex-1 flex flex-col min-w-0 border-r border-white/10">
+        <div className="flex-1 flex flex-col min-w-0 min-h-0 border-r border-white/10">
           <header className="shrink-0 bg-white dark:bg-primary-light border-b border-white/10 px-3 py-2">
             {shift ? (
               <div className="flex items-center justify-between mb-2 px-3 py-1.5 rounded-xl bg-success/10 border border-success/20">
@@ -382,8 +411,8 @@ export default function CashierDashboard() {
                 <button onClick={toggleFullscreen} className="p-1.5 rounded-lg hover:bg-black/5">
                   <Fullscreen className="h-4 w-4 text-text-secondary" />
                 </button>
-                <button onClick={() => setIsTableGrid(!isTableGrid)} className={`p-1.5 rounded-lg ${isTableGrid ? 'bg-secondary/10 text-secondary' : 'hover:bg-black/5 text-text-secondary'}`}>
-                  {isTableGrid ? <Grid3x3 className="h-4 w-4" /> : <List className="h-4 w-4" />}
+                <button onClick={() => setIsTableGrid(!isTableGrid)} className={`p-1.5 rounded-lg ${isTableGrid ? 'bg-secondary/10 text-secondary' : 'hover:bg-black/5 text-text-secondary'}`} title={isTableGrid ? 'List view' : 'Floor plan view'}>
+                  {isTableGrid ? <Map className="h-4 w-4" /> : <List className="h-4 w-4" />}
                 </button>
                 <button onClick={() => setCustomerDisplayOpen(true)} className="p-1.5 rounded-lg hover:bg-black/5 text-text-secondary" title="Customer Display">
                   <Eye className="h-4 w-4" />
@@ -424,14 +453,18 @@ export default function CashierDashboard() {
             </div>
           </header>
 
-          <div className="flex-1 overflow-y-auto touch-pan-y">
+          <div className="flex-1 min-h-0 overflow-y-auto touch-pan-y">
             {loading ? (
               <div className="flex justify-center py-20"><Loader2 className="h-8 w-8 animate-spin text-secondary" /></div>
             ) : isTableGrid ? (
-              <TableGridView
-                orders={allOrders.filter((o) => activeTab === 'pending' ? o.paymentStatus !== 'PAID' : o.paymentStatus === 'PAID')}
-                selectedId={selectedOrder?.id}
-                onSelect={(o) => setSelectedOrder(o)}
+              <FloorCanvas
+                tables={tables}
+                zones={zones}
+                orders={allOrders}
+                mode="view"
+                onSelect={handleFloorTableClick}
+                className="h-full p-2"
+                emptyHint="No tables yet — add them in Dashboard → Tables"
               />
             ) : paginated.length === 0 ? (
               <div className="text-center py-20 text-text-secondary/50">
@@ -498,10 +531,10 @@ export default function CashierDashboard() {
         </div>
 
         {/* RIGHT: Payment Panel */}
-        <div className="w-80 sm:w-96 shrink-0 bg-white dark:bg-primary-light flex flex-col">
+        <div className="w-80 sm:w-96 shrink-0 min-h-0 bg-white dark:bg-primary-light flex flex-col overflow-hidden">
           <AnimatePresence mode="wait">
             {showReceipt ? (
-              <motion.div key="receipt" initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0 }} className="flex-1 flex flex-col">
+              <motion.div key="receipt" initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0 }} className="flex-1 min-h-0 flex flex-col">
                 <div className="p-4 border-b border-white/10 flex items-center justify-between">
                   <h3 className="font-heading font-bold text-text-primary">Receipt</h3>
                   <div className="flex gap-1">
@@ -509,7 +542,7 @@ export default function CashierDashboard() {
                     <button onClick={() => setShowReceipt(false)} className="p-1.5 rounded-lg hover:bg-black/5"><X className="h-4 w-4 text-text-secondary" /></button>
                   </div>
                 </div>
-                <div className="flex-1 overflow-y-auto p-4 font-mono text-xs leading-relaxed" id="etr-receipt">
+                <div className="flex-1 min-h-0 overflow-y-auto p-4 font-mono text-xs leading-relaxed" id="etr-receipt">
                   <div className="text-center border-b-2 border-dashed border-gray-300 dark:border-white/20 pb-3 mb-3">
                     <h3 className="font-bold text-sm uppercase tracking-wider">{restaurant?.name || 'MenuMoja'}</h3>
                     <p className="text-text-secondary mt-0.5">{restaurant?.address || ''}</p>
@@ -571,7 +604,7 @@ export default function CashierDashboard() {
                 </div>
               </motion.div>
             ) : selectedOrder ? (
-              <motion.div key="payment" initial={{ opacity: 0, x: 20 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0 }} className="flex-1 flex flex-col">
+              <motion.div key="payment" initial={{ opacity: 0, x: 20 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0 }} className="flex-1 min-h-0 flex flex-col">
                 <div className="flex items-center justify-between p-3 sm:p-4 border-b border-white/10">
                   <div className="flex items-center gap-2">
                     <h3 className="font-heading font-bold text-text-primary dark:text-white text-sm sm:text-base">
@@ -594,7 +627,7 @@ export default function CashierDashboard() {
                   </div>
                 </div>
 
-                <div className="flex-1 overflow-y-auto p-3 sm:p-4 space-y-3 touch-pan-y">
+                <div className="flex-1 min-h-0 overflow-y-auto p-3 sm:p-4 space-y-3 touch-pan-y">
                   <div className="flex items-center gap-2 text-xs text-text-secondary">
                     <Clock className="w-3 h-3" /> {timeAgo(selectedOrder.createdAt)}
                     {selectedOrder.status !== 'SERVED' && selectedOrder.status !== 'CANCELLED' && (
@@ -806,7 +839,7 @@ export default function CashierDashboard() {
                 </div>
               </motion.div>
             ) : (
-              <motion.div key="empty" initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="flex-1 flex items-center justify-center p-8">
+              <motion.div key="empty" initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="flex-1 min-h-0 flex items-center justify-center p-8">
                 <div className="text-center text-text-secondary/40">
                   <Calculator className="h-16 w-16 mx-auto mb-4 opacity-20" />
                   <p className="font-accent text-sm">Select an order</p>

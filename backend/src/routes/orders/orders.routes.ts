@@ -7,6 +7,7 @@ import { AppError, NotFoundError, ValidationError } from '@/utils/errors';
 import { generateOrderNumber, calculateTotals, buildPaginationMeta } from '@/utils/helpers';
 import { updateOrderStatusSchema } from '@/utils/validation';
 import { mpesaService } from '@/services';
+import { onTableSeated, freeTableIfLastOrder } from '@/services/table.service';
 import { io } from '@/hooks/socket';
 import logger from '@/utils/logger';
 
@@ -153,6 +154,7 @@ router.post('/public/create',
     const totals = calculateTotals(orderItems.map((oi: { price: number; quantity: number }) => ({ price: oi.price, quantity: oi.quantity })));
 
     let tableNumberValue: number | null = null;
+    let seatedTableId: string | null = null;
 
     if (tableId) {
       const table = await prisma.restaurantTable.findUnique({
@@ -165,6 +167,7 @@ router.post('/public/create',
       }
 
       tableNumberValue = table.tableNumber;
+      seatedTableId = table.id;
 
       await prisma.restaurantTable.update({
         where: { id: tableId },
@@ -176,11 +179,16 @@ router.post('/public/create',
         where: { restaurantId, tableNumber },
       });
       if (table) {
+        seatedTableId = table.id;
         await prisma.restaurantTable.update({
           where: { id: table.id },
           data: { status: 'OCCUPIED', currentSessionId: sessionId },
         });
       }
+    }
+
+    if (seatedTableId) {
+      await onTableSeated(restaurantId, seatedTableId);
     }
 
     const orderNumber = generateOrderNumber(restaurantId);
@@ -977,8 +985,11 @@ router.delete('/:id',
         status: true,
         cancelledAt: true,
         cancelledReason: true,
+        tableId: true,
       },
     });
+
+    await freeTableIfLastOrder(restaurantId, updated.id, updated.tableId);
 
     try {
       io.to(`restaurant:${restaurantId}`).emit('order:status-changed', {
