@@ -25,9 +25,28 @@ export default class ErrorBoundary extends React.Component<ErrorBoundaryProps, E
   componentDidCatch(error: Error, errorInfo: React.ErrorInfo) {
     this.setState({ errorInfo })
     console.error('ErrorBoundary caught:', error, errorInfo)
+
+    const msg = (error?.message || '') + (errorInfo?.componentStack || '')
+    if (
+      msg.includes('Failed to fetch dynamically imported module') ||
+      msg.includes('Importing a module script failed') ||
+      msg.includes('dynamically imported module')
+    ) {
+      if (!sessionStorage.getItem('menumoja_chunk_reload')) {
+        sessionStorage.setItem('menumoja_chunk_reload', '1')
+        window.location.reload()
+      } else {
+        sessionStorage.removeItem('menumoja_chunk_reload')
+      }
+    }
   }
 
   handleReset = () => {
+    if (sessionStorage.getItem('menumoja_chunk_reload')) {
+      sessionStorage.removeItem('menumoja_chunk_reload')
+      window.location.reload()
+      return
+    }
     this.setState({ hasError: false, error: null, errorInfo: null })
   }
 
