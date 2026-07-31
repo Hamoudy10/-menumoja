@@ -7,7 +7,6 @@ import { useTranslation } from 'react-i18next'
 import toast from 'react-hot-toast'
 import DashboardSidebar from './DashboardSidebar'
 import NotificationBell from '@/components/notifications/NotificationBell'
-import ThemeProvider from '@/components/theme/ThemeProvider'
 import * as notificationsApi from '@/api/notifications'
 
 export default function DashboardLayout() {
@@ -72,8 +71,7 @@ export default function DashboardLayout() {
   }, [isAuthenticated])
 
   return (
-    <ThemeProvider>
-      <div className="flex min-h-screen bg-background-light dark:bg-background-dark" dir={language === 'ar' ? 'rtl' : 'ltr'}>
+    <div className="flex min-h-screen bg-background-light dark:bg-background-dark" dir={language === 'ar' ? 'rtl' : 'ltr'}>
         <div className="hidden lg:block">
           <DashboardSidebar />
         </div>
@@ -147,6 +145,5 @@ export default function DashboardLayout() {
           </main>
         </div>
       </div>
-    </ThemeProvider>
   )
 }

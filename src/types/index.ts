@@ -30,6 +30,12 @@ export interface Restaurant {
     primaryColor?: string
     secondaryColor?: string
     fontFamily?: string
+    gradientStart?: string
+    gradientEnd?: string
+    useGradient?: boolean
+    headingFont?: string
+    bodyFont?: string
+    accentFont?: string
     layoutStyle?: string
     welcomeMessage?: string
   }

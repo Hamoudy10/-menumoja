@@ -14,7 +14,7 @@ services:
       - key: FRONTEND_URL
         value: https://menumoja.vercel.app
       - key: API_URL
-        value: https://menumoja-backend.onrender.com
+        value: https://menumoja.onrender.com
       - key: REDIS_URL
         fromService:
           type: redis

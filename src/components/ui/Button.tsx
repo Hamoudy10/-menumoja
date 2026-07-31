@@ -4,7 +4,7 @@ import { Loader2 } from 'lucide-react'
 
 export interface ButtonProps {
   children: ReactNode
-  variant?: 'primary' | 'secondary' | 'ghost' | 'outline'
+  variant?: 'primary' | 'secondary' | 'ghost' | 'outline' | 'danger'
   size?: 'sm' | 'md' | 'lg'
   fullWidth?: boolean
   icon?: ReactNode
@@ -21,6 +21,7 @@ const variantStyles: Record<string, string> = {
   secondary: 'bg-accent text-primary hover:bg-yellow-400',
   ghost: 'bg-transparent text-text-secondary dark:text-white hover:bg-black/5 dark:hover:bg-white/10',
   outline: 'border-2 border-white/20 text-white hover:bg-white/10 hover:border-white/40',
+  danger: 'bg-danger text-white hover:bg-red-600 shadow-warm',
 }
 
 const sizeStyles: Record<string, string> = {

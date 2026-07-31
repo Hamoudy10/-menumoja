@@ -99,7 +99,7 @@ async function pauseAllQueues(): Promise<void> {
 async function resumeAllQueues(): Promise<void> { }
 
 export {
-  addEmailJob, addSmsJob, addSocialMediaJob, addAiMarketingJob,
+  addEmailJob, addSmsJob, addSocialMediaJob,
   addAnalyticsJob, addMpesaJob, addCameraJob, addCleanupJob,
   formatJobData, getQueue, pauseAllQueues, resumeAllQueues,
 };

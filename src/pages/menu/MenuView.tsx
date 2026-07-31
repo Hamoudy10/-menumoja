@@ -5,12 +5,14 @@ import { ShoppingCart, Plus, Minus, ChefHat, MapPin, Star, Search, Loader2, Chec
 import { useStore } from '@/store/useStore'
 import { Button } from '@/components/ui/Button'
 import { Badge } from '@/components/ui/Badge'
+import { useTheme } from '@/components/theme/ThemeProvider'
 import * as menuApi from '@/api/menu'
 
 export default function MenuView() {
   const { restaurantSlug } = useParams()
   const navigate = useNavigate()
   const { categories, cart, addToCart, updateCartQuantity, setLanguage } = useStore()
+  const { applyTheme } = useTheme()
   const [activeCategory, setActiveCategory] = useState('')
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
@@ -43,6 +45,19 @@ export default function MenuView() {
         setMenuCategories(cats)
         if (cats.length > 0) setActiveCategory(cats[0]?.id || '')
         if (restaurant?.language) setLanguage(restaurant.language)
+
+        const settings = restaurant?.settings
+        if (settings) {
+          const patch: any = {}
+          if (settings.primaryColor) patch.brandColor = settings.primaryColor
+          if (settings.gradientStart) patch.gradientStart = settings.gradientStart
+          if (settings.gradientEnd) patch.gradientEnd = settings.gradientEnd
+          if (typeof settings.useGradient === 'boolean') patch.useGradient = settings.useGradient
+          if (settings.headingFont) patch.fontHeading = settings.headingFont
+          if (settings.bodyFont) patch.fontBody = settings.bodyFont
+          if (settings.accentFont) patch.fontAccent = settings.accentFont
+          if (Object.keys(patch).length) applyTheme(patch)
+        }
       } catch (err: any) {
         if (cancelled) return
         setError(err?.response?.data?.message || err?.message || 'Failed to load menu')

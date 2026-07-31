@@ -4,6 +4,7 @@ import { useStore } from '@/store/useStore'
 import { AnimatePresence, motion } from 'framer-motion'
 import { Toaster } from 'react-hot-toast'
 import { GoogleOAuthProvider } from '@react-oauth/google'
+import ThemeProvider from '@/components/theme/ThemeProvider'
 
 const ProtectedRoute = lazy(() => import('@/components/layout/ProtectedRoute'))
 const DashboardLayout = lazy(() => import('@/components/layout/DashboardLayout'))
@@ -165,19 +166,21 @@ export default function App() {
 
   return (
     <GoogleOAuthProvider clientId={googleClientId || ''}>
-      <AppRoutes />
-      <Toaster
-        position="top-right"
-        toastOptions={{
-          style: {
-            borderRadius: '12px',
-            background: '#1A2A4A',
-            color: '#fff',
-            fontSize: '14px',
-          },
-          duration: 4000,
-        }}
-      />
+      <ThemeProvider>
+        <AppRoutes />
+        <Toaster
+          position="top-right"
+          toastOptions={{
+            style: {
+              borderRadius: '12px',
+              background: '#1A2A4A',
+              color: '#fff',
+              fontSize: '14px',
+            },
+            duration: 4000,
+          }}
+        />
+      </ThemeProvider>
     </GoogleOAuthProvider>
   )
 }

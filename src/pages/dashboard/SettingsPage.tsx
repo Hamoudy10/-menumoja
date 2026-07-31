@@ -131,10 +131,23 @@ export default function SettingsPage() {
         businessType: restaurant.businessType || 'Restaurant',
         county: restaurant.county || restaurant.city || 'Mombasa',
       })
-      setBrandColor(restaurant.brandColor || restaurant.settings?.primaryColor || '#FF6B35')
       setFontStyle(restaurant.fontStyle || 'modern')
     }
   }, [restaurant])
+
+  const nameToFamily = (name: string) => googleFonts.find((f) => f.name === name)?.family || name
+
+  useEffect(() => {
+    if (section !== 'appearance') return
+    setBrandColor(theme.brandColor)
+    setColorPickerInput(theme.brandColor)
+    setGradientStart(theme.gradientStart)
+    setGradientEnd(theme.gradientEnd)
+    setUseGradient(theme.useGradient)
+    setSelectedHeadingFont(nameToFamily(theme.fontHeading))
+    setSelectedBodyFont(nameToFamily(theme.fontBody))
+    setSelectedAccentFont(nameToFamily(theme.fontAccent))
+  }, [section, theme])
 
   const handleSaveProfile = async () => {
     setSaving(true)
@@ -161,6 +174,16 @@ export default function SettingsPage() {
         fontHeading: selectedHeadingFont,
         fontBody: selectedBodyFont,
         fontAccent: selectedAccentFont,
+      })
+
+      await restaurantApi.updateSettings({
+        primaryColor: brandColor,
+        gradientStart,
+        gradientEnd,
+        useGradient,
+        headingFont: selectedHeadingFont,
+        bodyFont: selectedBodyFont,
+        accentFont: selectedAccentFont,
       })
 
       await updateRestaurant({

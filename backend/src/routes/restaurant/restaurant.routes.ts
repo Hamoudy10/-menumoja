@@ -86,7 +86,7 @@ router.put(
       })();
     }
 
-    const { brandColor, fontStyle, cuisine, ownerName, location, ...restaurantData } = data;
+    const { brandColor, fontStyle, gradientStart, gradientEnd, useGradient, headingFont, bodyFont, accentFont, cuisine, ownerName, location, ...restaurantData } = data;
     if (location) restaurantData.address = location;
 
     const oldSlug = existing.slug;
@@ -116,10 +116,16 @@ router.put(
       );
     }
 
-    if (brandColor !== undefined || fontStyle !== undefined) {
+    if (brandColor !== undefined || fontStyle !== undefined || gradientStart !== undefined || gradientEnd !== undefined || useGradient !== undefined || headingFont !== undefined || bodyFont !== undefined || accentFont !== undefined) {
       const settingsUpdate: any = {};
       if (brandColor !== undefined) settingsUpdate.primaryColor = brandColor;
       if (fontStyle !== undefined) settingsUpdate.fontFamily = fontStyle;
+      if (gradientStart !== undefined) settingsUpdate.gradientStart = gradientStart;
+      if (gradientEnd !== undefined) settingsUpdate.gradientEnd = gradientEnd;
+      if (useGradient !== undefined) settingsUpdate.useGradient = useGradient;
+      if (headingFont !== undefined) settingsUpdate.headingFont = headingFont;
+      if (bodyFont !== undefined) settingsUpdate.bodyFont = bodyFont;
+      if (accentFont !== undefined) settingsUpdate.accentFont = accentFont;
       await prisma.restaurantSettings.upsert({
         where: { restaurantId },
         create: { restaurantId, ...settingsUpdate },

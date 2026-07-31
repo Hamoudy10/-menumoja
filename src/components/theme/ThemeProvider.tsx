@@ -15,6 +15,7 @@ interface ThemeConfig {
 interface ThemeContextType {
   theme: ThemeConfig
   updateTheme: (config: Partial<ThemeConfig>) => void
+  applyTheme: (config: Partial<ThemeConfig>) => void
   generatePalette: (color: string) => Record<string, string>
 }
 
@@ -32,6 +33,7 @@ const defaultTheme: ThemeConfig = {
 const ThemeContext = createContext<ThemeContextType>({
   theme: defaultTheme,
   updateTheme: () => {},
+  applyTheme: () => {},
   generatePalette: () => ({}),
 })
 
@@ -64,13 +66,13 @@ function generateColorPalette(baseColor: string): Record<string, string> {
   const lum = (0.299 * r + 0.587 * g + 0.114 * b) / 255
 
   const isLight = lum > 0.5
+  const accent = isLight ? adjustBrightness(baseColor, 30) : adjustBrightness(baseColor, -30)
 
   return {
-    '--color-primary': baseColor,
-    '--color-primary-light': adjustBrightness(baseColor, isLight ? -30 : 30),
-    '--color-primary-dark': adjustBrightness(baseColor, isLight ? 15 : -15),
-    '--color-secondary': isLight ? adjustBrightness(baseColor, -40) : adjustBrightness(baseColor, 40),
-    '--color-accent': isLight ? adjustBrightness(baseColor, 30) : adjustBrightness(baseColor, -30),
+    '--color-secondary': baseColor,
+    '--color-secondary-light': adjustBrightness(baseColor, isLight ? -20 : 20),
+    '--color-secondary-dark': adjustBrightness(baseColor, isLight ? 15 : -15),
+    '--color-accent': accent,
     '--color-success': '#2ECC71',
     '--color-warning': '#F39C12',
     '--color-danger': '#E74C3C',
@@ -80,6 +82,8 @@ function generateColorPalette(baseColor: string): Record<string, string> {
     '--color-text-primary': isLight ? '#1A1A2E' : '#F5F5F5',
     '--color-text-secondary': isLight ? '#6B7280' : '#A0AEC0',
     '--color-glass': isLight ? 'rgba(255,255,255,0.1)' : 'rgba(255,255,255,0.08)',
+    '--gradient-primary': `linear-gradient(135deg, ${baseColor}, ${accent})`,
+    '--gradient-secondary': `linear-gradient(135deg, ${accent}, ${baseColor})`,
   }
 }
 
@@ -89,7 +93,7 @@ function generateGradientPalette(start: string, end: string): Record<string, str
     ...base,
     '--gradient-primary': `linear-gradient(135deg, ${start}, ${end})`,
     '--gradient-secondary': `linear-gradient(135deg, ${end}, ${start})`,
-    '--color-primary': start,
+    '--color-secondary': start,
     '--color-accent': end,
   }
 }
@@ -125,12 +129,19 @@ export { googleFonts, GOOGLE_FONTS_URL }
 export default function ThemeProvider({ children }: { children: React.ReactNode }) {
   const { restaurant, darkMode } = useStore()
   const [theme, setTheme] = useState<ThemeConfig>(() => {
-    const saved = localStorage.getItem('app-theme')
-    return saved ? { ...defaultTheme, ...JSON.parse(saved) } : defaultTheme
+    try {
+      const saved = localStorage.getItem('app-theme')
+      return saved ? { ...defaultTheme, ...JSON.parse(saved) } : defaultTheme
+    } catch {
+      return defaultTheme
+    }
   })
 
   useEffect(() => {
-    setTheme(prev => ({ ...prev, darkMode }))
+    setTheme(prev => {
+      if (prev.darkMode === darkMode) return prev
+      return { ...prev, darkMode }
+    })
   }, [darkMode])
 
   useEffect(() => {
@@ -155,14 +166,22 @@ export default function ThemeProvider({ children }: { children: React.ReactNode 
   }, [theme])
 
   useEffect(() => {
-    if (restaurant?.brandColor) {
-      setTheme(prev => ({
-        ...prev,
-        brandColor: restaurant.brandColor || prev.brandColor,
-        fontHeading: restaurant.fontStyle === 'elegant' ? 'Playfair Display' : restaurant.fontStyle === 'classic' ? 'Merriweather' : 'Inter',
-      }))
-    }
-  }, [restaurant?.brandColor, restaurant?.fontStyle])
+    const s = restaurant?.settings
+    if (!s) return
+    if (localStorage.getItem('app-theme') !== null) return
+
+    const fontStyle = restaurant.fontStyle
+    setTheme(prev => ({
+      ...prev,
+      brandColor: s.primaryColor || prev.brandColor,
+      gradientStart: s.gradientStart || prev.gradientStart,
+      gradientEnd: s.gradientEnd || prev.gradientEnd,
+      useGradient: typeof s.useGradient === 'boolean' ? s.useGradient : prev.useGradient,
+      fontHeading: s.headingFont || (fontStyle === 'elegant' ? 'Playfair Display' : fontStyle === 'classic' ? 'Merriweather' : prev.fontHeading),
+      fontBody: s.bodyFont || prev.fontBody,
+      fontAccent: s.accentFont || prev.fontAccent,
+    }))
+  }, [restaurant?.settings, restaurant?.fontStyle])
 
   useEffect(() => {
     const link = document.createElement('link')
@@ -175,9 +194,15 @@ export default function ThemeProvider({ children }: { children: React.ReactNode 
   const updateTheme = useCallback((config: Partial<ThemeConfig>) => {
     setTheme(prev => {
       const next = { ...prev, ...config }
-      localStorage.setItem('app-theme', JSON.stringify(next))
+      try {
+        localStorage.setItem('app-theme', JSON.stringify(next))
+      } catch {}
       return next
     })
+  }, [])
+
+  const applyTheme = useCallback((config: Partial<ThemeConfig>) => {
+    setTheme(prev => ({ ...prev, ...config }))
   }, [])
 
   const generatePalette = useCallback((color: string) => {
@@ -185,7 +210,7 @@ export default function ThemeProvider({ children }: { children: React.ReactNode 
   }, [])
 
   return (
-    <ThemeContext.Provider value={{ theme, updateTheme, generatePalette }}>
+    <ThemeContext.Provider value={{ theme, updateTheme, applyTheme, generatePalette }}>
       {children}
     </ThemeContext.Provider>
   )

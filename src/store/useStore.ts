@@ -116,7 +116,15 @@ const defaultOnboarding: OnboardingData = {
 }
 
 export const useStore = create<AppState>((set) => ({
-  darkMode: false,
+  darkMode: (() => {
+    try {
+      return localStorage.getItem('app-theme')
+        ? (JSON.parse(localStorage.getItem('app-theme') || '{}').darkMode === true)
+        : false
+    } catch {
+      return false
+    }
+  })(),
   toggleDarkMode: () => set((s) => ({ darkMode: !s.darkMode })),
 
   isAuthenticated: false,
@@ -248,9 +256,13 @@ export const useStore = create<AppState>((set) => ({
       set({ accessToken, refreshToken, isAuthenticated: true, userRole: 'owner' })
       const data = await restaurantApi.fetchRestaurant()
       if (data) {
+        const restaurant = data.restaurant || data
+        if (restaurant && restaurant.settings && !restaurant.brandColor) {
+          restaurant.brandColor = restaurant.settings.primaryColor || '#FF6B35'
+        }
         set({
           userRole: data.user?.role || 'owner',
-          restaurant: data.restaurant || data,
+          restaurant,
         })
       }
     } catch (err: any) {
