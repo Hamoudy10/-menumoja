@@ -153,15 +153,29 @@ export function Footer() {
                 <li className="text-white/40 text-xs sm:text-sm font-body">
                   Mombasa, Kenya
                 </li>
-                <li className="text-white/40 text-xs sm:text-sm font-body">
-                  info@menumoja.co.ke
-                </li>
-                <li className="text-white/40 text-xs sm:text-sm font-body">
-                  +254 700 123 456
+                <li>
+                  <a
+                    href="mailto:badikuutechsolutions@gmail.com"
+                    className="text-white/40 hover:text-white transition-colors text-xs sm:text-sm font-body"
+                  >
+                    badikuutechsolutions@gmail.com
+                  </a>
                 </li>
                 <li>
                   <a
-                    href="#"
+                    href="https://wa.me/254742773562"
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="text-white/40 hover:text-white transition-colors text-xs sm:text-sm font-body"
+                  >
+                    +254 742 773 562
+                  </a>
+                </li>
+                <li>
+                  <a
+                    href="https://wa.me/254742773562?text=Hello%20BadikuuTech%20Solutions!%20I%27d%20like%20to%20know%20more%20about%20your%20platform."
+                    target="_blank"
+                    rel="noopener noreferrer"
                     className="inline-flex items-center gap-2 text-secondary hover:text-accent transition-colors text-xs sm:text-sm font-body font-medium"
                   >
                     <MessageCircle className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
@@ -174,7 +188,7 @@ export function Footer() {
 
           <div className="mt-10 sm:mt-14 lg:mt-16 pt-6 sm:pt-8 border-t border-white/5 flex flex-col sm:flex-row items-center justify-between gap-4">
             <p className="text-white/30 text-xs sm:text-sm font-body text-center sm:text-left">
-              &copy; {new Date().getFullYear()} MenuMoja. All rights reserved. 
+              &copy; {new Date().getFullYear()} BadikuuTech Solutions. All rights reserved. 
               Made with <span className="text-secondary">&#9829;</span> for Mombasa Restaurants.
             </p>
             <p className="text-white/20 text-[10px] sm:text-xs font-body">
@@ -199,7 +213,7 @@ export function Footer() {
       </motion.button>
 
       <motion.a
-        href="https://wa.me/254700123456?text=Hello%20MenuMoja!%20I%27d%20like%20to%20know%20more%20about%20your%20platform."
+        href="https://wa.me/254742773562?text=Hello%20BadikuuTech%20Solutions!%20I%27d%20like%20to%20know%20more%20about%20your%20platform."
         target="_blank"
         rel="noopener noreferrer"
         initial={{ opacity: 0, scale: 0 }}

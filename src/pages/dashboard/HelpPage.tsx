@@ -254,14 +254,14 @@ export default function HelpPage() {
             <p className="font-body text-sm text-white/70 mt-1">{t('help.support247')}</p>
           </div>
           <div className="flex items-center gap-4">
-            <div className="flex items-center gap-2">
+            <a href="https://wa.me/254742773562" target="_blank" rel="noopener noreferrer" className="flex items-center gap-2">
               <Phone className="h-4 w-4 text-accent" />
-              <span className="font-accent text-sm">+254 700 123 456</span>
-            </div>
-            <div className="flex items-center gap-2">
+              <span className="font-accent text-sm">+254 742 773 562</span>
+            </a>
+            <a href="mailto:badikuutechsolutions@gmail.com" className="flex items-center gap-2">
               <Mail className="h-4 w-4 text-accent" />
-              <span className="font-accent text-sm">support@menumoja.co.ke</span>
-            </div>
+              <span className="font-accent text-sm">badikuutechsolutions@gmail.com</span>
+            </a>
           </div>
         </div>
       </div>

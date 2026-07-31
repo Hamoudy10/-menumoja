@@ -575,7 +575,7 @@ export default function DemoPage() {
               <span className="text-white font-heading font-bold">MenuMoja</span>
             </div>
             <p className="text-gray-400 text-sm">
-              © 2025 MenuMoja. All rights reserved.
+              © {new Date().getFullYear()} BadikuuTech Solutions. All rights reserved.
             </p>
           </div>
         </div>
