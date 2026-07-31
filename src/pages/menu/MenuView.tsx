@@ -5,6 +5,7 @@ import { ShoppingCart, Plus, Minus, ChefHat, MapPin, Star, Search, Loader2, Chec
 import { useStore } from '@/store/useStore'
 import { Badge } from '@/components/ui/Badge'
 import { BrandLoader } from '@/components/ui/BrandLoader'
+import { AIChat } from '@/components/customer/AIChat'
 import { useTheme } from '@/components/theme/ThemeProvider'
 import * as menuApi from '@/api/menu'
 
@@ -375,6 +376,13 @@ export default function MenuView() {
           </div>
         ))}
       </main>
+
+      {restaurantInfo?.id && (
+        <AIChat
+          restaurantId={restaurantInfo.id}
+          menuItems={menuCategories.flatMap((cat) => cat.items)}
+        />
+      )}
     </div>
   )
 }

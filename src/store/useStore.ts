@@ -368,6 +368,20 @@ export const useStore = create<AppState>((set) => ({
         preparationTime: data.prepTime || 10,
         ingredients: data.ingredients || [],
         allergens: data.allergens || [],
+        calories: data.calories,
+        isHalal: !!data.isHalal,
+        isVegetarian: !!data.isVegetarian,
+        isVegan: !!data.isVegan,
+        isGlutenFree: !!data.isGlutenFree,
+        spiceLevel: data.spiceLevel,
+        containsNuts: !!data.containsNuts,
+        containsDairy: !!data.containsDairy,
+        containsSeafood: !!data.containsSeafood,
+        allergenNotes: data.allergenNotes,
+        nameSw: data.nameSw,
+        nameAr: data.nameAr,
+        descriptionSw: data.descriptionSw,
+        descriptionAr: data.descriptionAr,
       }
       const res = await menuApi.addItem(payload)
       const raw = res.item || res
@@ -381,13 +395,27 @@ export const useStore = create<AppState>((set) => ({
         dietaryTags: raw.dietaryTags || [],
         prepTime: raw.preparationTime || raw.prepTime || 10,
         available: raw.isAvailable !== false,
-        isSpecial: raw.isSpecial || false,
-        isPopular: raw.isPopular || false,
+        isSpecial: raw.isSpecial || raw.isTodaysSpecial || false,
+        isPopular: raw.isPopular || raw.isFeatured || false,
         isNew: raw.isNew ?? true,
         isPromoted: raw.isPromoted || false,
         order: raw.order ?? 0,
         ingredients: raw.ingredients || [],
         allergens: raw.allergens || [],
+        calories: raw.calories,
+        isHalal: raw.isHalal || false,
+        isVegetarian: raw.isVegetarian || false,
+        isVegan: raw.isVegan || false,
+        isGlutenFree: raw.isGlutenFree || false,
+        spiceLevel: raw.spiceLevel,
+        containsNuts: raw.containsNuts || false,
+        containsDairy: raw.containsDairy || false,
+        containsSeafood: raw.containsSeafood || false,
+        allergenNotes: raw.allergenNotes,
+        nameSw: raw.nameSw,
+        nameAr: raw.nameAr,
+        descriptionSw: raw.descriptionSw,
+        descriptionAr: raw.descriptionAr,
       }
       set((s) => ({
         categories: s.categories.map((c) =>
@@ -415,6 +443,20 @@ export const useStore = create<AppState>((set) => ({
       if (data.ingredients !== undefined) mapped.ingredients = data.ingredients
       if (data.allergens !== undefined) mapped.allergens = data.allergens
       if (data.photo !== undefined) mapped.image = data.photo
+      if (data.calories !== undefined) mapped.calories = data.calories
+      if (data.isHalal !== undefined) mapped.isHalal = data.isHalal
+      if (data.isVegetarian !== undefined) mapped.isVegetarian = data.isVegetarian
+      if (data.isVegan !== undefined) mapped.isVegan = data.isVegan
+      if (data.isGlutenFree !== undefined) mapped.isGlutenFree = data.isGlutenFree
+      if (data.spiceLevel !== undefined) mapped.spiceLevel = data.spiceLevel
+      if (data.containsNuts !== undefined) mapped.containsNuts = data.containsNuts
+      if (data.containsDairy !== undefined) mapped.containsDairy = data.containsDairy
+      if (data.containsSeafood !== undefined) mapped.containsSeafood = data.containsSeafood
+      if (data.allergenNotes !== undefined) mapped.allergenNotes = data.allergenNotes
+      if (data.nameSw !== undefined) mapped.nameSw = data.nameSw
+      if (data.nameAr !== undefined) mapped.nameAr = data.nameAr
+      if (data.descriptionSw !== undefined) mapped.descriptionSw = data.descriptionSw
+      if (data.descriptionAr !== undefined) mapped.descriptionAr = data.descriptionAr
       const res = await menuApi.updateItem(itemId, mapped)
       const raw = res.item || res
       const normalized = {
@@ -427,13 +469,27 @@ export const useStore = create<AppState>((set) => ({
         dietaryTags: raw.dietaryTags || raw.dietaryTags,
         prepTime: raw.preparationTime !== undefined ? raw.preparationTime : raw.prepTime,
         available: raw.isAvailable !== undefined ? raw.isAvailable : raw.available,
-        isSpecial: raw.isSpecial,
-        isPopular: raw.isPopular,
+        isSpecial: raw.isSpecial || raw.isTodaysSpecial,
+        isPopular: raw.isPopular || raw.isFeatured,
         isNew: raw.isNew,
         isPromoted: raw.isPromoted,
         order: raw.order,
         ingredients: raw.ingredients,
         allergens: raw.allergens,
+        calories: raw.calories,
+        isHalal: raw.isHalal || false,
+        isVegetarian: raw.isVegetarian || false,
+        isVegan: raw.isVegan || false,
+        isGlutenFree: raw.isGlutenFree || false,
+        spiceLevel: raw.spiceLevel,
+        containsNuts: raw.containsNuts || false,
+        containsDairy: raw.containsDairy || false,
+        containsSeafood: raw.containsSeafood || false,
+        allergenNotes: raw.allergenNotes,
+        nameSw: raw.nameSw,
+        nameAr: raw.nameAr,
+        descriptionSw: raw.descriptionSw,
+        descriptionAr: raw.descriptionAr,
       }
       set((s) => ({
         categories: s.categories.map((c) =>

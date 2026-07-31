@@ -329,11 +329,23 @@ router.post(
         isTodaysSpecial: data.isSpecial ?? false,
         isFeatured: data.isPopular ?? false,
         isNew: data.isNew ?? false,
+        isHalal: data.isHalal ?? false,
+        isVegetarian: data.isVegetarian ?? false,
+        isVegan: data.isVegan ?? false,
+        isGlutenFree: data.isGlutenFree ?? false,
+        spiceLevel: data.spiceLevel ?? 'NONE',
+        containsNuts: data.containsNuts ?? false,
+        containsDairy: data.containsDairy ?? false,
+        containsSeafood: data.containsSeafood ?? false,
+        allergenNotes: data.allergenNotes || (data.allergens?.join(', ') ?? null),
+        nameSw: data.nameSw || null,
+        nameAr: data.nameAr || null,
+        descriptionSw: data.descriptionSw || null,
+        descriptionAr: data.descriptionAr || null,
         photoUrl: data.image,
         preparationTimeMinutes: data.preparationTime,
         calories: data.calories,
         ingredients: data.ingredients || [],
-        allergenNotes: data.allergens?.join(', '),
         sortOrder: (maxOrder._max.sortOrder ?? -1) + 1,
       },
     });
@@ -372,6 +384,20 @@ router.put(
     if (data.isPopular !== undefined) updateData.isFeatured = data.isPopular;
     if (data.isSpecial !== undefined) updateData.isTodaysSpecial = data.isSpecial;
     if (data.isNew !== undefined) updateData.isNew = data.isNew;
+    if (data.isHalal !== undefined) updateData.isHalal = data.isHalal;
+    if (data.isVegetarian !== undefined) updateData.isVegetarian = data.isVegetarian;
+    if (data.isVegan !== undefined) updateData.isVegan = data.isVegan;
+    if (data.isGlutenFree !== undefined) updateData.isGlutenFree = data.isGlutenFree;
+    if (data.spiceLevel !== undefined) updateData.spiceLevel = data.spiceLevel;
+    if (data.containsNuts !== undefined) updateData.containsNuts = data.containsNuts;
+    if (data.containsDairy !== undefined) updateData.containsDairy = data.containsDairy;
+    if (data.containsSeafood !== undefined) updateData.containsSeafood = data.containsSeafood;
+    if (data.allergenNotes !== undefined) updateData.allergenNotes = data.allergenNotes;
+    if (data.nameSw !== undefined) updateData.nameSw = data.nameSw;
+    if (data.nameAr !== undefined) updateData.nameAr = data.nameAr;
+    if (data.descriptionSw !== undefined) updateData.descriptionSw = data.descriptionSw;
+    if (data.descriptionAr !== undefined) updateData.descriptionAr = data.descriptionAr;
+    if (data.calories !== undefined) updateData.calories = data.calories;
     if (data.preparationTime !== undefined) updateData.preparationTimeMinutes = data.preparationTime;
     if (data.calories !== undefined) updateData.calories = data.calories;
     if (data.ingredients !== undefined) updateData.ingredients = data.ingredients;

@@ -173,6 +173,19 @@ export const createItemSchema = z
     calories: z.number().int().min(0).optional(),
     ingredients: z.array(z.string()).max(100).optional(),
     allergens: z.array(z.string()).max(50).optional(),
+    nameSw: z.string().max(200).optional(),
+    nameAr: z.string().max(200).optional(),
+    descriptionSw: z.string().max(2000).optional(),
+    descriptionAr: z.string().max(2000).optional(),
+    isHalal: z.boolean().optional(),
+    isVegetarian: z.boolean().optional(),
+    isVegan: z.boolean().optional(),
+    isGlutenFree: z.boolean().optional(),
+    spiceLevel: z.enum(['NONE', 'MILD', 'MEDIUM', 'HOT', 'VERY_HOT']).optional(),
+    containsNuts: z.boolean().optional(),
+    containsDairy: z.boolean().optional(),
+    containsSeafood: z.boolean().optional(),
+    allergenNotes: z.string().max(500).optional(),
     variations: z
       .array(
         z.object({

@@ -2,7 +2,7 @@ import { useState, useEffect, useCallback } from 'react'
 import { motion, AnimatePresence, Reorder } from 'framer-motion'
 import {
   Plus, Grid3X3, List, Image, X, Check, Search,
-  Edit3, Trash2, Eye, EyeOff, GripVertical, Tag, Sparkles, RefreshCw, Loader2,
+  Edit3, Trash2, Eye, EyeOff, GripVertical, Tag, Sparkles, RefreshCw, Loader2, Globe, ChevronDown,
 } from 'lucide-react'
 import { useStore } from '@/store/useStore'
 import { useTranslation } from 'react-i18next'
@@ -20,7 +20,21 @@ const defaultItem = (categoryId: string, order: number): Partial<MenuItem> => ({
   name: '', price: 0, description: '', photo: '', categoryId,
   dietaryTags: [], prepTime: 10, available: true, isSpecial: false, isPopular: false,
   isNew: true, isPromoted: false, order, ingredients: [], allergens: [],
+  isHalal: false, isVegetarian: false, isVegan: false, isGlutenFree: false,
+  spiceLevel: 'NONE', containsNuts: false, containsDairy: false, containsSeafood: false,
+  calories: 0, allergenNotes: '', nameSw: '', nameAr: '', descriptionSw: '', descriptionAr: '',
 })
+
+const ALLERGEN_QUICK = [
+  { label: 'Nuts / Peanuts', key: 'nuts' as const },
+  { label: 'Dairy / Milk', key: 'dairy' as const },
+  { label: 'Fish / Seafood', key: 'seafood' as const },
+  { label: 'Eggs', key: 'eggs' as const },
+  { label: 'Soy', key: 'soy' as const },
+  { label: 'Sesame', key: 'sesame' as const },
+]
+
+const SPICE_LEVELS = ['NONE', 'MILD', 'MEDIUM', 'HOT', 'VERY_HOT']
 
 export default function MenuManager() {
   const { t } = useTranslation()
@@ -73,6 +87,7 @@ export default function MenuManager() {
   const [generatingOptions, setGeneratingOptions] = useState(false)
   const [aiGenerating, setAiGenerating] = useState(false)
   const [itemSaving, setItemSaving] = useState(false)
+  const [showAdvanced, setShowAdvanced] = useState(false)
   const [quickSaving, setQuickSaving] = useState(false)
   const [bulkDeleting, setBulkDeleting] = useState(false)
 
@@ -636,7 +651,7 @@ export default function MenuManager() {
                       <label key={flag} className="flex items-center gap-2 cursor-pointer">
                         <input
                           type="checkbox"
-                          checked={!!(editForm as any)[flag]}
+                          checked={!!editForm[flag]}
                           onChange={(e) => setEditForm({ ...editForm, [flag]: e.target.checked })}
                           className="rounded border-gray-300 text-secondary focus:ring-secondary"
                         />
@@ -646,29 +661,132 @@ export default function MenuManager() {
                   </div>
                 </div>
 
+                <div className="grid grid-cols-2 gap-3">
+                  <Input label="Calories (kcal)" type="number" value={editForm.calories ?? ''} onChange={(e) => setEditForm({ ...editForm, calories: parseInt(e.target.value) || 0 })} />
+                  <div>
+                    <label className="mb-2 block font-accent text-sm font-medium text-text-primary dark:text-white/90">Spice Level</label>
+                    <select
+                      value={editForm.spiceLevel || 'NONE'}
+                      onChange={(e) => setEditForm({ ...editForm, spiceLevel: e.target.value })}
+                      className="w-full rounded-xl border-2 border-gray-200 dark:border-white/20 bg-white dark:bg-white/5 px-3 py-2.5 font-body text-sm text-text-primary dark:text-white focus:border-secondary focus:outline-none"
+                    >
+                      {SPICE_LEVELS.map((lvl) => (
+                        <option key={lvl} value={lvl}>{lvl.charAt(0) + lvl.slice(1).toLowerCase()}</option>
+                      ))}
+                    </select>
+                  </div>
+                </div>
+
                 <div>
                   <label className="mb-2 block font-accent text-sm font-medium text-text-primary dark:text-white/90">{t('menu.dietaryTags')}</label>
-                  <div className="flex flex-wrap gap-2">
-                    {['Halal', 'Vegetarian', 'Vegan', 'Spicy', 'Gluten-Free'].map((tag) => (
-                      <button
-                        key={tag}
-                        onClick={() => {
-                          const currentTags = editForm.dietaryTags || []
-                          const tags = currentTags.includes(tag)
-                            ? currentTags.filter((t) => t !== tag)
-                            : [...currentTags, tag]
-                          setEditForm({ ...editForm, dietaryTags: tags })
-                        }}
-                        className={`rounded-full px-3 py-1 text-xs font-accent font-medium transition-colors ${
-                          (editForm.dietaryTags || []).includes(tag)
-                            ? 'bg-secondary text-white'
-                            : 'bg-black/5 dark:bg-white/10 text-text-secondary dark:text-white/60 hover:bg-black/10 dark:hover:bg-white/20'
-                        }`}
-                      >
-                        {tag}
-                      </button>
+                  <div className="grid grid-cols-2 gap-2">
+                    {([
+                      { key: 'isHalal', label: 'Halal', icon: '☪️' },
+                      { key: 'isVegetarian', label: 'Vegetarian', icon: '🥦' },
+                      { key: 'isVegan', label: 'Vegan', icon: '🌱' },
+                      { key: 'isGlutenFree', label: 'Gluten-Free', icon: '🌾' },
+                    ] as const).map(({ key, label, icon }) => (
+                      <label key={key} className={`flex items-center gap-2 rounded-xl border px-3 py-2.5 cursor-pointer transition-colors ${
+                        editForm[key] ? 'border-secondary bg-secondary/10 text-secondary' : 'border-gray-200 dark:border-white/20 text-text-secondary hover:border-gray-300'
+                      }`}>
+                        <input
+                          type="checkbox"
+                          checked={!!editForm[key]}
+                          onChange={(e) => setEditForm({ ...editForm, [key]: e.target.checked })}
+                          className="rounded border-gray-300 text-secondary focus:ring-secondary"
+                        />
+                        <span className="text-xs font-medium">{icon} {label}</span>
+                      </label>
                     ))}
                   </div>
+                </div>
+
+                <div>
+                  <label className="mb-2 block font-accent text-sm font-medium text-text-primary dark:text-white/90">Ingredients</label>
+                  <textarea
+                    value={(editForm.ingredients || []).join('\n')}
+                    onChange={(e) => setEditForm({ ...editForm, ingredients: e.target.value.split('\n').map((s) => s.trim()).filter(Boolean) })}
+                    placeholder="One ingredient per line&#10;e.g. Beef, Onions, Garlic"
+                    rows={3}
+                    className="w-full rounded-xl border-2 border-gray-200 dark:border-white/20 bg-white dark:bg-white/5 px-4 py-2.5 font-body text-sm text-text-primary dark:text-white placeholder:text-text-secondary/50 focus:border-secondary focus:outline-none"
+                  />
+                </div>
+
+                <div>
+                  <label className="mb-2 block font-accent text-sm font-medium text-text-primary dark:text-white/90">Allergens</label>
+                  <div className="flex flex-wrap gap-2 mb-2">
+                    {ALLERGEN_QUICK.map((a) => {
+                      const isOn = a.key === 'nuts'
+                        ? !!editForm.containsNuts
+                        : a.key === 'dairy'
+                          ? !!editForm.containsDairy
+                          : a.key === 'seafood'
+                            ? !!editForm.containsSeafood
+                            : ((editForm.allergenNotes || '').toLowerCase().includes(a.label.split(' ')[0].toLowerCase()))
+                      return (
+                        <button
+                          key={a.key}
+                          type="button"
+                          onClick={() => {
+                            if (a.key === 'nuts') setEditForm({ ...editForm, containsNuts: !editForm.containsNuts })
+                            else if (a.key === 'dairy') setEditForm({ ...editForm, containsDairy: !editForm.containsDairy })
+                            else if (a.key === 'seafood') setEditForm({ ...editForm, containsSeafood: !editForm.containsSeafood })
+                            else {
+                              const notes = editForm.allergenNotes || ''
+                              const tag = a.label.split(' ')[0]
+                              const re = new RegExp(tag, 'i')
+                              const has = re.test(notes)
+                              const list = notes.split(',').map((s) => s.trim()).filter(Boolean)
+                              setEditForm({
+                                ...editForm,
+                                allergenNotes: has ? list.filter((s) => !re.test(s)).join(', ') : [...list, tag].join(', '),
+                              })
+                            }
+                          }}
+                          className={`rounded-full px-3 py-1 text-xs font-accent font-medium transition-colors ${
+                            isOn ? 'bg-red-500/15 text-red-500 border border-red-500/30' : 'bg-black/5 dark:bg-white/10 text-text-secondary dark:text-white/60 border border-transparent hover:bg-black/10 dark:hover:bg-white/20'
+                          }`}
+                        >
+                          {a.label}
+                        </button>
+                      )
+                    })}
+                  </div>
+                  <Input
+                    label="Other allergen notes"
+                    value={editForm.allergenNotes || ''}
+                    onChange={(e) => setEditForm({ ...editForm, allergenNotes: e.target.value })}
+                    placeholder="e.g. May contain traces of sesame"
+                  />
+                </div>
+
+                <div className="rounded-xl border border-white/10 overflow-hidden">
+                  <button
+                    type="button"
+                    onClick={() => setShowAdvanced(!showAdvanced)}
+                    className="w-full flex items-center justify-between px-4 py-3 bg-black/5 dark:bg-white/5 text-text-primary dark:text-white/90 font-accent text-sm font-medium"
+                  >
+                    <span className="flex items-center gap-2"><Globe className="h-4 w-4 text-text-secondary" /> Localized names & descriptions</span>
+                    <ChevronDown className={`h-4 w-4 text-text-secondary transition-transform ${showAdvanced ? 'rotate-180' : ''}`} />
+                  </button>
+                  <AnimatePresence>
+                    {showAdvanced && (
+                      <motion.div initial={{ height: 0, opacity: 0 }} animate={{ height: 'auto', opacity: 1 }} exit={{ height: 0, opacity: 0 }} className="overflow-hidden">
+                        <div className="p-4 space-y-3">
+                          <Input label="Name (Swahili)" value={editForm.nameSw || ''} onChange={(e) => setEditForm({ ...editForm, nameSw: e.target.value })} />
+                          <Input label="Name (Arabic)" value={editForm.nameAr || ''} onChange={(e) => setEditForm({ ...editForm, nameAr: e.target.value })} />
+                          <div>
+                            <label className="mb-1 block font-accent text-xs font-medium text-text-secondary">Description (Swahili)</label>
+                            <textarea value={editForm.descriptionSw || ''} onChange={(e) => setEditForm({ ...editForm, descriptionSw: e.target.value })} rows={2} className="w-full rounded-xl border-2 border-gray-200 dark:border-white/20 bg-white dark:bg-white/5 px-4 py-2.5 font-body text-sm text-text-primary dark:text-white focus:border-secondary focus:outline-none" />
+                          </div>
+                          <div>
+                            <label className="mb-1 block font-accent text-xs font-medium text-text-secondary">Description (Arabic)</label>
+                            <textarea value={editForm.descriptionAr || ''} onChange={(e) => setEditForm({ ...editForm, descriptionAr: e.target.value })} rows={2} className="w-full rounded-xl border-2 border-gray-200 dark:border-white/20 bg-white dark:bg-white/5 px-4 py-2.5 font-body text-sm text-text-primary dark:text-white focus:border-secondary focus:outline-none" />
+                          </div>
+                        </div>
+                      </motion.div>
+                    )}
+                  </AnimatePresence>
                 </div>
 
                 <div className="flex gap-3 pt-4 border-t border-white/10">
@@ -684,6 +802,15 @@ export default function MenuManager() {
                           isSpecial: !!editForm.isSpecial, isPopular: !!editForm.isPopular,
                           isNew: editForm.isNew !== false, isPromoted: !!editForm.isPromoted,
                           ingredients: editForm.ingredients || [], allergens: editForm.allergens || [],
+                          calories: editForm.calories,
+                          isHalal: !!editForm.isHalal, isVegetarian: !!editForm.isVegetarian,
+                          isVegan: !!editForm.isVegan, isGlutenFree: !!editForm.isGlutenFree,
+                          spiceLevel: editForm.spiceLevel || 'NONE',
+                          containsNuts: !!editForm.containsNuts, containsDairy: !!editForm.containsDairy,
+                          containsSeafood: !!editForm.containsSeafood,
+                          allergenNotes: editForm.allergenNotes || '',
+                          nameSw: editForm.nameSw, nameAr: editForm.nameAr,
+                          descriptionSw: editForm.descriptionSw, descriptionAr: editForm.descriptionAr,
                         })
                       }
                       setEditingItem(null)

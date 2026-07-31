@@ -66,6 +66,20 @@ export interface MenuItem {
   order: number
   ingredients: string[]
   allergens: string[]
+  isHalal?: boolean
+  isVegetarian?: boolean
+  isVegan?: boolean
+  isGlutenFree?: boolean
+  spiceLevel?: string
+  containsNuts?: boolean
+  containsDairy?: boolean
+  containsSeafood?: boolean
+  calories?: number
+  allergenNotes?: string
+  nameSw?: string
+  nameAr?: string
+  descriptionSw?: string
+  descriptionAr?: string
 }
 
 export interface Order {
