@@ -173,7 +173,7 @@ export default function App() {
           toastOptions={{
             style: {
               borderRadius: '12px',
-              background: '#1A2A4A',
+              background: 'var(--color-primary-light)',
               color: '#fff',
               fontSize: '14px',
             },

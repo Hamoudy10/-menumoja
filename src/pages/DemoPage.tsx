@@ -20,7 +20,7 @@ const features = [
     icon: Smartphone,
     title: 'Digital Menu',
     description: 'Beautiful mobile-optimized menu with QR code access',
-    color: '#FF6B35',
+    color: 'var(--color-secondary)',
   },
   {
     icon: QrCode,
@@ -236,7 +236,7 @@ export default function DemoPage() {
                       <div className="flex items-center gap-2">
                         <div className="flex gap-1.5">
                           <div className="w-2.5 h-2.5 rounded-full bg-red-400" />
-                          <div className="w-2.5 h-2.5 rounded-full bg-yellow-400" />
+                          <div className="w-2.5 h-2.5 rounded-full bg-secondary" />
                           <div className="w-2.5 h-2.5 rounded-full bg-success" />
                         </div>
                         <span className="text-xs text-text-secondary ml-2 font-medium">Dashboard Preview</span>
@@ -336,7 +336,7 @@ export default function DemoPage() {
                                   <p className="text-xs font-bold text-secondary">{order.total}</p>
                                   <span className={`text-[8px] px-1.5 py-0.5 rounded font-medium ${
                                     order.status === 'New' ? 'bg-success/10 text-success' :
-                                    order.status === 'Preparing' ? 'bg-accent/10 text-accent' : 'bg-blue-50 text-blue-400'
+                                    order.status === 'Preparing' ? 'bg-accent/10 text-accent' : 'bg-secondary/10 text-secondary'
                                   }`}>{order.status}</span>
                                 </div>
                               </div>

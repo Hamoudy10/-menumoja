@@ -162,7 +162,7 @@ export default function AdminSettings() {
         className="bg-primary-light border border-white/5 rounded-2xl p-5 space-y-5"
       >
         <div className="flex items-center gap-3">
-          <div className="w-9 h-9 rounded-xl bg-gradient-to-br from-blue-500 to-purple-500 flex items-center justify-center">
+          <div className="w-9 h-9 rounded-xl grad-brand flex items-center justify-center">
             <Key className="w-4.5 h-4.5 text-white" />
           </div>
           <h3 className="text-sm font-semibold text-white">API Keys</h3>

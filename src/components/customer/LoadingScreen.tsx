@@ -91,7 +91,7 @@ export function LoadingScreen() {
         <div className="h-1 overflow-hidden rounded-full bg-white/20">
           <motion.div
             className="h-full rounded-full"
-            style={{ backgroundColor: '#FFD700' }}
+            style={{ backgroundColor: 'var(--color-accent)' }}
             animate={{ width: `${Math.min(progress, 100)}%` }}
             transition={{ duration: 0.3 }}
           />

@@ -25,8 +25,8 @@ export default function DashboardHome() {
     return [
       { label: 'Total Orders Today', value: String(todayOrders), icon: ShoppingCart, change: `${todayOrders > 0 ? '+' : ''}${todayOrders} today`, color: 'from-secondary to-accent' },
       { label: 'Revenue Today', value: `KES ${todayRevenue.toLocaleString()}`, icon: DollarSign, change: avgOrder > 0 ? `Avg KES ${avgOrder.toLocaleString()}` : 'No data', color: 'from-success to-emerald-400' },
-      { label: 'Active Tables', value: `${activeTables} / ${totalTables}`, icon: Store, change: `${totalTables > 0 ? Math.round((activeTables / totalTables) * 100) : 0}%`, color: 'from-blue-500 to-purple-500' },
-      { label: 'Avg. Order Value', value: `KES ${avgOrder.toLocaleString()}`, icon: TrendingUp, change: '+0%', color: 'from-pink-500 to-rose-400' },
+      { label: 'Active Tables', value: `${activeTables} / ${totalTables}`, icon: Store, change: `${totalTables > 0 ? Math.round((activeTables / totalTables) * 100) : 0}%`, color: 'grad-brand-dark' },
+      { label: 'Avg. Order Value', value: `KES ${avgOrder.toLocaleString()}`, icon: TrendingUp, change: '+0%', color: 'grad-brand-soft' },
     ]
   }, [orders, tables, transactions, todaySummary])
 
@@ -140,8 +140,8 @@ export default function DashboardHome() {
               {[
                 { label: 'View Menu', icon: Store, color: 'bg-secondary/10 text-secondary', link: '/dashboard/menu' },
                 { label: 'New Order', icon: ShoppingCart, color: 'bg-success/10 text-success', link: '/dashboard/orders' },
-                { label: 'Analytics', icon: TrendingUp, color: 'bg-blue-500/10 text-blue-500', link: '/dashboard/analytics' },
-                { label: 'Settings', icon: Users, color: 'bg-purple-500/10 text-purple-500', link: '/dashboard/settings' },
+                { label: 'Analytics', icon: TrendingUp, color: 'bg-secondary/10 text-secondary', link: '/dashboard/analytics' },
+                { label: 'Settings', icon: Users, color: 'bg-accent/10 text-accent', link: '/dashboard/settings' },
               ].map((action, i) => {
                 const Icon = action.icon
                 return (

@@ -232,7 +232,7 @@ export default function Step2Profile({ onNext, onPrev }: Props) {
       </div>
 
       <Card padding="none" className="overflow-hidden mb-6">
-        <div className="h-[520px] overflow-y-auto p-6 bg-gradient-to-b from-orange-50/50 to-white">
+        <div className="h-[520px] overflow-y-auto p-6 bg-gradient-to-b from-accent/10 to-white">
           <ChatBubble text={aiMessages.type} isAi />
 
           {formValues.restaurantType && (

@@ -73,6 +73,7 @@ function generateColorPalette(baseColor: string): Record<string, string> {
     '--color-secondary-light': adjustBrightness(baseColor, isLight ? -20 : 20),
     '--color-secondary-dark': adjustBrightness(baseColor, isLight ? 15 : -15),
     '--color-accent': accent,
+    '--color-accent-dark': adjustBrightness(accent, isLight ? 15 : -15),
     '--color-success': '#2ECC71',
     '--color-warning': '#F39C12',
     '--color-danger': '#E74C3C',

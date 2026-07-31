@@ -9,8 +9,8 @@ import { Badge } from '@/components/ui/Badge'
 
 const revenueByPlanDonut = [
   { name: 'Starter', value: 850000, color: '#6B7280', restaurants: 145 },
-  { name: 'Business', value: 1200000, color: '#FF6B35', restaurants: 78 },
-  { name: 'Premium', value: 650000, color: '#FFD700', restaurants: 24 },
+  { name: 'Business', value: 1200000, color: 'var(--color-secondary)', restaurants: 78 },
+  { name: 'Premium', value: 650000, color: 'var(--color-accent)', restaurants: 24 },
 ]
 
 const mrrTrend = [
@@ -138,7 +138,7 @@ export default function AdminSubscriptions() {
         >
           <div className="flex items-center justify-between mb-2">
             <p className="text-xs text-white/40">Upcoming Renewals</p>
-            <div className="w-9 h-9 rounded-xl bg-gradient-to-br from-blue-500 to-purple-500 flex items-center justify-center">
+            <div className="w-9 h-9 rounded-xl grad-brand flex items-center justify-center">
               <Calendar className="w-4.5 h-4.5 text-white" />
             </div>
           </div>

@@ -150,7 +150,7 @@ export function MenuItemCard({ item, onItemClick, layout }: MenuItemCardProps) {
             </span>
           )}
           {item.isNew && (
-            <span className="rounded-full bg-purple-500/90 px-2 py-0.5 text-[10px] font-bold text-white shadow-sm">
+            <span className="rounded-full bg-secondary px-2 py-0.5 text-[10px] font-bold text-white shadow-sm">
               ✨ New
             </span>
           )}

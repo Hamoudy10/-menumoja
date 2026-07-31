@@ -12,10 +12,10 @@ interface StatCardProps {
 }
 
 const colorMap: Record<string, string> = {
-  primary: 'from-blue-500 to-purple-500',
-  secondary: 'from-secondary to-accent',
+  primary: 'grad-brand-dark',
+  secondary: 'grad-brand',
   success: 'from-success to-emerald-400',
-  accent: 'from-pink-500 to-rose-400',
+  accent: 'grad-brand-soft',
 }
 
 export function StatCard({ icon, label, value, prefix = '', trend, trendLabel, color = 'primary' }: StatCardProps) {

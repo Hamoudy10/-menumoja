@@ -93,9 +93,9 @@ export default function AdminOverview() {
   const stats = [
     { label: 'Total Restaurants', value: '247', icon: Store, change: '+12%', up: true, color: 'from-secondary to-accent' },
     { label: 'Orders Today', value: '1,247', icon: ShoppingCart, change: '+8.3%', up: true, color: 'from-success to-emerald-400' },
-    { label: 'Revenue Processed', value: 'KES 2.3M', icon: DollarSign, change: '+15.2%', up: true, color: 'from-blue-500 to-purple-500' },
-    { label: 'New This Month', value: '18', icon: UserPlus, change: '+24%', up: true, color: 'from-pink-500 to-rose-400' },
-    { label: 'Churn Rate', value: '2.3%', icon: TrendingDown, change: '-0.4%', up: false, color: 'from-amber-500 to-orange-400' },
+    { label: 'Revenue Processed', value: 'KES 2.3M', icon: DollarSign, change: '+15.2%', up: true, color: 'grad-brand-dark' },
+    { label: 'New This Month', value: '18', icon: UserPlus, change: '+24%', up: true, color: 'grad-brand-soft' },
+    { label: 'Churn Rate', value: '2.3%', icon: TrendingDown, change: '-0.4%', up: false, color: 'grad-brand' },
     { label: 'Uptime', value: '99.9%', icon: Activity, change: '0.1%', up: true, color: 'from-green-500 to-teal-400' },
   ]
 
@@ -185,7 +185,7 @@ export default function AdminOverview() {
               <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.05)" />
               <XAxis dataKey="month" stroke="rgba(255,255,255,0.3)" tick={{ fontSize: 11 }} />
               <YAxis stroke="rgba(255,255,255,0.3)" tick={{ fontSize: 11 }} />
-              <Tooltip contentStyle={{ background: '#1A2A4A', border: '1px solid rgba(255,255,255,0.1)', borderRadius: 12, color: '#fff' }} />
+              <Tooltip contentStyle={{ background: 'var(--color-primary-light)', border: '1px solid rgba(255,255,255,0.1)', borderRadius: 12, color: '#fff' }} />
               <Area type="monotone" dataKey="new" stroke="#2ECC71" fill="#2ECC71" fillOpacity={0.15} strokeWidth={2} />
               <Area type="monotone" dataKey="cancellations" stroke="#EF4444" fill="#EF4444" fillOpacity={0.15} strokeWidth={2} />
             </AreaChart>

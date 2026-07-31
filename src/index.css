@@ -35,6 +35,7 @@
   --color-primary-light: #1A2A4A;
   --color-secondary: #FF6B35;
   --color-accent: #FFD700;
+  --color-accent-dark: #D4AF37;
   --color-success: #2ECC71;
   --color-warning: #F39C12;
   --color-danger: #E74C3C;
@@ -69,6 +70,15 @@
     -webkit-background-clip: text;
     -webkit-text-fill-color: transparent;
     background-clip: text;
+  }
+  .grad-brand {
+    background-image: var(--gradient-primary);
+  }
+  .grad-brand-dark {
+    background-image: linear-gradient(135deg, var(--color-secondary-dark), var(--color-secondary));
+  }
+  .grad-brand-soft {
+    background-image: linear-gradient(135deg, var(--color-accent), var(--color-secondary-light));
   }
   .shadow-soft {
     box-shadow: 0 2px 20px rgba(0, 0, 0, 0.06);

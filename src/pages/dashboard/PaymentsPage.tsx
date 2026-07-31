@@ -51,7 +51,7 @@ export default function PaymentsPage() {
 
   const pieData = [
     { name: 'M-Pesa', value: totals.mpesaTotal, color: '#3B82F6' },
-    { name: 'Cash', value: totals.cashTotal, color: '#FF6B35' },
+    { name: 'Cash', value: totals.cashTotal, color: 'var(--color-secondary)' },
   ]
 
   return (

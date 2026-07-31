@@ -69,7 +69,7 @@ export default function AnalyticsPage() {
         const totalRev = safeNum(m.totalRevenue)
         if (totalRev > 0) {
           if (mpesa > 0) parts.push({ name: 'M-Pesa', value: Math.round((mpesa / totalRev) * 100), color: '#3B82F6' })
-          if (cash > 0) parts.push({ name: 'Cash', value: Math.round((cash / totalRev) * 100), color: '#FF6B35' })
+          if (cash > 0) parts.push({ name: 'Cash', value: Math.round((cash / totalRev) * 100), color: 'var(--color-secondary)' })
           const card = totalRev - mpesa - cash
           if (card > 0) parts.push({ name: 'Card', value: Math.round((card / totalRev) * 100), color: '#2ECC71' })
         }
@@ -91,11 +91,11 @@ export default function AnalyticsPage() {
     const topItem = m.topItem || topItems[0]
     return [
       { icon: DollarSign, label: 'Revenue', value: formatKES(rev), sub: overview?.comparisons?.revenueChange != null ? `${overview.comparisons.revenueChange > 0 ? '+' : ''}${overview.comparisons.revenueChange}%` : null, color: 'from-secondary to-accent' },
-      { icon: ShoppingBag, label: 'Orders', value: orders.toLocaleString(), sub: overview?.comparisons?.ordersChange != null ? `${overview.comparisons.ordersChange > 0 ? '+' : ''}${overview.comparisons.ordersChange}%` : null, color: 'from-blue-500 to-purple-500' },
+      { icon: ShoppingBag, label: 'Orders', value: orders.toLocaleString(), sub: overview?.comparisons?.ordersChange != null ? `${overview.comparisons.ordersChange > 0 ? '+' : ''}${overview.comparisons.ordersChange}%` : null, color: 'grad-brand-dark' },
       { icon: TrendingUp, label: 'Avg Order', value: formatKES(avgOrder), sub: null, color: 'from-success to-emerald-400' },
-      { icon: ScanLine, label: 'QR Scans', value: scans.toLocaleString(), sub: overview?.comparisons?.scansChange != null ? `${overview.comparisons.scansChange > 0 ? '+' : ''}${overview.comparisons.scansChange}%` : null, color: 'from-pink-500 to-rose-400' },
-      { icon: Star, label: 'Top Item', value: topItem?.name || '--', sub: topItem?.orders ? `${topItem.orders} orders` : null, color: 'from-amber-500 to-yellow-300' },
-      { icon: Clock, label: `${period === 'today' ? 'Today' : period === 'week' ? 'This Week' : 'This Month'}`, value: `${orders} orders`, sub: null, color: 'from-purple-500 to-indigo-500' },
+      { icon: ScanLine, label: 'QR Scans', value: scans.toLocaleString(), sub: overview?.comparisons?.scansChange != null ? `${overview.comparisons.scansChange > 0 ? '+' : ''}${overview.comparisons.scansChange}%` : null, color: 'grad-brand-soft' },
+      { icon: Star, label: 'Top Item', value: topItem?.name || '--', sub: topItem?.orders ? `${topItem.orders} orders` : null, color: 'grad-brand' },
+      { icon: Clock, label: `${period === 'today' ? 'Today' : period === 'week' ? 'This Week' : 'This Month'}`, value: `${orders} orders`, sub: null, color: 'grad-brand-dark' },
     ]
   }, [overview, topItems, period])
 
@@ -195,7 +195,7 @@ export default function AnalyticsPage() {
                 <div className="space-y-2">
                   {topItems.slice(0, 6).map((item: any, i: number) => (
                     <div key={i} className="flex items-center gap-3">
-                      <span className={`flex h-5 w-5 shrink-0 items-center justify-center rounded-md text-[9px] font-bold ${i === 0 ? 'bg-gradient-to-br from-accent to-yellow-400 text-primary' : 'bg-black/5 dark:bg-white/10 text-text-secondary'}`}>{i + 1}</span>
+                      <span className={`flex h-5 w-5 shrink-0 items-center justify-center rounded-md text-[9px] font-bold ${i === 0 ? 'grad-brand text-white' : 'bg-black/5 dark:bg-white/10 text-text-secondary'}`}>{i + 1}</span>
                       <span className="flex-1 font-body text-sm text-text-primary dark:text-white truncate">{item.name || item.itemName}</span>
                       <div className="w-16 h-1.5 rounded-full bg-black/5 dark:bg-white/10 overflow-hidden">
                         <div className="h-full rounded-full bg-secondary" style={{ width: `${Math.min(100, ((item.orders || 1) / (topItems[0]?.orders || 1)) * 100)}%` }} />
