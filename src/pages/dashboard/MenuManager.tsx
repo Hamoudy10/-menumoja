@@ -13,7 +13,9 @@ import { EmptyState } from '@/components/ui/EmptyState'
 import { SearchBar } from '@/components/ui/SearchBar'
 import { RefreshButton } from '@/components/ui/RefreshButton'
 import { Skeleton } from '@/components/ui/Skeleton'
-import { showSuccessToast } from '@/components/ui/Toast'
+import { compressImage } from '@/utils/image'
+import * as restaurantApi from '@/api/restaurant'
+import { showSuccessToast, showErrorToast } from '@/components/ui/Toast'
 import type { MenuCategory, MenuItem } from '@/types'
 
 const defaultItem = (categoryId: string, order: number): Partial<MenuItem> => ({
@@ -88,6 +90,22 @@ export default function MenuManager() {
   const [aiGenerating, setAiGenerating] = useState(false)
   const [itemSaving, setItemSaving] = useState(false)
   const [showAdvanced, setShowAdvanced] = useState(false)
+  const [uploadingPhoto, setUploadingPhoto] = useState(false)
+
+  const pickItemPhoto = async (file: File) => {
+    if (!file.type.startsWith('image/')) return
+    setUploadingPhoto(true)
+    try {
+      const dataUrl = await compressImage(file)
+      const res = await restaurantApi.uploadImage(dataUrl, 'menu-items')
+      setEditForm((prev) => ({ ...prev, photo: res?.url || dataUrl }))
+      showSuccessToast('Photo uploaded')
+    } catch {
+      showErrorToast('Photo upload failed')
+    } finally {
+      setUploadingPhoto(false)
+    }
+  }
   const [quickSaving, setQuickSaving] = useState(false)
   const [bulkDeleting, setBulkDeleting] = useState(false)
 
@@ -526,11 +544,7 @@ export default function MenuManager() {
                     onDrop={(e) => {
                       e.preventDefault()
                       const file = e.dataTransfer.files[0]
-                      if (file && file.type.startsWith('image/')) {
-                        const reader = new FileReader()
-                        reader.onload = (ev) => setEditForm({ ...editForm, photo: ev.target?.result as string })
-                        reader.readAsDataURL(file)
-                      }
+                      if (file) pickItemPhoto(file)
                     }}
                     className="relative rounded-xl border-2 border-dashed border-white/20 p-4 text-center hover:border-secondary/50 transition-colors cursor-pointer"
                     onClick={() => {
@@ -539,16 +553,17 @@ export default function MenuManager() {
                       input.accept = 'image/*'
                       input.onchange = () => {
                         const file = input.files?.[0]
-                        if (file) {
-                          const reader = new FileReader()
-                          reader.onload = (ev) => setEditForm({ ...editForm, photo: ev.target?.result as string })
-                          reader.readAsDataURL(file)
-                        }
+                        if (file) pickItemPhoto(file)
                       }
                       input.click()
                     }}
                   >
-                    {editForm.photo ? (
+                    {uploadingPhoto ? (
+                      <div className="py-6 flex flex-col items-center gap-2">
+                        <Loader2 className="mx-auto h-7 w-7 text-secondary animate-spin" />
+                        <p className="text-xs font-accent text-text-secondary dark:text-white/60">Uploading photo…</p>
+                      </div>
+                    ) : editForm.photo ? (
                       <div className="relative">
                         <img src={editForm.photo} alt="" className="mx-auto h-32 w-32 rounded-xl object-cover" onError={(e) => { (e.target as HTMLImageElement).src = '' }} />
                         <p className="mt-2 text-xs text-text-secondary dark:text-white/50">Drop new image or click to change</p>
