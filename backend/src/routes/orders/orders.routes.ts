@@ -316,6 +316,130 @@ router.post('/public/create',
   })
 );
 
+// ── POS / Staff Order Creation ──
+
+const posOrderSchema = z.object({
+  tableNumber: z.number().int().min(0).optional(),
+  customerName: z.string().max(100).optional(),
+  customerPhone: z.string().max(20).optional(),
+  items: z.array(z.object({
+    menuItemId: z.string().uuid('Invalid menu item ID').optional(),
+    name: z.string().max(200).optional(),
+    price: z.number().min(0).optional(),
+    quantity: z.number().int().min(1).max(100),
+    specialInstructions: z.string().max(500).optional(),
+  })).min(1, 'At least one item is required').max(100, 'Maximum 100 items'),
+  notes: z.string().max(1000).optional(),
+  paymentMethod: z.enum(['cash', 'mpesa', 'card']).default('cash'),
+}).strict();
+
+router.post('/',
+  authenticate,
+  enforceRestaurantScope,
+  auditLog,
+  validate(posOrderSchema),
+  asyncHandler(async (req, res) => {
+    const restaurantId = (req as any).restaurantId;
+    const { tableNumber, customerName, customerPhone, items, notes, paymentMethod } = req.body;
+
+    const resolvedItems: Array<{ menuItemId: string | null; name: string; price: number; quantity: number; specialInstructions: string | null }> = [];
+    const lookupIds = items
+      .filter((i: any) => i.menuItemId)
+      .map((i: any) => i.menuItemId);
+
+    const dbItems: Array<{ id: string; name: string; price: unknown; preparationTimeMinutes: number | null }> =
+      lookupIds.length > 0
+        ? await prisma.menuItem.findMany({
+            where: { id: { in: lookupIds }, restaurantId, isAvailable: true },
+            select: { id: true, name: true, price: true, preparationTimeMinutes: true },
+          })
+        : [];
+
+    const dbMap = new Map(dbItems.map((m) => [m.id, m]));
+
+    for (const item of items) {
+      if (item.menuItemId) {
+        const dbItem = dbMap.get(item.menuItemId);
+        if (!dbItem) {
+          throw new ValidationError(`Menu item not found or unavailable: ${item.menuItemId}`, 'Kipengee cha menyu hakikupatikana');
+        }
+        resolvedItems.push({
+          menuItemId: dbItem.id,
+          name: dbItem.name,
+          price: Number(dbItem.price),
+          quantity: item.quantity,
+          specialInstructions: item.specialInstructions || null,
+        });
+      } else {
+        if (!item.name || item.price === undefined) {
+          throw new ValidationError('Free-text items need a name and price', 'Kipengee kinahitaji jina na bei');
+        }
+        resolvedItems.push({
+          menuItemId: null,
+          name: item.name,
+          price: item.price,
+          quantity: item.quantity,
+          specialInstructions: item.specialInstructions || null,
+        });
+      }
+    }
+
+    const totals = calculateTotals(resolvedItems.map((i) => ({ price: i.price, quantity: i.quantity })));
+    const estimatedPrepMinutes = Math.max(
+      ...resolvedItems.map((i) => {
+        const db = dbMap.get(i.menuItemId || '');
+        return db?.preparationTimeMinutes || 10;
+      }),
+      10
+    );
+
+    const order = await prisma.order.create({
+      data: {
+        orderNumber: generateOrderNumber(restaurantId),
+        restaurantId,
+        tableId: null,
+        tableNumber: tableNumber || null,
+        sessionId: uuidv4(),
+        status: 'PENDING',
+        paymentStatus: 'UNPAID',
+        paymentMethod: paymentMethod === 'mpesa' ? 'MPESA' : paymentMethod === 'card' ? 'CARD' : 'CASH',
+        subtotal: totals.subtotal,
+        serviceCharge: totals.serviceCharge,
+        taxAmount: totals.tax,
+        tipAmount: 0,
+        totalAmount: totals.total,
+        specialNotes: notes || null,
+        estimatedPrepMinutes,
+        customerName: customerName || null,
+        customerPhone: customerPhone || null,
+        items: {
+          create: resolvedItems.map((i) => ({
+            menuItemId: i.menuItemId,
+            itemName: i.name,
+            itemPrice: i.price,
+            quantity: i.quantity,
+            specialInstructions: i.specialInstructions,
+            subtotal: i.price * i.quantity,
+          })),
+        },
+      },
+      include: { items: true },
+    });
+
+    logger.info('POS order created', { orderId: order.id, orderNumber: order.orderNumber, restaurantId });
+
+    res.status(201).json({
+      success: true,
+      data: {
+        orderId: order.id,
+        orderNumber: order.orderNumber,
+        estimatedPrepMinutes,
+        totalAmount: Number(order.totalAmount),
+      },
+    });
+  })
+);
+
 router.get('/public/:orderId/status',
   validateParams(orderIdParamSchema),
   asyncHandler(async (req, res) => {

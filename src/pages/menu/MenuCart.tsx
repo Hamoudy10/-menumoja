@@ -23,6 +23,8 @@ export default function MenuCart() {
   const isTakeaway = !tableFromUrl
 
   const total = cart.reduce((s, i) => s + i.item.price * i.quantity, 0)
+  const serviceCharge = Math.round(total * 0.05 * 100) / 100
+  const grandTotal = Math.round((total + serviceCharge) * 100) / 100
 
   const submitOrder = async (method: 'mpesa' | 'cash') => {
     if (cart.length === 0 || placing) return
@@ -134,16 +136,16 @@ export default function MenuCart() {
 
             <div className="bg-white rounded-2xl p-4 border border-gray-100 shadow-soft space-y-3">
               <div className="flex items-center justify-between text-sm">
-                <span className="text-text-secondary">Subtotal</span>
+                <span className="text-text-secondary">Subtotal (VAT included)</span>
                 <span className="font-medium text-primary">KES {total.toLocaleString()}</span>
               </div>
               <div className="flex items-center justify-between text-sm">
-                <span className="text-text-secondary">Service Fee</span>
-                <span className="font-medium text-primary">KES 0</span>
+                <span className="text-text-secondary">Service Charge (5%)</span>
+                <span className="font-medium text-primary">KES {serviceCharge.toLocaleString()}</span>
               </div>
               <div className="flex items-center justify-between text-base pt-3 border-t border-gray-100">
                 <span className="font-semibold text-primary">Total</span>
-                <span className="font-bold text-secondary text-lg">KES {total.toLocaleString()}</span>
+                <span className="font-bold text-secondary text-lg">KES {grandTotal.toLocaleString()}</span>
               </div>
             </div>
 
@@ -211,7 +213,7 @@ export default function MenuCart() {
               <div className="flex gap-3 mt-4">
                 <Button variant="outline" fullWidth onClick={() => { setShowMpesaInput(false); setShowPaymentChoice(true) }}>Back</Button>
                 <Button variant="primary" fullWidth disabled={!mpesaPhone || placing} loading={placing} onClick={() => submitOrder('mpesa')}>
-                  Pay KES {total.toLocaleString()}
+                  Pay KES {grandTotal.toLocaleString()}
                 </Button>
               </div>
             </motion.div>

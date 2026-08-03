@@ -39,13 +39,16 @@ export function calculateTotals(
     return { subtotal: 0, serviceCharge: 0, tax: 0, total: 0 };
   }
 
+  // Menu prices are VAT-INCLUSIVE (displayed price is the final price).
+  // VAT is derived as the portion embedded in the price (16/116),
+  // never added on top — so the cashier charge matches the menu price.
   const subtotal = items.reduce(
     (sum, item) => sum + item.price * item.quantity,
     0
   );
   const serviceCharge = subtotal * SERVICE_CHARGE_RATE;
-  const tax = subtotal * TAX_RATE;
-  const total = subtotal + serviceCharge + tax;
+  const tax = (subtotal * TAX_RATE) / (1 + TAX_RATE);
+  const total = subtotal + serviceCharge;
 
   return {
     subtotal: Math.round(subtotal * 100) / 100,
