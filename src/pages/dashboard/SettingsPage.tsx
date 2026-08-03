@@ -97,10 +97,9 @@ export default function SettingsPage() {
     mpesaEnabled: true,
     cashEnabled: true,
     selectedProducts: ['stk_push', 'till_number'],
-    tillNumber: '5273012',
-    paybillNumber: '',
+    mpesaShortcode: '',
+    mpesaPasskey: '',
     businessName: '',
-    buyGoodsNumber: '',
     stkPushEnabled: true,
   })
 
@@ -149,6 +148,17 @@ export default function SettingsPage() {
         coverPhotoUrl: restaurant.coverPhotoUrl || '',
       })
       setFontStyle(restaurant.fontStyle || 'modern')
+      const s = restaurant.settings as any
+      if (s?.mpesaShortcode || s?.mpesaPasskey || s?.mpesaBusinessName) {
+        setPaymentSettings((prev) => ({
+          ...prev,
+          mpesaShortcode: s.mpesaShortcode || prev.mpesaShortcode,
+          mpesaPasskey: s.mpesaPasskey || prev.mpesaPasskey,
+          businessName: s.mpesaBusinessName || prev.businessName,
+          mpesaEnabled: s.allowMpesaPayment ?? prev.mpesaEnabled,
+          cashEnabled: s.allowCashPayment ?? prev.cashEnabled,
+        }))
+      }
     }
   }, [restaurant, loadAll])
 
@@ -996,20 +1006,19 @@ export default function SettingsPage() {
               </div>
             </div>
 
-            {paymentSettings.selectedProducts.includes('till_number') && (
-              <Input label="Till Number" value={paymentSettings.tillNumber}
-                onChange={(e) => setPaymentSettings({ ...paymentSettings, tillNumber: e.target.value })} placeholder="e.g., 5273012" />
-            )}
-            {paymentSettings.selectedProducts.includes('paybill') && (
-              <Input label="PayBill Number" value={paymentSettings.paybillNumber}
-                onChange={(e) => setPaymentSettings({ ...paymentSettings, paybillNumber: e.target.value })} placeholder="e.g., 247247" />
-            )}
-            {paymentSettings.selectedProducts.includes('buy_goods') && (
-              <Input label="Buy Goods Till Number" value={paymentSettings.buyGoodsNumber}
-                onChange={(e) => setPaymentSettings({ ...paymentSettings, buyGoodsNumber: e.target.value })} placeholder="e.g., 5273012" />
-            )}
-            <Input label="Business Name" value={paymentSettings.businessName || restaurant?.name || ''}
-              onChange={(e) => setPaymentSettings({ ...paymentSettings, businessName: e.target.value })} placeholder="Business name registered with M-Pesa" />
+            <div className="border-t border-white/10 pt-4 space-y-3">
+              <h4 className="font-accent text-sm font-bold text-text-primary dark:text-white">M-Pesa STK Push (Online Checkout)</h4>
+              <p className="font-accent text-xs text-text-secondary dark:text-white/50">
+                Customers pay on their phone via a payment prompt (STK push). Money goes straight to <b>your</b> till or paybill — we never touch it.
+              </p>
+              <Input label="Active M-Pesa Number (Paybill or Till)" value={paymentSettings.mpesaShortcode}
+                onChange={(e) => setPaymentSettings({ ...paymentSettings, mpesaShortcode: e.target.value })} placeholder="e.g., 247247 (paybill) or 5273012 (till)" />
+              <Input label="M-Pesa Passkey (from Daraja portal)" type="password" value={paymentSettings.mpesaPasskey}
+                onChange={(e) => setPaymentSettings({ ...paymentSettings, mpesaPasskey: e.target.value })}
+                placeholder="Available in developer.safaricom.co.ke → your number → Lipa Na M-Pesa Online" />
+              <Input label="Business Name (shown on payment prompt)" value={paymentSettings.businessName || restaurant?.name || ''}
+                onChange={(e) => setPaymentSettings({ ...paymentSettings, businessName: e.target.value })} placeholder="Business name registered with M-Pesa" />
+            </div>
             <Button onClick={handleSavePayments} loading={saving}><Save className="h-4 w-4" /> Update Payment Settings</Button>
           </div>
         )

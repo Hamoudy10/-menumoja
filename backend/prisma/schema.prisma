@@ -311,6 +311,9 @@ model RestaurantSettings {
   tipPercentages       Int[]        @map("tip_percentages")
   serviceChargePercent Decimal     @default(0) @map("service_charge_percent") @db.Decimal(5, 2)
   taxPercent           Decimal      @default(0) @map("tax_percent") @db.Decimal(5, 2)
+  mpesaShortcode       String?      @map("mpesa_shortcode")
+  mpesaPasskey         String?      @map("mpesa_passkey")
+  mpesaBusinessName    String?      @map("mpesa_business_name")
   createdAt            DateTime     @default(now()) @map("created_at")
   updatedAt            DateTime     @updatedAt @map("updated_at")
 

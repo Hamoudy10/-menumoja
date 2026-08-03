@@ -148,7 +148,9 @@ export async function stkPush(
   phone: string,
   amount: number,
   orderNumber: string,
-  shortCode?: string
+  shortCode?: string,
+  passkey?: string,
+  businessName?: string
 ): Promise<{
   checkoutRequestId: string;
   MerchantRequestID: string;
@@ -164,8 +166,8 @@ export async function stkPush(
     const token = await getAccessToken();
     const timestamp = generateTimestamp();
     const businessShortCode = shortCode || process.env.MPESA_SHORTCODE || '174379';
-    const passkey = process.env.MPESA_PASSKEY || 'bfb279f9aa9bdbcf158e97dd71a467cd2e0c893059b10f78e6b72ada1ed2c919';
-    const password = generatePassword(businessShortCode, passkey, timestamp);
+    const resolvedPasskey = passkey || process.env.MPESA_PASSKEY || 'bfb279f9aa9bdbcf158e97dd71a467cd2e0c893059b10f78e6b72ada1ed2c919';
+    const password = generatePassword(businessShortCode, resolvedPasskey, timestamp);
     const callbackUrl = process.env.MPESA_CALLBACK_URL || 'https://menumoja.onrender.com/api/v1/payments/mpesa/callback';
 
     const payload = {
@@ -178,8 +180,8 @@ export async function stkPush(
       PartyB: businessShortCode,
       PhoneNumber: formattedPhone,
       CallBackURL: callbackUrl,
-      AccountReference: orderNumber.substring(0, 12),
-      TransactionDesc: `Payment for Order ${orderNumber}`,
+      AccountReference: (businessName || orderNumber).substring(0, 12),
+      TransactionDesc: `Payment for Order ${orderNumber}`.substring(0, 13),
     };
 
     const response = await api.post('/mpesa/stkpush/v1/processrequest', payload, {

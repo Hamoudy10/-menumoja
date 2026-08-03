@@ -9,8 +9,8 @@ interface Intent {
 
 const INTENTS: Intent[] = [
   {
-    keywords: ['pricing', 'price', 'cost', 'plans', 'plan', 'subscription', 'monthly', 'package'],
-    reply: 'MenuMoja has three plans:\n\n• Starter — KES 1,500/mo: 1 restaurant, QR menu, ordering, M-Pesa payments\n• Business — KES 2,500/mo: everything in Starter + staff tools, analytics & receipts\n• Premium — KES 5,000/mo: everything in Business + AI features, surveillance & priority support\n\nYou can start on a free trial and upgrade anytime! 🚀',
+    keywords: ['pricing', 'price', 'cost', 'plans', 'plan', 'subscription', 'monthly', 'package', 'commission', 'fee'],
+    reply: 'MenuMoja pricing is simple — you only pay when you sell:\n\n🔧 One-time setup: KES 5,000 (QR codes, menu built, staff trained)\n💸 Commission: 5% of sales made through the system\n🛡️ Monthly cap: never more than KES 10,000/month\n\nNo monthly subscription, no lock-in, and M-Pesa money goes straight to YOUR till. A restaurant doing KES 200,000/month in orders pays the KES 10,000 cap — small sales pay even less, no sales pay nothing! 🚀',
   },
   {
     keywords: ['features', 'feature', 'what can', 'does it do', 'capabilit', 'capab'],

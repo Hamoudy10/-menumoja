@@ -183,11 +183,37 @@ router.put(
   validate(updateSettingsSchema),
   asyncHandler(async (req, res) => {
     const restaurantId = (req as any).restaurantId;
+    const body = req.body;
+
+    const MODEL_FIELDS = [
+      'primaryColor', 'secondaryColor', 'fontFamily', 'gradientStart', 'gradientEnd',
+      'useGradient', 'headingFont', 'bodyFont', 'accentFont', 'layoutStyle',
+      'welcomeMessage', 'welcomeMessageSw', 'announcement', 'announcementActive',
+      'languageEnglish', 'languageSwahili', 'languageArabic', 'showPrices',
+      'allowOrdering', 'allowCashPayment', 'allowMpesaPayment', 'tipEnabled',
+      'tipPercentages', 'serviceChargePercent', 'taxPercent',
+      'mpesaShortcode', 'mpesaPasskey', 'mpesaBusinessName',
+    ];
+
+    const settingsData: any = {};
+    for (const key of MODEL_FIELDS) {
+      if (body[key] !== undefined) settingsData[key] = body[key];
+    }
+
+    const paymentSettings = body.paymentSettings;
+    if (paymentSettings && typeof paymentSettings === 'object') {
+      if (typeof paymentSettings.mpesaEnabled === 'boolean') settingsData.allowMpesaPayment = paymentSettings.mpesaEnabled;
+      if (typeof paymentSettings.cashEnabled === 'boolean') settingsData.allowCashPayment = paymentSettings.cashEnabled;
+      const shortcode = paymentSettings.mpesaShortcode || paymentSettings.tillNumber || paymentSettings.paybillNumber || '';
+      if (shortcode) settingsData.mpesaShortcode = String(shortcode).trim();
+      if (paymentSettings.mpesaPasskey) settingsData.mpesaPasskey = String(paymentSettings.mpesaPasskey).trim();
+      if (paymentSettings.businessName) settingsData.mpesaBusinessName = String(paymentSettings.businessName).trim();
+    }
 
     const settings = await prisma.restaurantSettings.upsert({
       where: { restaurantId },
-      create: { restaurantId, ...req.body },
-      update: req.body,
+      create: { restaurantId, ...settingsData },
+      update: settingsData,
     });
 
     logger.info('Restaurant settings updated', { restaurantId });

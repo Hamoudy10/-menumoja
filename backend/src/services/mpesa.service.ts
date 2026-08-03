@@ -2,6 +2,7 @@ import logger from '../utils/logger';
 import { AppError } from '../utils/errors';
 import * as mpesa from '../integrations/mpesa';
 import { sendSMS } from '../integrations/africasTalking';
+import { prisma } from '../config/database';
 
 interface OrderService {
   getOrderById: (orderId: string) => Promise<OrderRecord | null>;
@@ -91,11 +92,29 @@ export async function initiatePayment(
 
   const shortCode = process.env.MPESA_SHORTCODE || '174379';
 
+  let passkey: string | undefined;
+  let businessName: string | undefined;
+  let restaurantShortcode: string | undefined;
+
+  try {
+    const settings = await prisma.restaurantSettings.findUnique({
+      where: { restaurantId: order.restaurantId },
+      select: { mpesaShortcode: true, mpesaPasskey: true, mpesaBusinessName: true },
+    });
+    restaurantShortcode = settings?.mpesaShortcode || undefined;
+    passkey = settings?.mpesaPasskey || undefined;
+    businessName = settings?.mpesaBusinessName || undefined;
+  } catch (settingsError) {
+    logger.warn('Failed to load restaurant M-Pesa credentials', { error: settingsError, restaurantId: order.restaurantId });
+  }
+
   const result = await mpesa.stkPush(
     order.customerPhone,
     order.amount,
     order.orderNumber,
-    shortCode
+    restaurantShortcode || shortCode,
+    passkey,
+    businessName
   );
 
   await payments.createPayment({
