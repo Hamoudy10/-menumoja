@@ -99,6 +99,15 @@ export const createRestaurantSchema = z
     cuisine: z.string().optional(),
     ownerName: z.string().optional(),
     location: z.string().optional(),
+    logoUrl: z.string().max(10000).optional().or(z.literal('')),
+    coverPhotoUrl: z.string().max(10000).optional().or(z.literal('')),
+  })
+  .strict();
+
+export const uploadImageSchema = z
+  .object({
+    dataUrl: z.string().min(20, 'Invalid image data').max(4000000),
+    folder: z.string().max(100).optional(),
   })
   .strict();
 

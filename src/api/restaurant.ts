@@ -8,6 +8,9 @@ export const fetchRestaurant = () =>
 export const updateRestaurant = (data: any) =>
   api.put('/restaurant/me', data).then(unwrap)
 
+export const uploadImage = (dataUrl: string, folder?: string) =>
+  api.post('/restaurant/me/upload-image', { dataUrl, folder }).then(unwrap)
+
 export const updateSettings = (data: any) =>
   api.put('/restaurant/me/settings', data).then(unwrap)
 

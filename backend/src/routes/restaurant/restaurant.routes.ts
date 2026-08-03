@@ -1,11 +1,12 @@
 import { Router } from 'express';
 import { asyncHandler, AppError, generateSlug, hashPassword, generatePin } from '@/utils';
 import { authenticate, enforceRestaurantScope, validate, auditLog } from '@/middleware';
-import { updateRestaurantSchema, updateSettingsSchema, openingHoursSchema, createBranchSchema, createTableSchema, updateTableSchema, updateTableStatusSchema, updateTableSessionSchema, createZoneSchema, updateZoneSchema, createPromotionSchema, updatePromotionSchema, createStaffSchema, updateStaffSchema } from '@/utils/validation';
+import { updateRestaurantSchema, updateSettingsSchema, openingHoursSchema, createBranchSchema, createTableSchema, updateTableSchema, updateTableStatusSchema, updateTableSessionSchema, createZoneSchema, updateZoneSchema, createPromotionSchema, updatePromotionSchema, createStaffSchema, updateStaffSchema, uploadImageSchema } from '@/utils/validation';
 import { prisma } from '@/config/database';
 import logger from '@/utils/logger';
 import { emitTableStatusChanged } from '@/hooks/socket';
 import { invalidateMenuCache } from '@/utils/cache';
+import { uploadImage as cloudinaryUpload } from '@/integrations/cloudinary';
 
 const router = Router();
 
@@ -90,6 +91,8 @@ router.put(
 
     const { brandColor, fontStyle, gradientStart, gradientEnd, useGradient, headingFont, bodyFont, accentFont, cuisine, ownerName, location, ...restaurantData } = data;
     if (location) restaurantData.address = location;
+    if (restaurantData.logoUrl === '') restaurantData.logoUrl = null;
+    if (restaurantData.coverPhotoUrl === '') restaurantData.coverPhotoUrl = null;
 
     const oldSlug = existing.slug;
     const restaurant = await prisma.restaurant.update({
@@ -141,6 +144,35 @@ router.put(
       success: true,
       data: restaurant,
     });
+  })
+);
+
+// POST /me/upload-image - Upload restaurant logo / cover image
+router.post(
+  '/me/upload-image',
+  auditLog,
+  validate(uploadImageSchema),
+  asyncHandler(async (req, res) => {
+    const restaurantId = (req as any).restaurantId;
+    const { dataUrl, folder } = req.body;
+
+    const match = /^data:(image\/[a-z+]+);base64,(.+)$/.exec(dataUrl || '');
+    if (!match) {
+      throw new AppError(400, 'INVALID_IMAGE', 'Invalid image data — expected a base64 image', 'Data ya picha si sahihi');
+    }
+
+    const buffer = Buffer.from(match[2], 'base64');
+    if (buffer.length > 3 * 1024 * 1024) {
+      throw new AppError(400, 'IMAGE_TOO_LARGE', 'Image too large (max 3MB)', 'Picha ni kubwa sana (upeo MB 3)');
+    }
+
+    try {
+      const uploaded = await cloudinaryUpload(buffer, folder || `logos/${restaurantId}`);
+      res.json({ success: true, data: { url: uploaded.url } });
+    } catch (error) {
+      logger.warn('Cloudinary upload failed, storing image as-is', { error, restaurantId });
+      res.json({ success: true, data: { url: dataUrl } });
+    }
   })
 );
 

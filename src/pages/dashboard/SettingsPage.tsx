@@ -72,7 +72,9 @@ export default function SettingsPage() {
   const [profile, setProfile] = useState({
     name: '', ownerName: '', email: '', phone: '', cuisine: '', location: '', description: '',
     kraPin: '', businessRegNo: '', vatRegNo: '', businessType: '', county: 'Mombasa',
+    logoUrl: '', coverPhotoUrl: '',
   })
+  const [uploadingImage, setUploadingImage] = useState<'logo' | 'cover' | null>(null)
   const [brandColor, setBrandColor] = useState('#FF6B35')
   const [colorPickerInput, setColorPickerInput] = useState('#FF6B35')
   const [gradientStart, setGradientStart] = useState('#FF6B35')
@@ -143,6 +145,8 @@ export default function SettingsPage() {
         vatRegNo: restaurant.vatRegNo || '',
         businessType: restaurant.businessType || 'Restaurant',
         county: restaurant.county || restaurant.city || 'Mombasa',
+        logoUrl: restaurant.logoUrl || '',
+        coverPhotoUrl: restaurant.coverPhotoUrl || '',
       })
       setFontStyle(restaurant.fontStyle || 'modern')
     }
@@ -163,11 +167,40 @@ export default function SettingsPage() {
   }, [section, theme])
 
   const handleSaveProfile = async () => {
+    if (uploadingImage) { showErrorToast('Wait for the image upload to finish'); return }
     setSaving(true)
     try {
       await updateRestaurant(profile)
-      showSuccessToast(t('settings.saveChanges'))
+      showSuccessToast(t('settings.profileSaved'))
     } catch { showErrorToast('Failed to save profile') } finally { setSaving(false) }
+  }
+
+  const handleImageUpload = (kind: 'logo' | 'cover') => {
+    const input = document.createElement('input')
+    input.type = 'file'
+    input.accept = 'image/*'
+    input.onchange = async () => {
+      const file = input.files?.[0]
+      if (!file) return
+      if (file.size > 3 * 1024 * 1024) { showErrorToast('Image too large (max 3MB)'); return }
+      const reader = new FileReader()
+      reader.onload = async (ev) => {
+        const dataUrl = ev.target?.result as string
+        setUploadingImage(kind)
+        try {
+          const res = await restaurantApi.uploadImage(dataUrl, kind === 'logo' ? 'logos' : 'covers')
+          const url = res?.url || dataUrl
+          setProfile((p) => ({ ...p, [kind === 'logo' ? 'logoUrl' : 'coverPhotoUrl']: url }))
+          showSuccessToast(kind === 'logo' ? 'Logo uploaded — save to apply' : 'Cover uploaded — save to apply')
+        } catch {
+          showErrorToast('Upload failed')
+        } finally {
+          setUploadingImage(null)
+        }
+      }
+      reader.readAsDataURL(file)
+    }
+    input.click()
   }
 
   const handleSaveAppearance = async () => {
@@ -330,14 +363,96 @@ export default function SettingsPage() {
         return (
           <div className="space-y-4">
             <div className="flex items-center gap-4 mb-4">
-              <div className="flex h-16 w-16 items-center justify-center rounded-full bg-gradient-to-br from-secondary to-accent text-white font-heading text-2xl font-bold">
-                {restaurant?.name?.charAt(0) || 'M'}
+              <div className="h-16 w-16 shrink-0 overflow-hidden rounded-full bg-gradient-to-br from-secondary to-accent flex items-center justify-center text-white font-heading text-2xl font-bold">
+                {profile.logoUrl ? (
+                  <img src={profile.logoUrl} alt="logo" className="h-full w-full object-cover" onError={(e) => { (e.target as HTMLImageElement).style.display = 'none' }} />
+                ) : (
+                  restaurant?.name?.charAt(0) || 'M'
+                )}
               </div>
               <div>
                 <h3 className="font-heading text-lg font-bold text-text-primary dark:text-white">{restaurant?.name || 'Your Restaurant'}</h3>
                 <p className="font-body text-sm text-text-secondary dark:text-white/50">{t('settings.ownerSince')} {restaurant?.createdAt ? new Date(restaurant.createdAt).toLocaleDateString('en-US', { month: 'long', year: 'numeric' }) : 'Jan 2025'}</p>
               </div>
             </div>
+
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              <div>
+                <label className="mb-2 block font-accent text-sm font-medium text-text-primary dark:text-white/90">Restaurant Logo</label>
+                <div
+                  onClick={() => handleImageUpload('logo')}
+                  onDragOver={(e) => e.preventDefault()}
+                  onDrop={(e) => {
+                    e.preventDefault()
+                    const file = e.dataTransfer.files[0]
+                    if (file && file.type.startsWith('image/')) {
+                      const reader = new FileReader()
+                      reader.onload = async (ev) => {
+                        const dataUrl = ev.target?.result as string
+                        setUploadingImage('logo')
+                        try {
+                          const res = await restaurantApi.uploadImage(dataUrl, 'logos')
+                          setProfile((p) => ({ ...p, logoUrl: res?.url || dataUrl }))
+                          showSuccessToast('Logo uploaded — save to apply')
+                        } catch { showErrorToast('Upload failed') } finally { setUploadingImage(null) }
+                      }
+                      reader.readAsDataURL(file)
+                    }
+                  }}
+                  className="relative cursor-pointer rounded-xl border-2 border-dashed border-white/20 p-4 text-center hover:border-secondary/50 transition-colors"
+                >
+                  {profile.logoUrl ? (
+                    <div className="flex items-center justify-center gap-3">
+                      <img src={profile.logoUrl} alt="logo" className="h-14 w-14 rounded-full object-cover" onError={(e) => { (e.target as HTMLImageElement).style.display = 'none' }} />
+                      <span className="text-xs text-text-secondary dark:text-white/50">{uploadingImage === 'logo' ? 'Uploading…' : 'Click or drop to change'}</span>
+                    </div>
+                  ) : (
+                    <div className="flex flex-col items-center gap-1 py-2">
+                      <Image className="h-6 w-6 text-text-secondary/40" />
+                      <span className="text-xs text-text-secondary dark:text-white/60">{uploadingImage === 'logo' ? 'Uploading…' : 'Upload logo'}</span>
+                    </div>
+                  )}
+                </div>
+              </div>
+              <div>
+                <label className="mb-2 block font-accent text-sm font-medium text-text-primary dark:text-white/90">Cover Photo</label>
+                <div
+                  onClick={() => handleImageUpload('cover')}
+                  onDragOver={(e) => e.preventDefault()}
+                  onDrop={(e) => {
+                    e.preventDefault()
+                    const file = e.dataTransfer.files[0]
+                    if (file && file.type.startsWith('image/')) {
+                      const reader = new FileReader()
+                      reader.onload = async (ev) => {
+                        const dataUrl = ev.target?.result as string
+                        setUploadingImage('cover')
+                        try {
+                          const res = await restaurantApi.uploadImage(dataUrl, 'covers')
+                          setProfile((p) => ({ ...p, coverPhotoUrl: res?.url || dataUrl }))
+                          showSuccessToast('Cover uploaded — save to apply')
+                        } catch { showErrorToast('Upload failed') } finally { setUploadingImage(null) }
+                      }
+                      reader.readAsDataURL(file)
+                    }
+                  }}
+                  className="relative cursor-pointer rounded-xl border-2 border-dashed border-white/20 p-4 text-center hover:border-secondary/50 transition-colors"
+                >
+                  {profile.coverPhotoUrl ? (
+                    <div>
+                      <img src={profile.coverPhotoUrl} alt="cover" className="mx-auto h-16 w-full max-w-[200px] rounded-lg object-cover" onError={(e) => { (e.target as HTMLImageElement).style.display = 'none' }} />
+                      <span className="block mt-1.5 text-xs text-text-secondary dark:text-white/50">{uploadingImage === 'cover' ? 'Uploading…' : 'Click or drop to change'}</span>
+                    </div>
+                  ) : (
+                    <div className="flex flex-col items-center gap-1 py-2">
+                      <Image className="h-6 w-6 text-text-secondary/40" />
+                      <span className="text-xs text-text-secondary dark:text-white/60">{uploadingImage === 'cover' ? 'Uploading…' : 'Upload cover photo'}</span>
+                    </div>
+                  )}
+                </div>
+              </div>
+            </div>
+
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <Input label={t('settings.restaurantName')} value={profile.name} onChange={(e) => setProfile({ ...profile, name: e.target.value })} />
               <Input label={t('settings.ownerName')} value={profile.ownerName} onChange={(e) => setProfile({ ...profile, ownerName: e.target.value })} />

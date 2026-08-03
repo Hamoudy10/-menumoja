@@ -137,10 +137,14 @@ export default function MenuView() {
       <header className="sticky top-0 z-30 bg-white border-b border-gray-100 shadow-soft">
         <div className="max-w-lg mx-auto px-4 py-3">
           <div className="flex items-center justify-between mb-2">
-            <div className="flex items-center gap-2">
-              <div className="w-9 h-9 rounded-xl bg-secondary flex items-center justify-center">
-                <ChefHat className="w-5 h-5 text-white" />
-              </div>
+              <div className="flex items-center gap-2">
+                <div className="w-9 h-9 rounded-xl bg-secondary flex items-center justify-center overflow-hidden">
+                  {restaurantInfo?.logoUrl ? (
+                    <img src={restaurantInfo.logoUrl} alt="logo" className="w-full h-full object-cover" onError={(e) => { (e.target as HTMLImageElement).style.display = 'none' }} />
+                  ) : (
+                    <ChefHat className="w-5 h-5 text-white" />
+                  )}
+                </div>
               <div>
                 <h1 className="font-heading font-bold text-primary text-sm">
                   {restaurantInfo?.name || restaurantSlug || 'Restaurant'}

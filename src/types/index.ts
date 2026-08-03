@@ -10,6 +10,8 @@ export interface Restaurant {
   location: string
   logo: string
   coverPhoto: string
+  logoUrl?: string
+  coverPhotoUrl?: string
   brandColor: string
   fontStyle: 'modern' | 'elegant' | 'classic'
   layout: 'grid' | 'list'
