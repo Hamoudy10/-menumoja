@@ -185,6 +185,28 @@ export default function SettingsPage() {
     } catch { showErrorToast('Failed to save profile') } finally { setSaving(false) }
   }
 
+  const compressImage = (file: File, maxDim = 512, quality = 0.85): Promise<string> =>
+    new Promise((resolve, reject) => {
+      const reader = new FileReader()
+      reader.onload = () => {
+        const img = new window.Image()
+        img.onload = () => {
+          const scale = Math.min(1, maxDim / Math.max(img.width, img.height))
+          const canvas = document.createElement('canvas')
+          canvas.width = Math.max(1, Math.round(img.width * scale))
+          canvas.height = Math.max(1, Math.round(img.height * scale))
+          const ctx = canvas.getContext('2d')
+          if (!ctx) { reject(new Error('no canvas context')); return }
+          ctx.drawImage(img, 0, 0, canvas.width, canvas.height)
+          resolve(canvas.toDataURL('image/jpeg', quality))
+        }
+        img.onerror = () => reject(new Error('image load failed'))
+        img.src = reader.result as string
+      }
+      reader.onerror = () => reject(new Error('file read failed'))
+      reader.readAsDataURL(file)
+    })
+
   const handleImageUpload = (kind: 'logo' | 'cover') => {
     const input = document.createElement('input')
     input.type = 'file'
@@ -193,22 +215,18 @@ export default function SettingsPage() {
       const file = input.files?.[0]
       if (!file) return
       if (file.size > 3 * 1024 * 1024) { showErrorToast('Image too large (max 3MB)'); return }
-      const reader = new FileReader()
-      reader.onload = async (ev) => {
-        const dataUrl = ev.target?.result as string
-        setUploadingImage(kind)
-        try {
-          const res = await restaurantApi.uploadImage(dataUrl, kind === 'logo' ? 'logos' : 'covers')
-          const url = res?.url || dataUrl
-          setProfile((p) => ({ ...p, [kind === 'logo' ? 'logoUrl' : 'coverPhotoUrl']: url }))
-          showSuccessToast(kind === 'logo' ? 'Logo uploaded — save to apply' : 'Cover uploaded — save to apply')
-        } catch {
-          showErrorToast('Upload failed')
-        } finally {
-          setUploadingImage(null)
-        }
+      setUploadingImage(kind)
+      try {
+        const dataUrl = await compressImage(file)
+        const res = await restaurantApi.uploadImage(dataUrl, kind === 'logo' ? 'logos' : 'covers')
+        const url = res?.url || dataUrl
+        setProfile((p) => ({ ...p, [kind === 'logo' ? 'logoUrl' : 'coverPhotoUrl']: url }))
+        showSuccessToast(kind === 'logo' ? 'Logo uploaded — save to apply' : 'Cover uploaded — save to apply')
+      } catch {
+        showErrorToast('Upload failed')
+      } finally {
+        setUploadingImage(null)
       }
-      reader.readAsDataURL(file)
     }
     input.click()
   }
@@ -392,21 +410,17 @@ export default function SettingsPage() {
                 <div
                   onClick={() => handleImageUpload('logo')}
                   onDragOver={(e) => e.preventDefault()}
-                  onDrop={(e) => {
+                  onDrop={async (e) => {
                     e.preventDefault()
                     const file = e.dataTransfer.files[0]
                     if (file && file.type.startsWith('image/')) {
-                      const reader = new FileReader()
-                      reader.onload = async (ev) => {
-                        const dataUrl = ev.target?.result as string
-                        setUploadingImage('logo')
-                        try {
-                          const res = await restaurantApi.uploadImage(dataUrl, 'logos')
-                          setProfile((p) => ({ ...p, logoUrl: res?.url || dataUrl }))
-                          showSuccessToast('Logo uploaded — save to apply')
-                        } catch { showErrorToast('Upload failed') } finally { setUploadingImage(null) }
-                      }
-                      reader.readAsDataURL(file)
+                      setUploadingImage('logo')
+                      try {
+                        const dataUrl = await compressImage(file)
+                        const res = await restaurantApi.uploadImage(dataUrl, 'logos')
+                        setProfile((p) => ({ ...p, logoUrl: res?.url || dataUrl }))
+                        showSuccessToast('Logo uploaded — save to apply')
+                      } catch { showErrorToast('Upload failed') } finally { setUploadingImage(null) }
                     }
                   }}
                   className="relative cursor-pointer rounded-xl border-2 border-dashed border-white/20 p-4 text-center hover:border-secondary/50 transition-colors"
@@ -429,21 +443,17 @@ export default function SettingsPage() {
                 <div
                   onClick={() => handleImageUpload('cover')}
                   onDragOver={(e) => e.preventDefault()}
-                  onDrop={(e) => {
+                  onDrop={async (e) => {
                     e.preventDefault()
                     const file = e.dataTransfer.files[0]
                     if (file && file.type.startsWith('image/')) {
-                      const reader = new FileReader()
-                      reader.onload = async (ev) => {
-                        const dataUrl = ev.target?.result as string
-                        setUploadingImage('cover')
-                        try {
-                          const res = await restaurantApi.uploadImage(dataUrl, 'covers')
-                          setProfile((p) => ({ ...p, coverPhotoUrl: res?.url || dataUrl }))
-                          showSuccessToast('Cover uploaded — save to apply')
-                        } catch { showErrorToast('Upload failed') } finally { setUploadingImage(null) }
-                      }
-                      reader.readAsDataURL(file)
+                      setUploadingImage('cover')
+                      try {
+                        const dataUrl = await compressImage(file)
+                        const res = await restaurantApi.uploadImage(dataUrl, 'covers')
+                        setProfile((p) => ({ ...p, coverPhotoUrl: res?.url || dataUrl }))
+                        showSuccessToast('Cover uploaded — save to apply')
+                      } catch { showErrorToast('Upload failed') } finally { setUploadingImage(null) }
                     }
                   }}
                   className="relative cursor-pointer rounded-xl border-2 border-dashed border-white/20 p-4 text-center hover:border-secondary/50 transition-colors"

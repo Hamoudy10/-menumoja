@@ -99,8 +99,8 @@ export const createRestaurantSchema = z
     cuisine: z.string().optional(),
     ownerName: z.string().optional(),
     location: z.string().optional(),
-    logoUrl: z.string().max(10000).optional().or(z.literal('')),
-    coverPhotoUrl: z.string().max(10000).optional().or(z.literal('')),
+    logoUrl: z.string().max(4000000).optional().or(z.literal('')),
+    coverPhotoUrl: z.string().max(4000000).optional().or(z.literal('')),
   })
   .strict();
 
