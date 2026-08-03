@@ -3,10 +3,13 @@ import { motion, AnimatePresence } from 'framer-motion'
 import {
   ChefHat, Store, Menu, QrCode, TrendingUp, Smartphone,
   ArrowRight, Check, Star, Users, Clock, ShoppingCart,
-  CreditCard, BarChart3, Sparkles, Zap,
+  CreditCard, BarChart3, Sparkles, Zap, Plus, Minus, ScanLine,
 } from 'lucide-react'
 import { Button } from '@/components/ui/Button'
 import { Card } from '@/components/ui/Card'
+import { QRCode } from '@/components/ui/QRCode'
+import { AIChat } from '@/components/customer/AIChat'
+import * as menuApi from '@/api/menu'
 
 const stats = [
   { label: 'Active Restaurants', value: '2,500+', icon: Store },
@@ -85,14 +88,71 @@ const menuItems = [
   { name: 'Samosas', price: 'KES 350', emoji: '🥟', tag: 'Chef\'s Pick' },
 ]
 
+interface LiveItem {
+  id: string
+  name: string
+  price: number
+  photoUrl?: string | null
+}
+
+interface LiveCat {
+  id: string
+  name: string
+  items: LiveItem[]
+}
+
+interface LiveMenu {
+  restaurant?: { id: string; name: string; city?: string | null; logoUrl?: string | null }
+  categories?: LiveCat[]
+}
+
 export default function DemoPage() {
   const [showMockup, setShowMockup] = useState(false)
   const [activeTab, setActiveTab] = useState<'menu' | 'orders' | 'analytics'>('menu')
+
+  const [liveMenu, setLiveMenu] = useState<LiveMenu | null>(null)
+  const [liveLoading, setLiveLoading] = useState(true)
+  const [liveCat, setLiveCat] = useState('')
+  const [cart, setCart] = useState<Record<string, number>>({})
 
   useEffect(() => {
     const t = setTimeout(() => setShowMockup(true), 500)
     return () => clearTimeout(t)
   }, [])
+
+  useEffect(() => {
+    menuApi
+      .getPublicMenu('bahari-restaurant')
+      .then((data) => {
+        const parsed = data as LiveMenu
+        setLiveMenu(parsed)
+        const cats = parsed.categories || []
+        if (cats.length > 0) setLiveCat(cats[0].id)
+      })
+      .catch(() => {})
+      .finally(() => setLiveLoading(false))
+  }, [])
+
+  const liveCats = liveMenu?.categories || []
+  const activeCat = liveCats.find((c) => c.id === liveCat) || liveCats[0]
+  const liveItems = activeCat?.items || []
+  const allLiveItems = liveCats.flatMap((c) => c.items)
+  const cartCount = Object.values(cart).reduce((s, q) => s + q, 0)
+  const cartTotal = Object.entries(cart).reduce((s, [id, q]) => {
+    const it = allLiveItems.find((i) => i.id === id)
+    return s + (it ? Number(it.price) * q : 0)
+  }, 0)
+  const cartSC = Math.round(cartTotal * 0.05 * 100) / 100
+  const cartGrand = cartTotal + cartSC
+  const menuUrl = `${window.location.origin}/menu/bahari-restaurant`
+
+  const bumpCart = (id: string, delta: number) => {
+    setCart((prev) => {
+      const next = { ...prev, [id]: Math.max(0, (prev[id] || 0) + delta) }
+      if (next[id] === 0) delete next[id]
+      return next
+    })
+  }
 
   const OrderNotification = () => (
     <motion.div
@@ -193,9 +253,9 @@ export default function DemoPage() {
                   variant="ghost"
                   size="lg"
                   className="text-white hover:bg-white/10"
-                  onClick={() => document.getElementById('features')?.scrollIntoView({ behavior: 'smooth' })}
+                  onClick={() => document.getElementById('livedemo')?.scrollIntoView({ behavior: 'smooth' })}
                 >
-                  See how it works
+                  See the live demo
                 </Button>
               </motion.div>
 
@@ -468,6 +528,202 @@ export default function DemoPage() {
         </div>
       </section>
 
+      <section id="livedemo" className="py-20 bg-gradient-to-b from-white to-background-light">
+        <div className="max-w-6xl mx-auto px-4">
+          <motion.div
+            initial={{ opacity: 0, y: 20 }}
+            whileInView={{ opacity: 1, y: 0 }}
+            viewport={{ once: true }}
+            className="text-center mb-14"
+          >
+            <div className="inline-flex items-center gap-2 px-4 py-2 bg-success/10 text-success rounded-full text-sm font-medium mb-4">
+              <span className="w-2 h-2 rounded-full bg-success animate-pulse" />
+              Live Demo — powered by real data
+            </div>
+            <h2 className="text-3xl font-heading font-bold text-primary mb-4">
+              Try It Right Now
+            </h2>
+            <p className="text-text-secondary max-w-xl mx-auto">
+              This is a working demo of a real restaurant menu. Browse, add to cart,
+              or scan the QR with your phone to order from an actual table.
+            </p>
+          </motion.div>
+
+          <div className="grid lg:grid-cols-2 gap-10 items-center">
+            <div className="flex justify-center">
+              <div className="w-[320px] rounded-[36px] bg-gray-900 p-3 shadow-2xl">
+                <div className="rounded-[28px] bg-white overflow-hidden">
+                  <div className="bg-gray-100 px-4 py-3 flex items-center justify-between border-b border-gray-100">
+                    <div className="flex items-center gap-2 min-w-0">
+                      <div className="w-8 h-8 rounded-full bg-secondary flex items-center justify-center overflow-hidden shrink-0">
+                        {liveMenu?.restaurant?.logoUrl ? (
+                          <img src={liveMenu.restaurant.logoUrl} alt="" className="w-full h-full object-cover" />
+                        ) : (
+                          <ChefHat className="w-4 h-4 text-white" />
+                        )}
+                      </div>
+                      <div className="min-w-0">
+                        <p className="text-xs font-bold text-primary truncate">{liveMenu?.restaurant?.name || 'Loading…'}</p>
+                        <p className="text-[9px] text-text-secondary truncate">{liveMenu?.restaurant?.city || 'Scan & order'}</p>
+                      </div>
+                    </div>
+                    <div className="flex items-center gap-1">
+                      <div className="w-1.5 h-1.5 rounded-full bg-success" />
+                      <span className="text-[9px] text-success font-medium">Live</span>
+                    </div>
+                  </div>
+
+                  <div className="flex gap-1 px-3 pt-3 pb-1 overflow-x-auto">
+                    {liveLoading ? (
+                      <div className="h-7 w-20 rounded-full bg-gray-100 animate-pulse" />
+                    ) : (
+                      liveCats.map((c) => (
+                        <button
+                          key={c.id}
+                          onClick={() => setLiveCat(c.id)}
+                          className={`shrink-0 px-3 py-1.5 rounded-full text-[10px] font-semibold transition-all ${
+                            liveCat === c.id ? 'bg-secondary text-white' : 'bg-gray-100 text-text-secondary'
+                          }`}
+                        >
+                          {c.name}
+                        </button>
+                      ))
+                    )}
+                  </div>
+
+                  <div className="h-[340px] overflow-y-auto px-3 py-2 space-y-2">
+                    {liveLoading ? (
+                      Array.from({ length: 4 }).map((_, i) => (
+                        <div key={i} className="h-16 rounded-xl bg-gray-100 animate-pulse" />
+                      ))
+                    ) : (
+                      liveItems.map((item) => {
+                        const qty = cart[item.id] || 0
+                        return (
+                          <motion.div
+                            key={item.id}
+                            layout
+                            className="flex items-center gap-2 p-2 rounded-xl border border-gray-50 hover:border-gray-200 transition-colors"
+                          >
+                            <div className="w-9 h-9 rounded-lg bg-gradient-to-br from-secondary/10 to-accent/10 flex items-center justify-center overflow-hidden shrink-0">
+                              {item.photoUrl ? (
+                                <img src={item.photoUrl} alt="" className="w-full h-full object-cover" />
+                              ) : (
+                                <ChefHat className="w-4 h-4 text-secondary" />
+                              )}
+                            </div>
+                            <div className="flex-1 min-w-0">
+                              <p className="text-[11px] font-semibold text-primary truncate">{item.name}</p>
+                              <p className="text-[10px] text-secondary font-bold">KES {Number(item.price).toLocaleString()}</p>
+                            </div>
+                            {qty === 0 ? (
+                              <button
+                                onClick={() => bumpCart(item.id, 1)}
+                                className="w-7 h-7 rounded-full bg-secondary text-white flex items-center justify-center shrink-0 active:scale-90 transition-transform"
+                              >
+                                <Plus className="w-3.5 h-3.5" />
+                              </button>
+                            ) : (
+                              <div className="flex items-center gap-1.5 shrink-0">
+                                <button onClick={() => bumpCart(item.id, -1)} className="w-6 h-6 rounded-full border border-gray-200 flex items-center justify-center active:scale-90 transition-transform">
+                                  <Minus className="w-3 h-3" />
+                                </button>
+                                <span className="w-5 text-center text-[11px] font-bold text-primary">{qty}</span>
+                                <button onClick={() => bumpCart(item.id, 1)} className="w-6 h-6 rounded-full bg-secondary text-white flex items-center justify-center active:scale-90 transition-transform">
+                                  <Plus className="w-3 h-3" />
+                                </button>
+                              </div>
+                            )}
+                          </motion.div>
+                        )
+                      })
+                    )}
+                    {!liveLoading && liveItems.length === 0 && (
+                      <p className="text-center text-xs text-text-secondary py-10">No items in this category</p>
+                    )}
+                  </div>
+
+                  <div className="border-t border-gray-100 px-4 py-3">
+                    {cartCount === 0 ? (
+                      <p className="text-[11px] text-text-secondary text-center">Tap + on an item to add it to the cart</p>
+                    ) : (
+                      <div className="flex items-center justify-between">
+                        <div>
+                          <p className="text-[10px] text-text-secondary">{cartCount} items · Subtotal KES {cartTotal.toLocaleString()}</p>
+                          <p className="text-xs font-bold text-secondary">Total KES {cartGrand.toLocaleString()}</p>
+                        </div>
+                        <a
+                          href={menuUrl}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="text-[11px] font-semibold bg-secondary text-white px-3 py-2 rounded-full flex items-center gap-1"
+                        >
+                          Order Now <ArrowRight className="w-3 h-3" />
+                        </a>
+                      </div>
+                    )}
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <div className="space-y-5">
+              <motion.div
+                initial={{ opacity: 0, y: 20 }}
+                whileInView={{ opacity: 1, y: 0 }}
+                viewport={{ once: true }}
+                className="bg-white rounded-2xl p-6 border border-gray-100 shadow-soft text-center"
+              >
+                <h3 className="font-heading font-bold text-primary text-lg mb-1">Scan & Order From Your Phone</h3>
+                <p className="text-sm text-text-secondary mb-5">
+                  Point your camera here — the full ordering experience opens on your phone.
+                </p>
+                <div className="flex justify-center mb-5">
+                  <div className="p-4 bg-white rounded-2xl border border-gray-100 shadow-soft inline-block">
+                    <QRCode value={menuUrl} size={180} showDownload={false} />
+                  </div>
+                </div>
+                <div className="flex items-center justify-center gap-3 flex-wrap">
+                  <a
+                    href={menuUrl}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="inline-flex items-center gap-2 bg-secondary text-white px-5 py-2.5 rounded-xl text-sm font-semibold hover:bg-secondary-dark transition-colors"
+                  >
+                    <Smartphone className="w-4 h-4" /> Open Live Menu
+                  </a>
+                  <span className="inline-flex items-center gap-2 text-xs text-text-secondary">
+                    <ScanLine className="w-4 h-4 text-success" /> Works on any phone — no app needed
+                  </span>
+                </div>
+              </motion.div>
+
+              <motion.div
+                initial={{ opacity: 0, y: 20 }}
+                whileInView={{ opacity: 1, y: 0 }}
+                viewport={{ once: true }}
+                transition={{ delay: 0.1 }}
+                className="bg-gradient-to-br from-secondary/10 to-accent/10 rounded-2xl p-6 border border-secondary/20"
+              >
+                <div className="flex items-center gap-3 mb-2">
+                  <div className="w-10 h-10 rounded-xl bg-secondary flex items-center justify-center">
+                    <Sparkles className="w-5 h-5 text-white" />
+                  </div>
+                  <div>
+                    <h3 className="font-heading font-bold text-primary">Ask the Chef AI</h3>
+                    <p className="text-xs text-text-secondary">Real AI — try "what's popular?" or "vegetarian options?"</p>
+                  </div>
+                </div>
+                <p className="text-sm text-text-secondary mb-4">
+                  The chat bubble at the bottom-right of this page is live. It answers from this
+                  restaurant's actual menu, suggests dishes, and can add them to a cart.
+                </p>
+              </motion.div>
+            </div>
+          </div>
+        </div>
+      </section>
+
       <section className="py-20 bg-primary overflow-hidden">
         <div className="max-w-6xl mx-auto px-4">
           <motion.div
@@ -580,6 +836,10 @@ export default function DemoPage() {
           </div>
         </div>
       </footer>
+
+      {liveMenu?.restaurant?.id && (
+        <AIChat restaurantId={liveMenu.restaurant.id} menuItems={allLiveItems} />
+      )}
     </div>
   )
 }
