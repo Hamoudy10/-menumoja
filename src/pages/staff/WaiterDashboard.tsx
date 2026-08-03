@@ -11,6 +11,7 @@ import { Button } from '@/components/ui/Button'
 import { Badge } from '@/components/ui/Badge'
 import { showSuccessToast, showErrorToast } from '@/components/ui/Toast'
 import FloorCanvas, { resolveTableStatus } from '@/components/floor/FloorCanvas'
+import { useRestaurantTheme } from '@/hooks/useRestaurantTheme'
 
 const statusLabels: Record<string, string> = {
   PENDING: 'New',
@@ -45,6 +46,7 @@ interface ComplaintForm {
 
 export default function WaiterDashboard() {
   const navigate = useNavigate()
+  useRestaurantTheme(localStorage.getItem('staffRestaurantSlug'))
   const [orders, setOrders] = useState<any[]>([])
   const [loading, setLoading] = useState(true)
   const [activeTab, setActiveTab] = useState<'active' | 'served' | 'floor'>('active')

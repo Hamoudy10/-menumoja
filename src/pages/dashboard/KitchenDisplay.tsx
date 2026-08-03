@@ -6,6 +6,7 @@ import { useNavigate } from 'react-router-dom'
 import { Badge } from '@/components/ui/Badge'
 import { Button } from '@/components/ui/Button'
 import { Skeleton } from '@/components/ui/Skeleton'
+import { useRestaurantTheme } from '@/hooks/useRestaurantTheme'
 import { showSuccessToast } from '@/components/ui/Toast'
 
 const statusColors: Record<string, string> = {
@@ -17,6 +18,7 @@ const statusColors: Record<string, string> = {
 
 export default function KitchenDisplay() {
   const navigate = useNavigate()
+  useRestaurantTheme(localStorage.getItem('staffRestaurantSlug'))
   const { orders, liveOrders, fetchOrders, fetchLiveOrders, updateOrderStatus, tables, fetchTables } = useStore()
 
   const tableInfo = useMemo(() => {

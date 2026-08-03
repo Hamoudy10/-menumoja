@@ -21,11 +21,13 @@ import * as paymentsApi from '@/api/payments'
 import * as tablesApi from '@/api/tables'
 import NumberPad from '@/components/pos/NumberPad'
 import FloorCanvas from '@/components/floor/FloorCanvas'
+import { useRestaurantTheme } from '@/hooks/useRestaurantTheme'
 
 const ITEMS_PER_PAGE = 20
 
 export default function CashierDashboard() {
   const navigate = useNavigate()
+  useRestaurantTheme(localStorage.getItem('staffRestaurantSlug'))
   const { restaurant } = useStore()
   const staffName = localStorage.getItem('staffName') || 'Cashier'
   const [isFullscreen, setIsFullscreen] = useState(false)
