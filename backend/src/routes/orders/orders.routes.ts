@@ -2,7 +2,7 @@ import { Router } from 'express';
 import { v4 as uuidv4 } from 'uuid';
 import { z } from 'zod';
 import { prisma } from '@/config/database';
-import { authenticate, optionalAuth, enforceRestaurantScope, validate, validateQuery, validateParams, generalLimiter, auditLog, asyncHandler } from '@/middleware';
+import { authenticate, optionalAuth, enforceRestaurantScope, validate, validateQuery, validateParams, generalLimiter, orderCreateLimiter, auditLog, asyncHandler } from '@/middleware';
 import { AppError, NotFoundError, ValidationError } from '@/utils/errors';
 import { generateOrderNumber, calculateTotals, buildPaginationMeta } from '@/utils/helpers';
 import { updateOrderStatusSchema } from '@/utils/validation';
@@ -59,12 +59,14 @@ const customerCreateOrderSchema = z.object({
   sessionId: z.string().optional(),
   items: z.array(z.object({
     menuItemId: z.string().uuid('Invalid menu item ID'),
-    quantity: z.number().int().min(1, 'Quantity must be at least 1'),
+    quantity: z.number().int().min(1, 'Quantity must be at least 1').max(20, 'Maximum 20 per item'),
     specialInstructions: z.string().max(500).optional(),
-  })).min(1, 'At least one item is required'),
+  })).min(1, 'At least one item is required').max(30, 'Maximum 30 items per order'),
   specialNotes: z.string().max(1000).optional(),
   paymentMethod: z.enum(['mpesa', 'cash', 'card']).default('cash'),
-  customerPhone: z.string().optional(),
+  customerName: z.string().max(100).optional(),
+  customerPhone: z.string().max(20).optional(),
+  website: z.string().max(50).optional(),
 });
 
 const TRANSITION_MAP: Record<string, string[]> = {
@@ -87,10 +89,18 @@ const STATUS_PRIORITY: Record<string, number> = {
 
 router.post('/public/create',
   generalLimiter,
+  orderCreateLimiter,
   optionalAuth,
   validate(customerCreateOrderSchema),
   asyncHandler(async (req, res) => {
-    let { restaurantId, restaurantSlug, tableId, tableNumber, sessionId, items, specialNotes, paymentMethod } = req.body;
+    let { restaurantId, restaurantSlug, tableId, tableNumber, sessionId, items, specialNotes, paymentMethod, customerName, customerPhone, website } = req.body;
+
+    if (website) {
+      return res.status(201).json({
+        success: true,
+        data: { orderId: uuidv4(), orderNumber: 'SPAM', estimatedPrepMinutes: 0, totalAmount: 0 },
+      });
+    }
 
     if (!restaurantId && restaurantSlug) {
       const slugRestaurant = await prisma.restaurant.findUnique({
@@ -105,6 +115,35 @@ router.post('/public/create',
     }
 
     sessionId = sessionId || uuidv4();
+
+    const recentOrder = await prisma.order.findFirst({
+      where: {
+        restaurantId,
+        sessionId,
+        createdAt: { gte: new Date(Date.now() - 60000) },
+      },
+      select: { id: true },
+    });
+    if (recentOrder) {
+      throw new ValidationError(
+        'Please wait a moment before placing another order',
+        'Tafadhali subiri muda kidogo kabla ya kuweka agizo lingine'
+      );
+    }
+
+    const activeCount = await prisma.order.count({
+      where: {
+        restaurantId,
+        sessionId,
+        status: { in: ['PENDING', 'CONFIRMED', 'PREPARING', 'READY'] },
+      },
+    });
+    if (activeCount >= 3) {
+      throw new ValidationError(
+        'You have too many active orders — please wait for them to complete',
+        'Una agizo nyingi zilizosubiri — tafadhali subiri zikamilike'
+      );
+    }
 
     const restaurant = await prisma.restaurant.findUnique({
       where: { id: restaurantId },
@@ -215,6 +254,8 @@ router.post('/public/create',
         totalAmount: totals.total,
         specialNotes: specialNotes || null,
         estimatedPrepMinutes,
+        customerName: customerName || null,
+        customerPhone: customerPhone || null,
         items: {
           create: orderItems.map((oi: { menuItemId: string; quantity: number; specialInstructions: string | null; price: number }) => {
             const menuItem = menuItems.find((m) => m.id === oi.menuItemId)!;

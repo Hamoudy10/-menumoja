@@ -156,7 +156,10 @@ export default function WaiterDashboard() {
           <div className="flex items-start justify-between">
             <div>
               <div className="flex items-center gap-2">
-                <h3 className="font-bold text-primary">{order.tableNumber > 0 ? `Table ${order.tableNumber}` : 'Takeaway'}</h3>
+                <h3 className="font-bold text-primary">
+                  {order.tableNumber > 0 ? `Table ${order.tableNumber}` : order.customerName ? order.customerName : 'Takeaway'}
+                  {order.customerPhone && <span className="text-xs font-normal text-text-secondary ml-2">📞 {order.customerPhone}</span>}
+                </h3>
                 <span className="text-xs text-text-secondary">#{order.orderNumber}</span>
               </div>
               <p className="text-xs text-text-secondary mt-0.5">

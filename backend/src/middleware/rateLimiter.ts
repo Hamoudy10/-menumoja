@@ -82,3 +82,23 @@ export const mpesaLimiter = rateLimit({
     );
   },
 });
+
+export const orderCreateLimiter = rateLimit({
+  windowMs: 60 * 1000,
+  max: 6,
+  standardHeaders: true,
+  legacyHeaders: false,
+  skip: skipInTest,
+  keyGenerator: (req) => {
+    const sessionId = (req.body as any)?.sessionId;
+    const restaurantId = (req.body as any)?.restaurantId;
+    const key = sessionId ? `rl:order:${restaurantId || 'any'}:${sessionId}` : `rl:order:${req.ip}`;
+    return key;
+  },
+  handler: (_req, _res) => {
+    throw new RateLimitError(
+      'Too many orders in a short time. Please wait a moment.',
+      'Agizo nyingi sana kwa muda mfupi. Tafadhali subiri muda kidogo.'
+    );
+  },
+});

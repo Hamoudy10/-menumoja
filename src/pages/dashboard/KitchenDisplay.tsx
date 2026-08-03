@@ -161,7 +161,8 @@ export default function KitchenDisplay() {
                       </Badge>
                     </div>
                     <p className="text-xs text-text-secondary mt-0.5">
-                      {order.tableNumber > 0 ? `Table ${order.tableNumber}` : 'Takeaway'} · <Clock className="w-3 h-3 inline" />{' '}
+                      {order.tableNumber > 0 ? `Table ${order.tableNumber}` : (order.customerName ? order.customerName : 'Takeaway')}
+                      {order.customerPhone && ` · ${order.customerPhone}`} · <Clock className="w-3 h-3 inline" />{' '}
                       {order.createdAt ? Math.floor((Date.now() - new Date(order.createdAt).getTime()) / 60000) : 0} min ago
                       {(() => {
                         const info = order.tableId ? tableInfo.get(order.tableId) : null

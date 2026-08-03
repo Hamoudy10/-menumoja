@@ -346,6 +346,8 @@ export default function CashierDashboard() {
         total: orderTotal, method: paymentMethod,
         cashReceived: parseFloat(cashReceived) || 0, change,
         tip, serviceCharge: scAmount,
+        customerName: selectedOrder.customerName,
+        customerPhone: selectedOrder.customerPhone,
         time: new Date().toLocaleString('en-KE', { hour12: true }),
         date: new Date().toLocaleDateString('en-KE'),
         staffName,
@@ -446,6 +448,8 @@ export default function CashierDashboard() {
     lines.push(`<div class="h"><div class="b">ETR RECEIPT</div><div>Serial: ${esc(lp.receiptNo)}</div><div>${esc(lp.date)} ${esc(lp.time)}</div></div>`)
     lines.push(`<div class="meta"><div><span>Order:</span><span>#${esc(lp.orderNumber)}</span></div>`)
     lines.push(`<div><span>Table:</span><span>${lp.table > 0 ? `T${lp.table}` : 'Takeaway'}</span></div>`)
+    if (lp.customerName) lines.push(`<div><span>Customer:</span><span>${esc(lp.customerName)}</span></div>`)
+    if (lp.customerPhone) lines.push(`<div><span>Phone:</span><span>${esc(lp.customerPhone)}</span></div>`)
     lines.push(`<div><span>Payment:</span><span>${esc(String(lp.method || '').toUpperCase())}</span></div>`)
     if (lp.staffName) lines.push(`<div><span>Cashier:</span><span>${esc(lp.staffName)}</span></div>`)
     lines.push(`</div>`)
@@ -508,6 +512,8 @@ export default function CashierDashboard() {
       change: p.changeGiven != null ? Number(p.changeGiven) : 0,
       tip: Number(o.tipAmount || 0),
       serviceCharge: Number(o.serviceCharge || 0),
+      customerName: o.customerName || '',
+      customerPhone: o.customerPhone || '',
       date: p.processedAt ? new Date(p.processedAt).toLocaleDateString('en-KE') : '',
       time: p.processedAt ? new Date(p.processedAt).toLocaleString('en-KE', { hour12: true }) : '',
       staffName: p.cashier?.fullName || 'Cashier',
@@ -752,7 +758,8 @@ export default function CashierDashboard() {
                             <span className="text-sm font-bold text-secondary">{formatKES(order.total)}</span>
                           </div>
                           <div className="flex items-center gap-2 text-xs text-text-secondary">
-                            <span>{order.tableNumber > 0 ? `Table ${order.tableNumber}` : 'Takeaway'}</span>
+                            <span>{order.tableNumber > 0 ? `Table ${order.tableNumber}` : (order.customerName ? order.customerName : 'Takeaway')}</span>
+                            {order.customerPhone && <span>· {order.customerPhone}</span>}
                             <span>·</span>
                             <Clock className="w-3 h-3" /> {timeAgo(order.createdAt)}
                             <span>·</span>
@@ -813,6 +820,8 @@ export default function CashierDashboard() {
                   <div className="space-y-1 mb-3">
                     <div className="flex justify-between text-[10px] text-text-secondary"><span>Order:</span><span>#{lastPayment?.orderNumber}</span></div>
                     <div className="flex justify-between text-[10px] text-text-secondary"><span>Table:</span><span>{lastPayment?.table > 0 ? `T${lastPayment.table}` : 'Takeaway'}</span></div>
+                    {lastPayment?.customerName && <div className="flex justify-between text-[10px] text-text-secondary"><span>Customer:</span><span>{lastPayment.customerName}</span></div>}
+                    {lastPayment?.customerPhone && <div className="flex justify-between text-[10px] text-text-secondary"><span>Phone:</span><span>{lastPayment.customerPhone}</span></div>}
                     <div className="flex justify-between text-[10px] text-text-secondary"><span>Payment:</span><span className="uppercase">{lastPayment?.method}</span></div>
                     <div className="flex justify-between text-[10px] text-text-secondary"><span>Cashier:</span><span>{lastPayment?.staffName}</span></div>
                   </div>

@@ -472,6 +472,8 @@ router.get(
     if (q) {
       orderWhere.OR = [
         { orderNumber: { contains: q, mode: 'insensitive' } },
+        { customerName: { contains: q, mode: 'insensitive' } },
+        { customerPhone: { contains: q } },
         { items: { some: { itemName: { contains: q, mode: 'insensitive' } } } },
       ];
     }
@@ -508,6 +510,8 @@ router.get(
               taxAmount: true,
               tipAmount: true,
               totalAmount: true,
+              customerName: true,
+              customerPhone: true,
               items: {
                 select: { itemName: true, itemPrice: true, quantity: true },
                 orderBy: { createdAt: 'asc' },

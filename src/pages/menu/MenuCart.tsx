@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import { useParams, useNavigate, useSearchParams } from 'react-router-dom'
-import { ShoppingCart, Trash2, Minus, Plus, ArrowLeft, Smartphone, Banknote, Loader2, X } from 'lucide-react'
+import { ShoppingCart, Trash2, Minus, Plus, ArrowLeft, Smartphone, Banknote, Loader2, X, User } from 'lucide-react'
 import { useStore } from '@/store/useStore'
 import { Button } from '@/components/ui/Button'
 import { Input } from '@/components/ui/Input'
@@ -16,12 +16,20 @@ export default function MenuCart() {
   const [showPaymentChoice, setShowPaymentChoice] = useState(false)
   const [showMpesaInput, setShowMpesaInput] = useState(false)
   const [mpesaPhone, setMpesaPhone] = useState('')
+  const [customerName, setCustomerName] = useState('')
+  const [customerPhone, setCustomerPhone] = useState('')
   const { cart, removeFromCart, updateCartQuantity, clearCart, placeOrder } = useStore()
+
+  const isTakeaway = !tableFromUrl
 
   const total = cart.reduce((s, i) => s + i.item.price * i.quantity, 0)
 
   const submitOrder = async (method: 'mpesa' | 'cash') => {
     if (cart.length === 0 || placing) return
+    if (isTakeaway && !customerName.trim()) {
+      showSuccessToast('Please enter your name so we know who the order is for')
+      return
+    }
     setPlacing(true)
     try {
       const order = await placeOrder({
@@ -36,7 +44,8 @@ export default function MenuCart() {
         })),
         total,
         paymentMethod: method,
-        customerPhone: method === 'mpesa' ? mpesaPhone : undefined,
+        customerName: isTakeaway ? customerName.trim() : undefined,
+        customerPhone: (method === 'mpesa' ? mpesaPhone : customerPhone.trim()) || undefined,
         specialInstructions: '',
       })
       clearCart()
@@ -137,6 +146,22 @@ export default function MenuCart() {
                 <span className="font-bold text-secondary text-lg">KES {total.toLocaleString()}</span>
               </div>
             </div>
+
+            {isTakeaway && (
+              <motion.div
+                initial={{ opacity: 0, y: 10 }}
+                animate={{ opacity: 1, y: 0 }}
+                className="bg-white rounded-2xl p-4 border border-gray-100 shadow-soft space-y-3"
+              >
+                <div className="flex items-center gap-2">
+                  <User className="w-4 h-4 text-secondary" />
+                  <h3 className="font-heading font-bold text-primary text-sm">Pickup details</h3>
+                </div>
+                <p className="text-xs text-text-secondary -mt-1">So we know who this order belongs to</p>
+                <Input label="Your name" value={customerName} onChange={(e) => setCustomerName(e.target.value)} placeholder="e.g. John Kamau" />
+                <Input label="Phone (optional)" type="tel" value={customerPhone} onChange={(e) => setCustomerPhone(e.target.value)} placeholder="+2547XX XXX XXX" />
+              </motion.div>
+            )}
 
             <Button
               variant="primary"

@@ -361,6 +361,9 @@ function KitchenDisplay({ orders, updateOrderStatus }: { orders: Order[]; update
                   <span className="font-heading text-3xl font-bold text-text-primary dark:text-white">
                     {order.tableNumber != null && order.tableNumber > 0 ? `T${order.tableNumber.toString().padStart(2, '0')}` : 'T—'}
                   </span>
+                  {(order as any).customerName && order.tableNumber <= 0 && (
+                    <span className="text-sm font-bold text-text-primary dark:text-white max-w-[140px] truncate">{(order as any).customerName}</span>
+                  )}
                   <div className={`flex items-center gap-1.5 font-accent text-lg font-bold tabular-nums ${
                     isOverdue ? 'text-red-500' : 'text-text-secondary dark:text-white/60'
                   }`}>
