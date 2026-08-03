@@ -170,7 +170,7 @@ export default function WaiterDashboard() {
               </p>
             </div>
             <div className="flex items-center gap-2">
-              <Badge className={statusColors[order.status] || 'bg-gray-100'}>{statusLabels[order.status] || order.status}</Badge>
+                                  <Badge className={statusColors[String(order.status).toUpperCase()] || 'bg-gray-100'}>{statusLabels[String(order.status).toUpperCase()] || order.status}</Badge>
               <Badge className={paymentStatusColors[paymentStatus] || 'bg-gray-100'}>{paymentStatus}</Badge>
             </div>
           </div>
@@ -344,7 +344,7 @@ export default function WaiterDashboard() {
                               <div className="flex items-center justify-between mb-2">
                                 <div className="flex items-center gap-2">
                                   <span className="font-bold text-primary text-sm">#{order.orderNumber}</span>
-                                  <Badge className={statusColors[order.status] || 'bg-gray-100'}>{statusLabels[order.status] || order.status}</Badge>
+              <Badge className={statusColors[String(order.status).toUpperCase()] || 'bg-gray-100'}>{statusLabels[String(order.status).toUpperCase()] || order.status}</Badge>
                                   <Badge className={paymentStatusColors[String(order.paymentStatus || 'UNPAID')] || 'bg-gray-100'}>{order.paymentStatus || 'UNPAID'}</Badge>
                                 </div>
                                 <span className="text-xs text-text-secondary">{order.createdAt ? new Date(order.createdAt).toLocaleTimeString() : ''}</span>

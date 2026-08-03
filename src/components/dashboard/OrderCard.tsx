@@ -18,7 +18,8 @@ const statusConfig: Record<OrderStatus, { label: string; icon: any; color: strin
 }
 
 export function OrderCard({ order, onStatusChange, busy = false }: OrderCardProps) {
-  const config = statusConfig[order.status as OrderStatus] || statusConfig.new
+  const statusKey = String(order.status || '').toLowerCase() as OrderStatus
+  const config = statusConfig[statusKey] || statusConfig.new
   const StatusIcon = config.icon
 
   return (

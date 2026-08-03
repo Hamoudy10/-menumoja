@@ -89,7 +89,7 @@ export interface Order {
   tableNumber: number
   items: OrderItem[]
   total: number
-  status: 'new' | 'preparing' | 'ready' | 'served'
+  status: 'new' | 'preparing' | 'ready' | 'served' | 'cancelled'
   paymentMethod: 'mpesa' | 'cash' | 'card'
   paymentStatus: 'pending' | 'confirmed' | 'failed'
   specialInstructions: string

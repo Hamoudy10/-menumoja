@@ -16,6 +16,16 @@ import type {
 } from '@/types'
 import type { Restaurant } from '@/types'
 
+function normalizeOrderStatus(status: unknown): 'new' | 'preparing' | 'ready' | 'served' | 'cancelled' {
+  const s = String(status || '').toUpperCase()
+  if (s === 'PENDING' || s === 'NEW') return 'new'
+  if (s === 'CONFIRMED' || s === 'PREPARING') return 'preparing'
+  if (s === 'READY') return 'ready'
+  if (s === 'SERVED' || s === 'COMPLETED') return 'served'
+  if (s === 'CANCELLED' || s === 'CANCELED') return 'cancelled'
+  return 'new'
+}
+
 interface AppState {
   darkMode: boolean
   toggleDarkMode: () => void
@@ -551,8 +561,7 @@ export const useStore = create<AppState>((set) => ({
   orders: [],
   liveOrders: [],
   loadingOrders: false,
-  fetchOrders: async (params) => {
-    set({ loadingOrders: true })
+  fetchOrders: async (params) => {    set({ loadingOrders: true })
     try {
       const data = await ordersApi.fetchOrders(params)
       const rawOrders = data.orders || data
@@ -561,12 +570,14 @@ export const useStore = create<AppState>((set) => ({
         tableNumber: o.tableNumber ?? o.table_number ?? 0,
         items: (o.items || []).map((i: any) => ({ name: i.name || i.itemName || '', price: i.price || i.itemPrice || 0, quantity: i.quantity || 1 })),
         total: (o.total ?? o.totalAmount ?? 0) as number,
-        status: o.status === 'PENDING' ? 'new' : o.status === 'CONFIRMED' ? 'preparing' : (o.status || 'new') as 'new' | 'preparing' | 'ready' | 'served',
+        status: normalizeOrderStatus(o.status),
         paymentMethod: (o.paymentMethod || 'cash') as 'mpesa' | 'cash' | 'card',
         paymentStatus: (o.paymentStatus || 'pending') as 'pending' | 'confirmed' | 'failed',
         specialInstructions: o.specialInstructions || o.specialNotes || '',
         createdAt: o.createdAt || new Date().toISOString(),
         orderNumber: o.orderNumber,
+        customerName: o.customerName,
+        customerPhone: o.customerPhone,
       })) : []
       set({ orders: normalized })
     } catch (err: any) {
@@ -584,7 +595,7 @@ export const useStore = create<AppState>((set) => ({
         tableNumber: o.tableNumber ?? o.table_number ?? 0,
         items: (o.items || []).map((i: any) => ({ name: i.name || i.itemName || '', price: i.price || i.itemPrice || 0, quantity: i.quantity || 1 })),
         total: (o.total ?? o.totalAmount ?? 0) as number,
-        status: (o.status || 'new') as 'new' | 'preparing' | 'ready' | 'served',
+        status: normalizeOrderStatus(o.status),
         paymentMethod: (o.paymentMethod || 'cash') as 'mpesa' | 'cash' | 'card',
         paymentStatus: (o.paymentStatus || 'pending') as 'pending' | 'confirmed' | 'failed',
         specialInstructions: o.specialInstructions || o.specialNotes || '',
