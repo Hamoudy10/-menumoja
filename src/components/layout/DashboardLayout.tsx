@@ -114,8 +114,12 @@ export default function DashboardLayout() {
               <NotificationBell />
 
               <div className="flex items-center gap-2 rounded-xl bg-black/5 dark:bg-white/10 px-3 py-1.5">
-                <div className="flex h-7 w-7 items-center justify-center rounded-lg bg-secondary text-[10px] font-bold text-white">
-                  {restaurant?.name?.charAt(0) || 'M'}
+                <div className="flex h-7 w-7 items-center justify-center rounded-lg bg-secondary text-[10px] font-bold text-white overflow-hidden">
+                  {restaurant?.logoUrl ? (
+                    <img src={restaurant.logoUrl} alt="" className="h-full w-full object-cover" onError={(e) => { (e.target as HTMLImageElement).style.display = 'none' }} />
+                  ) : (
+                    restaurant?.name?.charAt(0) || 'M'
+                  )}
                 </div>
                 <div className="hidden sm:block">
                   <p className="font-accent text-xs font-medium text-text-primary dark:text-white leading-tight">

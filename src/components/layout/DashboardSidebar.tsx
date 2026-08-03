@@ -29,8 +29,12 @@ export default function DashboardSidebar({ onClose }: DashboardSidebarProps) {
     <aside className="w-60 h-screen bg-white dark:bg-primary border-r border-gray-100 dark:border-white/5 flex flex-col sticky top-0">
       <div className="flex items-center justify-between p-4 border-b border-gray-100 dark:border-white/5">
         <div className="flex items-center gap-2">
-          <div className="w-9 h-9 rounded-xl bg-secondary flex items-center justify-center">
-            <ChefHat className="w-5 h-5 text-white" />
+          <div className="w-9 h-9 rounded-xl bg-secondary flex items-center justify-center overflow-hidden">
+            {restaurant?.logoUrl ? (
+              <img src={restaurant.logoUrl} alt="" className="h-full w-full object-cover" onError={(e) => { (e.target as HTMLImageElement).style.display = 'none' }} />
+            ) : (
+              <ChefHat className="w-5 h-5 text-white" />
+            )}
           </div>
           <div className="min-w-0">
             <p className="font-heading font-bold text-primary dark:text-white text-sm truncate">
