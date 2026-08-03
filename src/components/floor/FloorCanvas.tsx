@@ -106,6 +106,10 @@ interface DragState {
   baseW: number
   baseH: number
   moved: boolean
+  curX: number
+  curY: number
+  curW: number
+  curH: number
 }
 
 interface FloorCanvasProps {
@@ -160,7 +164,7 @@ export default function FloorCanvas({
     e.preventDefault()
     e.stopPropagation()
     ;(e.currentTarget as HTMLElement).setPointerCapture(e.pointerId)
-    dragRef.current = { kind, id, startClientX: e.clientX, startClientY: e.clientY, baseX, baseY, baseW, baseH, moved: false }
+    dragRef.current = { kind, id, startClientX: e.clientX, startClientY: e.clientY, baseX, baseY, baseW, baseH, moved: false, curX: baseX, curY: baseY, curW: baseW, curH: baseH }
   }
 
   const handlePointerMove = (e: React.PointerEvent) => {
@@ -177,12 +181,16 @@ export default function FloorCanvas({
     if (!drag.moved) return
 
     if (drag.kind === 'table' || drag.kind === 'zone') {
-      const x = clampX(snap(drag.baseX + dx), drag.baseW)
-      const y = clampY(snap(drag.baseY + dy), drag.baseH)
+      const x = clampX(drag.baseX + dx, drag.baseW)
+      const y = clampY(drag.baseY + dy, drag.baseH)
+      drag.curX = x
+      drag.curY = y
       setDrafts((d) => ({ ...d, [drag.id!]: { x, y, w: drag.baseW, h: drag.baseH } }))
     } else if (drag.kind === 'resize-table' || drag.kind === 'resize-zone') {
-      const w = Math.max(1, snap(drag.baseW + dx))
-      const h = Math.max(1, snap(drag.baseH + dy))
+      const w = Math.max(1, drag.baseW + dx)
+      const h = Math.max(1, drag.baseH + dy)
+      drag.curW = w
+      drag.curH = h
       setDrafts((d) => ({ ...d, [drag.id!]: { x: drag.baseX, y: drag.baseY, w, h } }))
     } else if (drag.kind === 'draw') {
       const x = Math.min(drag.baseX, p.x)
@@ -201,8 +209,7 @@ export default function FloorCanvas({
 
     if (drag.kind === 'table') {
       if (drag.moved) {
-        const d = drafts[drag.id!]
-        if (d && onMoveTable) onMoveTable(drag.id!, d.x, d.y)
+        onMoveTable?.(drag.id!, Math.round(drag.curX), Math.round(drag.curY))
       } else if (onSelect) {
         onSelect(drag.id!)
       }
@@ -213,8 +220,7 @@ export default function FloorCanvas({
       })
     } else if (drag.kind === 'zone') {
       if (drag.moved) {
-        const d = drafts[drag.id!]
-        if (d && onMoveZone) onMoveZone(drag.id!, d.x, d.y)
+        onMoveZone?.(drag.id!, Math.round(drag.curX), Math.round(drag.curY))
       } else if (onSelect) {
         onSelect(drag.id!)
       }
@@ -224,16 +230,14 @@ export default function FloorCanvas({
         return next
       })
     } else if (drag.kind === 'resize-table') {
-      const d = drafts[drag.id!]
-      if (d && onResizeTable) onResizeTable(drag.id!, d.w, d.h)
+      onResizeTable?.(drag.id!, Math.max(1, Math.round(drag.curW)), Math.max(1, Math.round(drag.curH)))
       setDrafts((s) => {
         const next = { ...s }
         delete next[drag.id!]
         return next
       })
     } else if (drag.kind === 'resize-zone') {
-      const d = drafts[drag.id!]
-      if (d && onResizeZone) onResizeZone(drag.id!, d.w, d.h)
+      onResizeZone?.(drag.id!, Math.max(1, Math.round(drag.curW)), Math.max(1, Math.round(drag.curH)))
       setDrafts((s) => {
         const next = { ...s }
         delete next[drag.id!]
@@ -254,6 +258,7 @@ export default function FloorCanvas({
     dragRef.current = {
       kind: 'draw', startClientX: e.clientX, startClientY: e.clientY,
       baseX: clampX(p.x, 0), baseY: clampY(p.y, 0), baseW: 0, baseH: 0, moved: false,
+      curX: 0, curY: 0, curW: 0, curH: 0,
     }
   }
 

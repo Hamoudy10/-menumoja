@@ -79,7 +79,10 @@ export default function MenuOrderStatus() {
     )
   }
 
-  const currentStepIndex = steps.findIndex(s => s.id === order.status)
+  const statusKey = String(order.status || '').toLowerCase()
+  const currentStepIndex = statusKey === 'pending' || statusKey === 'confirmed' || statusKey === 'new'
+    ? 0
+    : steps.findIndex(s => s.id === statusKey)
 
   return (
     <div className="min-h-screen bg-background-light">
