@@ -269,7 +269,14 @@ TARGET DOMAIN                    CURRENT STATE                        GAP CLASS
 
 **Remaining in Tier 2:** order-time COGS snapshotting + menu engineering (STAR/PLOW HORSE/PUZZLE/DOG) → Tier 2c.
 
-### Tier 2c — PROFITABILITY & MENU ENGINEERING (next recommended)
+### Tier 2c — PROFITABILITY & MENU ENGINEERING ✅ EXECUTED (2026-08-12)
+1. ✅ **Profitability overview** — grossSales (Σ paid order totals), discounts (gross − Σ paid payments), refunds, netSales, **estimated COGS** (Σ order-item qty × current active recipe cost), contribution, margin %, order count, units sold, AOV. COGS explicitly labelled an estimate (order-time snapshots deferred to the COGS-on-orders phase).
+2. ✅ **Menu engineering** — popularity (units sold) × profitability (margin %) split at the axis medians → **STAR / PLOW HORSE / PUZZLE / DOG**, each with a recommendation (promote/reprice/promote/remove-review). Items without recipes → **NO_COST_DATA** (never guessed). Unsold items don't skew the popularity median.
+3. ✅ **API** — `GET /analytics/profitability/overview?period=` + `GET /analytics/profitability/menu-engineering?period=` (reuse analytics period/date helpers).
+4. ✅ **UI** — `/dashboard/profitability`: period toggle, metric cards (gross/net/COGS/contribution), margin/orders/units/refunds tiles, and a 2×2 matrix with quadrant buckets, counts, and recommendations. Sidebar + route wired.
+5. ✅ Tests — `tests/profitability.test.ts` (4): full overview math (2,500 gross / 100 discounts / 200 refunds / 2,200 net / 600 COGS / 72.7% margin), empty period, four-way classification with exact medians, NO_COST_DATA handling.
+
+### Tier 3 — CUSTOMER CRM (next recommended)
 7. POS hardening: modifiers, split/partial payments, held orders (persisted), KDS station/actions, table merge/split, optimistic locking
 8. M-Pesa: state machine, PaymentAttempt/WebhookEvent, reconciliation dashboard, timeout/reversal handling
 9. Offline-first: local queues + sync + connectivity UI + PWA decision

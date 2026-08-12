@@ -5,6 +5,7 @@ import { prisma } from '../../config/database';
 import { authenticate, enforceRestaurantScope, validateQuery } from '../../middleware';
 import { AppError, NotFoundError } from '../../utils/errors';
 import { formatKES, asyncHandler } from '../../utils/helpers';
+import { getProfitabilityOverview, getMenuEngineering } from '../../services/profitability.service';
 import logger from '../../utils/logger';
 import { AuthenticatedRequest } from '../../types';
 
@@ -434,6 +435,28 @@ router.get('/export', asyncHandler(async (req: AuthenticatedRequest, res: Respon
   }
 
   res.json({ success: true, data: { totalRevenue, totalOrders, totalScans, avgOrderValue, dailyAnalytics } });
+}));
+
+// ── Profitability ──
+
+// GET /profitability/overview?period= - revenue/discounts/refunds/COGS/margin
+router.get('/profitability/overview', validateQuery(periodQuerySchema), asyncHandler(async (req: AuthenticatedRequest, res: Response) => {
+  const restaurantId = (req as any).restaurantId;
+  const { period = 'month', startDate, endDate } = req.query as any;
+  const range = getDateRange(period, startDate, endDate);
+
+  const overview = await getProfitabilityOverview(restaurantId, range.start, range.end, period);
+  res.json({ success: true, data: overview });
+}));
+
+// GET /profitability/menu-engineering?period= - STAR/PLOW/PUZZLE/DOG matrix
+router.get('/profitability/menu-engineering', validateQuery(periodQuerySchema), asyncHandler(async (req: AuthenticatedRequest, res: Response) => {
+  const restaurantId = (req as any).restaurantId;
+  const { period = 'month', startDate, endDate } = req.query as any;
+  const range = getDateRange(period, startDate, endDate);
+
+  const result = await getMenuEngineering(restaurantId, range.start, range.end);
+  res.json({ success: true, data: result });
 }));
 
 export default router;

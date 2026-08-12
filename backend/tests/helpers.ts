@@ -85,10 +85,12 @@ jest.mock('../src/config/database', () => {
       create: jest.fn(),
       update: jest.fn(),
       count: jest.fn(),
+      aggregate: jest.fn(),
     },
     orderItem: {
       create: jest.fn(),
       findMany: jest.fn(),
+      groupBy: jest.fn().mockResolvedValue([]),
     },
     payment: {
       findFirst: jest.fn(),
@@ -99,8 +101,7 @@ jest.mock('../src/config/database', () => {
       updateMany: jest.fn(),
       count: jest.fn(),
       aggregate: jest.fn(),
-    },
-    receipt: {
+    },    receipt: {
       findFirst: jest.fn().mockResolvedValue(null),
       findUnique: jest.fn().mockResolvedValue(null),
       findMany: jest.fn().mockResolvedValue([]),
