@@ -13,6 +13,41 @@ let aiClient: OpenAI | null = null;
 
 const AI_MODEL = config.aiProvider === 'deepseek' ? config.deepseekModel : 'gpt-4o';
 export const MODEL_NAME = AI_MODEL;
+
+/**
+ * Menu Moja AI Manager answer: grounded on the provided data payload.
+ * Returns the reply plus real token usage for cost tracking.
+ */
+export async function generateManagerAnswer(
+  question: string,
+  dataText: string
+): Promise<{ reply: string; model: string; usage?: { promptTokens: number; completionTokens: number } }> {
+  return withRetry(async () => {
+    const client = getClient();
+    const response = await client.chat.completions.create({
+      model: AI_MODEL,
+      messages: [
+        { role: 'system', content: 'You are Menu Moja AI Manager, an executive assistant for a restaurant owner. Answer using ONLY the numbers and facts in DATA. Never invent figures, percentages or claims not present in DATA. If the data does not contain the answer, say what data would be needed. Be concise, practical and specific. Use KES amounts as given. Add one short actionable recommendation based ONLY on the data where useful.' },
+        { role: 'user', content: `QUESTION: ${question}\n\nDATA:\n${dataText}` },
+      ],
+      max_tokens: 600,
+      temperature: 0.4,
+    });
+
+    return {
+      reply: response.choices[0]?.message?.content || 'I could not produce an answer right now. Please try again.',
+      model: AI_MODEL,
+      usage: {
+        promptTokens: response.usage?.prompt_tokens || 0,
+        completionTokens: response.usage?.completion_tokens || 0,
+      },
+    };
+  }, {
+    reply: 'I could not connect to the AI service right now. Please try again in a moment.',
+    model: AI_MODEL,
+    usage: { promptTokens: 0, completionTokens: 0 },
+  });
+}
 const AI_BASE_URL = config.aiProvider === 'deepseek' ? 'https://api.deepseek.com/v1' : undefined;
 
 function getClient(): OpenAI {

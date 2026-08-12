@@ -574,4 +574,34 @@ router.get('/usage',
   })
 );
 
+const managerAskSchema = z.object({
+  message: z.string().min(1).max(1000),
+}).strict();
+
+// POST /manager/ask - grounded AI Restaurant Manager answer
+router.post('/manager/ask',
+  authenticate,
+  enforceRestaurantScope,
+  validate(managerAskSchema),
+  asyncHandler(async (req: any, res: any) => {
+    const restaurantId = (req as any).restaurantId;
+    const { answerQuestion } = await import('@/services/ai-manager.service');
+    const result = await answerQuestion(restaurantId, req.body.message);
+    res.json({ success: true, data: result });
+  })
+);
+
+// GET /manager/briefing?date=YYYY-MM-DD - deterministic daily briefing
+router.get('/manager/briefing',
+  authenticate,
+  enforceRestaurantScope,
+  asyncHandler(async (req: any, res: any) => {
+    const restaurantId = (req as any).restaurantId;
+    const { generateDailyBriefing } = await import('@/services/ai-manager.service');
+    const date = req.query.date ? new Date(String(req.query.date)) : new Date();
+    const briefing = await generateDailyBriefing(restaurantId, date);
+    res.json({ success: true, data: briefing });
+  })
+);
+
 export default router;

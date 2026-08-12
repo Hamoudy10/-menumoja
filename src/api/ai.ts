@@ -25,3 +25,9 @@ export const generateSocialPost = (data: any) =>
 
 export const getAiUsage = (period?: string) =>
   api.get('/ai/usage', { params: period ? { period } : {} }).then(unwrap)
+
+export const askManager = (message: string) =>
+  api.post('/ai/manager/ask', { message }).then(unwrap)
+
+export const getManagerBriefing = () =>
+  api.get('/ai/manager/briefing').then(unwrap)

@@ -322,7 +322,17 @@ TARGET DOMAIN                    CURRENT STATE                        GAP CLASS
 
 **Remaining in Tier 4:** structured function-calling tools (current design = retrieval + grounding, which achieves the same no-hallucination guarantee more simply), AI Restaurant Manager + daily briefing (Tier 4b).
 
-### Tier 4b — AI RESTAURANT MANAGER (next recommended)
+### Tier 4b — AI RESTAURANT MANAGER ✅ EXECUTED (2026-08-12)
+1. ✅ **Structured tool layer** (`manager.service.ts`) — retrievals: sales summary (revenue/orders/AOV + previous-period comparison + top items), order summary (statuses/peak/dine-in vs takeaway), profitability snapshot, inventory risk (low/out of stock with reorder levels), customer segments + repeat rate, staff metrics (waiters served / cashiers collected), campaign results (sent/failed + attributed revenue), and a **naive sales forecast** (same-weekday average over 4 weeks with confidence High/Moderate/Low + low/high band). No tool ever dumps the database.
+2. ✅ **Grounded answers** — intent detection (specificity-weighted keywords) maps the question to a tool; the LLM sees ONLY the tool output and is instructed to never invent numbers; replies + real token usage are logged via the AI usage system. Unknown intents cost nothing (helpful menu returned). Budget-exhausted or LLM-failed → structured data returned directly (**AI is never a dependency for operations**).
+3. ✅ **Daily briefing** — deterministic: yesterday's revenue/orders/AOV, ±% vs same weekday last week, top seller, highest-margin best-seller, low-stock warnings, no-orders note. **Every insight carries a reason and a data source.**
+4. ✅ **API** — `POST /ai/manager/ask`, `GET /ai/manager/briefing` (tenant-scoped, validated).
+5. ✅ **UI** — `/dashboard/ai-manager`: briefing card grid + chat with suggested questions, source labels ("answered from structured data") and cost/reliability note. Sidebar + route wired.
+6. ✅ Tests — `tests/manager.test.ts` (7): intent mapping incl. tie-breaking, unknown-intent no-LLM path, tool answer with data, briefing math (8.5% change, top seller, reasons+sources), forecast shape, ask + briefing API endpoints.
+
+**Deferred (documented):** deeper forecasting (holidays/seasonality/promos) requires more history; LLM-phrased briefing polish optional; automated daily-briefing scheduling needs real BullMQ workers.
+
+### Tier 4c — SMART UPSELLING & PERSONALIZED MENU (next recommended)
 7. POS hardening: modifiers, split/partial payments, held orders (persisted), KDS station/actions, table merge/split, optimistic locking
 8. M-Pesa: state machine, PaymentAttempt/WebhookEvent, reconciliation dashboard, timeout/reversal handling
 9. Offline-first: local queues + sync + connectivity UI + PWA decision
