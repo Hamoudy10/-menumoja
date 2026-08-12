@@ -96,12 +96,30 @@ jest.mock('../src/config/database', () => {
       update: jest.fn(),
       updateMany: jest.fn(),
       count: jest.fn(),
+      aggregate: jest.fn(),
     },
     receipt: {
       findFirst: jest.fn().mockResolvedValue(null),
       findUnique: jest.fn().mockResolvedValue(null),
       findMany: jest.fn().mockResolvedValue([]),
       create: jest.fn(),
+      count: jest.fn().mockResolvedValue(0),
+    },
+    paymentAttempt: {
+      findFirst: jest.fn().mockResolvedValue(null),
+      findMany: jest.fn().mockResolvedValue([]),
+      create: jest.fn().mockResolvedValue({}),
+      updateMany: jest.fn().mockResolvedValue({ count: 0 }),
+      count: jest.fn().mockResolvedValue(0),
+    },
+    paymentWebhookEvent: {
+      findMany: jest.fn().mockResolvedValue([]),
+      create: jest.fn().mockResolvedValue({}),
+      count: jest.fn().mockResolvedValue(0),
+    },
+    reconciliationRecord: {
+      findMany: jest.fn().mockResolvedValue([]),
+      upsert: jest.fn().mockResolvedValue({}),
       count: jest.fn().mockResolvedValue(0),
     },
     cashReconciliation: {
@@ -229,6 +247,11 @@ jest.mock('../src/services', () => ({
 jest.mock('../src/integrations/mpesa', () => ({
   checkIdempotency: jest.fn().mockResolvedValue('new'),
   queryStatus: jest.fn().mockResolvedValue({ ResultCode: 0 }),
+  stkPush: jest.fn().mockResolvedValue({
+    checkoutRequestId: 'test-checkout',
+    MerchantRequestID: 'test-mid',
+    ResponseDescription: 'Success',
+  }),
 }));
 
 import { prisma } from '../src/config/database';

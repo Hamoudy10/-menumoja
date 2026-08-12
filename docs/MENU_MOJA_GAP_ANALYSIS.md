@@ -228,7 +228,18 @@ TARGET DOMAIN                    CURRENT STATE                        GAP CLASS
 
 **Remaining in Tier 1a:** split/partial payments (allocation model), modifiers/add-ons (DB + POS + QR + KDS), KDS station routing, table merge/split.
 
-### Tier 1b — M-PESA STATE MACHINE (next recommended)
+### Tier 1b — M-PESA STATE MACHINE ✅ EXECUTED (2026-08-12)
+1. ✅ **Models (migration 5)** — `PaymentAttempt` (per STK push: INITIATED→PENDING→SUCCESS/FAILED/EXPIRED/CANCELLED/REVERSED/UNKNOWN, receipt + error codes), `PaymentWebhookEvent` (raw Safaricom callbacks, ipAddress, isDuplicate, processed), `ReconciliationRecord` (daily: expected/received/difference/unmatched/duplicate/failed/expired/reversed).
+2. ✅ **Attempt lifecycle** — created on every STK push; SUCCESS/FAILED (1032 → CANCELLED) on callback; updated on status-query resolution.
+3. ✅ **Webhook audit** — every callback persisted raw with duplicate flag + source IP; duplicates never reprocessed (Redis idempotency retained).
+4. ✅ **Amount-mismatch guard** — settled amount ≠ requested → attempt FAILED `AMOUNT_MISMATCH`, payment NOT marked paid, bilingual SMS to customer.
+5. ✅ **Stale expiry** — attempts still PENDING after 30 min marked EXPIRED (run during reconciliation).
+6. ✅ **Reconciliation API + UI** — `POST /payments/reconciliation/run` (expire stale → compute → upsert), `GET /reconciliation/summary?date=`, `GET /reconciliation/history`; PaymentsPage shows Expected/Received/Difference/Unmatched + Duplicate/Failed/Expired/Reversed chips, Run button, history list.
+7. ✅ Tests — `tests/reconciliation.test.ts` (6): attempt creation, webhook logging (new + duplicate), reconcile compute+persist, expiry, history.
+
+**Remaining in Tier 1b:** REVERSED ingestion (Safaricom B2C/C2B reversal events — needs eTIMS-class API work), scheduled nightly reconciliation (blocked on real BullMQ workers), UNKNOWN-state handling.
+
+### Tier 1c — OFFLINE-FIRST (next recommended)
 7. POS hardening: modifiers, split/partial payments, held orders (persisted), KDS station/actions, table merge/split, optimistic locking
 8. M-Pesa: state machine, PaymentAttempt/WebhookEvent, reconciliation dashboard, timeout/reversal handling
 9. Offline-first: local queues + sync + connectivity UI + PWA decision

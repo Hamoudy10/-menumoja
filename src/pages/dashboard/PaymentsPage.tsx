@@ -1,6 +1,6 @@
 import { useMemo, useState, useEffect, useCallback } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
-import { DollarSign, Smartphone, Banknote, Clock, ArrowUpRight, ArrowDownRight } from 'lucide-react'
+import { DollarSign, Smartphone, Banknote, Clock, ArrowUpRight, ArrowDownRight, RefreshCw, PlayCircle } from 'lucide-react'
 import {
   PieChart, Pie, Cell, BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, AreaChart, Area,
 } from 'recharts'
@@ -9,6 +9,10 @@ import { Badge } from '@/components/ui/Badge'
 import { StatCard } from '@/components/dashboard/StatCard'
 import { Skeleton } from '@/components/ui/Skeleton'
 import { RefreshButton } from '@/components/ui/RefreshButton'
+import { Button } from '@/components/ui/Button'
+import { Input } from '@/components/ui/Input'
+import { showSuccessToast, showErrorToast } from '@/components/ui/Toast'
+import { getReconciliationSummary, runReconciliation, getReconciliationHistory } from '@/api/payments'
 
 function CustomTooltip({ active, payload, label }: any) {
   if (!active || !payload) return null
@@ -32,6 +36,38 @@ export default function PaymentsPage() {
 
   const [refreshing, setRefreshing] = useState(false)
   const [loaded, setLoaded] = useState(false)
+
+  const [reconDate, setReconDate] = useState(() => new Date().toISOString().slice(0, 10))
+  const [recon, setRecon] = useState<any>(null)
+  const [reconLoading, setReconLoading] = useState(false)
+  const [reconRunning, setReconRunning] = useState(false)
+  const [reconHistory, setReconHistory] = useState<any[]>([])
+
+  const fetchRecon = useCallback(async (date: string) => {
+    setReconLoading(true)
+    try {
+      const [summary, history] = await Promise.all([
+        getReconciliationSummary(date),
+        getReconciliationHistory({ perPage: 10 }),
+      ])
+      setRecon(summary)
+      setReconHistory(Array.isArray(history) ? history : history?.data || [])
+    } catch { showErrorToast('Failed to load reconciliation') }
+    finally { setReconLoading(false) }
+  }, [])
+
+  useEffect(() => { fetchRecon(reconDate) }, [fetchRecon, reconDate])
+
+  const handleRunRecon = async () => {
+    setReconRunning(true)
+    try {
+      const result = await runReconciliation(reconDate)
+      setRecon(result)
+      showSuccessToast('Reconciliation completed')
+      fetchRecon(reconDate)
+    } catch { showErrorToast('Reconciliation failed') }
+    finally { setReconRunning(false) }
+  }
 
   const refresh = useCallback(async () => {
     try {
@@ -221,6 +257,81 @@ export default function PaymentsPage() {
             </div>
           </div>
         </div>
+      </div>
+
+      {/* M-Pesa Reconciliation */}
+      <div className="rounded-2xl bg-white dark:bg-primary-light border border-white/10 p-4">
+        <div className="flex flex-wrap items-center justify-between gap-3 mb-4">
+          <div>
+            <h3 className="font-heading text-lg font-bold text-text-primary dark:text-white">M-Pesa Reconciliation</h3>
+            <p className="font-body text-xs text-text-secondary dark:text-white/50">Expected vs received, matched against STK-push attempts and Safaricom callbacks</p>
+          </div>
+          <div className="flex items-center gap-2">
+            <Input type="date" value={reconDate} onChange={(e) => setReconDate(e.target.value)} className="!w-auto text-sm" />
+            <Button size="sm" loading={reconRunning} onClick={handleRunRecon}>
+              <PlayCircle className="h-3.5 w-3.5" /> Run
+            </Button>
+          </div>
+        </div>
+
+        {reconLoading ? (
+          <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+            <Skeleton variant="card" className="h-20" />
+            <Skeleton variant="card" className="h-20" />
+            <Skeleton variant="card" className="h-20" />
+            <Skeleton variant="card" className="h-20" />
+          </div>
+        ) : recon ? (
+          <>
+            <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+              <div className="rounded-xl bg-black/5 dark:bg-white/5 p-4">
+                <p className="font-accent text-xs text-text-secondary dark:text-white/50 uppercase tracking-wider">Expected</p>
+                <p className="font-heading text-xl font-bold text-text-primary dark:text-white mt-1">KES {Number(recon.expectedMpesa || 0).toLocaleString()}</p>
+              </div>
+              <div className="rounded-xl bg-black/5 dark:bg-white/5 p-4">
+                <p className="font-accent text-xs text-text-secondary dark:text-white/50 uppercase tracking-wider">Received</p>
+                <p className="font-heading text-xl font-bold text-success mt-1">KES {Number(recon.receivedMpesa || 0).toLocaleString()}</p>
+              </div>
+              <div className={`rounded-xl p-4 ${Number(recon.difference || 0) === 0 ? 'bg-success/10' : 'bg-red-500/10'}`}>
+                <p className={`font-accent text-xs uppercase tracking-wider ${Number(recon.difference || 0) === 0 ? 'text-success' : 'text-red-500'}`}>Difference</p>
+                <p className={`font-heading text-xl font-bold mt-1 ${Number(recon.difference || 0) === 0 ? 'text-success' : 'text-red-500'}`}>KES {Number(recon.difference || 0).toLocaleString()}</p>
+              </div>
+              <div className="rounded-xl bg-black/5 dark:bg-white/5 p-4">
+                <p className="font-accent text-xs text-text-secondary dark:text-white/50 uppercase tracking-wider">Unmatched</p>
+                <p className="font-heading text-xl font-bold text-text-primary dark:text-white mt-1">{recon.unmatched ?? 0}</p>
+              </div>
+            </div>
+            <div className="flex flex-wrap gap-2 mt-3">
+              {[
+                { label: 'Duplicates', value: recon.duplicate ?? 0, cls: 'bg-amber-500/10 text-amber-600 dark:text-amber-400' },
+                { label: 'Failed', value: recon.failed ?? 0, cls: 'bg-red-500/10 text-red-600 dark:text-red-400' },
+                { label: 'Expired', value: recon.expired ?? 0, cls: 'bg-orange-500/10 text-orange-600 dark:text-orange-400' },
+                { label: 'Reversed', value: recon.reversed ?? 0, cls: 'bg-purple-500/10 text-purple-600 dark:text-purple-400' },
+              ].map((chip) => (
+                <span key={chip.label} className={`text-[11px] font-semibold px-2.5 py-1 rounded-full ${chip.cls}`}>
+                  {chip.label}: {chip.value}
+                </span>
+              ))}
+            </div>
+          </>
+        ) : null}
+
+        {reconHistory.length > 0 && (
+          <div className="mt-4 border-t border-black/5 dark:border-white/10 pt-3">
+            <p className="font-accent text-xs text-text-secondary dark:text-white/50 uppercase tracking-wider mb-2">History</p>
+            <div className="space-y-1.5 max-h-40 overflow-y-auto">
+              {reconHistory.map((r) => (
+                <div key={r.id} className="flex items-center justify-between text-xs font-accent">
+                  <span className="text-text-primary dark:text-white">{String(r.date).slice(0, 10)}</span>
+                  <span className="text-text-secondary">KES {Number(r.receivedMpesa || 0).toLocaleString()} received</span>
+                  <span className={Number(r.difference) === 0 ? 'text-success' : 'text-red-500'}>
+                    {Number(r.difference) === 0 ? 'Matched' : `Δ KES ${Number(r.difference).toLocaleString()}`}
+                  </span>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
       </div>
     </div>
   )

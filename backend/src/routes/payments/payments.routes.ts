@@ -9,6 +9,7 @@ import { getIdempotencyKey, findIdempotentPayment, recordPaymentIdempotency, isU
 import { initiateMpesaSchema, recordCashSchema, receiptListQuerySchema } from '@/utils/validation';
 import { mpesaService } from '@/services';
 import { createReceiptForPayment, getReceiptById } from '@/services/receipt.service';
+import { computeReconciliation, runReconciliation, listReconciliations } from '@/services/reconciliation.service';
 import { freeTableIfLastOrder } from '@/services/table.service';
 import * as mpesa from '@/integrations/mpesa';
 import { io } from '@/hooks/socket';
@@ -219,6 +220,22 @@ router.post('/mpesa/callback',
 
     try {
       const idempotencyStatus = await mpesa.checkIdempotency(checkoutRequestId);
+
+      try {
+        await prisma.paymentWebhookEvent.create({
+          data: {
+            checkoutRequestId,
+            payload: callbackBody as any,
+            ipAddress: req.ip || null,
+            isDuplicate: idempotencyStatus === 'completed',
+            processed: idempotencyStatus !== 'completed',
+            processedAt: new Date(),
+          },
+        });
+      } catch (webhookLogError) {
+        logger.error('Failed to persist webhook event', { error: webhookLogError, checkoutRequestId });
+      }
+
       if (idempotencyStatus === 'completed') {
         logger.info('Duplicate M-Pesa callback, already processed', { checkoutRequestId });
         return res.json({ ResultCode: 0, ResultDesc: 'Success' });
@@ -958,6 +975,54 @@ router.get('/report/tax',
         },
       },
     });
+  })
+);
+
+// ── M-Pesa Reconciliation Routes ──
+
+// GET /reconciliation/summary?date=YYYY-MM-DD - Live computed reconciliation
+router.get('/reconciliation/summary',
+  authenticate,
+  enforceRestaurantScope,
+  asyncHandler(async (req, res) => {
+    const restaurantId = (req as any).restaurantId;
+    const date = req.query.date ? new Date(String(req.query.date)) : new Date();
+
+    const summary = await computeReconciliation(restaurantId, date);
+
+    res.json({ success: true, data: { date: date.toISOString().slice(0, 10), ...summary } });
+  })
+);
+
+// POST /reconciliation/run - Expire stale attempts, compute and persist the day's record
+router.post('/reconciliation/run',
+  authenticate,
+  enforceRestaurantScope,
+  auditLog,
+  asyncHandler(async (req, res) => {
+    const restaurantId = (req as any).restaurantId;
+    const date = req.body?.date ? new Date(String(req.body.date)) : new Date();
+    const notes = req.body?.notes ? String(req.body.notes).slice(0, 500) : undefined;
+
+    const result = await runReconciliation(restaurantId, date, notes);
+
+    res.json({ success: true, data: result });
+  })
+);
+
+// GET /reconciliation/history - Persisted reconciliation records
+router.get('/reconciliation/history',
+  authenticate,
+  enforceRestaurantScope,
+  validateQuery(receiptListQuerySchema),
+  asyncHandler(async (req, res) => {
+    const restaurantId = (req as any).restaurantId;
+    const page = Math.max(1, Number(req.query.page) || 1);
+    const perPage = Math.min(100, Math.max(1, Number(req.query.perPage) || 20));
+
+    const { records, total } = await listReconciliations(restaurantId, page, perPage);
+
+    res.json({ success: true, data: records, meta: buildPaginationMeta(total, page, perPage) });
   })
 );
 

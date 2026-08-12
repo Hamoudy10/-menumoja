@@ -52,3 +52,12 @@ export const recordServiceCharge = (orderId: string, amount: number) =>
 
 export const voidPayment = (paymentId: string, reason: string) =>
   api.post(`/payments/${paymentId}/void`, { reason }).then(unwrap)
+
+export const getReconciliationSummary = (date?: string) =>
+  api.get('/payments/reconciliation/summary', { params: date ? { date } : {} }).then(unwrap)
+
+export const runReconciliation = (date?: string, notes?: string) =>
+  api.post('/payments/reconciliation/run', { date, notes }).then(unwrap)
+
+export const getReconciliationHistory = (params?: any) =>
+  api.get('/payments/reconciliation/history', { params }).then(unwrap)
