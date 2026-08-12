@@ -164,6 +164,44 @@ enum PaymentAttemptStatus {
   UNKNOWN
 }
 
+enum UnitOfMeasure {
+  KG
+  G
+  L
+  ML
+  PIECE
+  PACK
+  BOX
+  DOZEN
+  BAG
+  JAR
+}
+
+enum StockMovementType {
+  OPENING
+  PURCHASE
+  SALE
+  WASTE
+  ADJUSTMENT
+  TRANSFER_IN
+  TRANSFER_OUT
+}
+
+enum StockMovementReference {
+  PURCHASE_ORDER
+  ORDER
+  MANUAL
+  OPENING
+}
+
+enum PurchaseOrderStatus {
+  DRAFT
+  ORDERED
+  PARTIAL
+  RECEIVED
+  CANCELLED
+}
+
 // ==============================
 // MODELS
 // ==============================
@@ -280,6 +318,10 @@ model Restaurant {
   reconciliationRecords  ReconciliationRecord[]
   cashReconciliations    CashReconciliation[]
   receipts               Receipt[]
+  inventoryItems         InventoryItem[]
+  stockMovements         StockMovement[]
+  suppliers              Supplier[]
+  purchaseOrders         PurchaseOrder[]
   aiConversations        AiConversation[]
   faqs                   RestaurantFaq[]
   aiGeneratedContents    AiGeneratedContent[]
@@ -851,6 +893,110 @@ model ReconciliationRecord {
   @@unique([restaurantId, date])
   @@index([restaurantId])
   @@map("reconciliation_records")
+}
+
+model InventoryItem {
+  id            String        @id @default(uuid()) @db.Uuid
+  restaurantId  String        @map("restaurant_id") @db.Uuid
+  name          String
+  nameSw        String?       @map("name_sw")
+  category      String?
+  unit          UnitOfMeasure @default(PIECE)
+  minStock      Decimal       @default(0) @map("min_stock") @db.Decimal(10, 2)
+  maxStock      Decimal?      @map("max_stock") @db.Decimal(10, 2)
+  reorderLevel  Decimal       @default(0) @map("reorder_level") @db.Decimal(10, 2)
+  isActive      Boolean       @default(true) @map("is_active")
+  createdAt     DateTime      @default(now()) @map("created_at")
+  updatedAt     DateTime      @updatedAt @map("updated_at")
+
+  restaurant    Restaurant         @relation(fields: [restaurantId], references: [id], onDelete: Cascade)
+  movements     StockMovement[]
+  purchaseItems PurchaseOrderItem[]
+
+  @@index([restaurantId])
+  @@map("inventory_items")
+}
+
+model StockMovement {
+  id            String               @id @default(uuid()) @db.Uuid
+  restaurantId  String               @map("restaurant_id") @db.Uuid
+  itemId        String               @map("item_id") @db.Uuid
+  type          StockMovementType
+  quantity      Decimal              @db.Decimal(10, 2)
+  unitCost      Decimal?             @map("unit_cost") @db.Decimal(10, 2)
+  totalCost     Decimal?             @map("total_cost") @db.Decimal(10, 2)
+  referenceType StockMovementReference @map("reference_type")
+  referenceId   String?              @map("reference_id")
+  notes         String?
+  performedById String?              @map("performed_by_id")
+  createdAt     DateTime             @default(now()) @map("created_at")
+
+  restaurant Restaurant    @relation(fields: [restaurantId], references: [id], onDelete: Cascade)
+  item       InventoryItem @relation(fields: [itemId], references: [id], onDelete: Cascade)
+
+  @@index([restaurantId])
+  @@index([itemId])
+  @@index([type])
+  @@index([createdAt])
+  @@map("stock_movements")
+}
+
+model Supplier {
+  id           String   @id @default(uuid()) @db.Uuid
+  restaurantId String   @map("restaurant_id") @db.Uuid
+  name         String
+  phone        String?
+  email        String?
+  address      String?
+  notes        String?
+  isActive     Boolean  @default(true) @map("is_active")
+  createdAt    DateTime @default(now()) @map("created_at")
+  updatedAt    DateTime @updatedAt @map("updated_at")
+
+  restaurant     Restaurant     @relation(fields: [restaurantId], references: [id], onDelete: Cascade)
+  purchaseOrders PurchaseOrder[]
+
+  @@index([restaurantId])
+  @@map("suppliers")
+}
+
+model PurchaseOrder {
+  id               String              @id @default(uuid()) @db.Uuid
+  restaurantId     String              @map("restaurant_id") @db.Uuid
+  supplierId       String?             @map("supplier_id") @db.Uuid
+  orderNumber      String              @unique @map("order_number")
+  status           PurchaseOrderStatus @default(DRAFT)
+  expectedDelivery DateTime?           @map("expected_delivery")
+  receivedAt       DateTime?           @map("received_at")
+  notes            String?
+  createdById      String?             @map("created_by_id")
+  createdAt        DateTime            @default(now()) @map("created_at")
+  updatedAt        DateTime            @updatedAt @map("updated_at")
+
+  restaurant Restaurant         @relation(fields: [restaurantId], references: [id], onDelete: Cascade)
+  supplier  Supplier?           @relation(fields: [supplierId], references: [id], onDelete: SetNull)
+  items     PurchaseOrderItem[]
+
+  @@index([restaurantId])
+  @@index([status])
+  @@map("purchase_orders")
+}
+
+model PurchaseOrderItem {
+  id              String   @id @default(uuid()) @db.Uuid
+  purchaseOrderId String   @map("purchase_order_id") @db.Uuid
+  itemId          String   @map("item_id") @db.Uuid
+  quantity        Decimal  @db.Decimal(10, 2)
+  unitCost        Decimal  @map("unit_cost") @db.Decimal(10, 2)
+  receivedQty     Decimal  @default(0) @map("received_qty") @db.Decimal(10, 2)
+  createdAt       DateTime @default(now()) @map("created_at")
+
+  purchaseOrder PurchaseOrder  @relation(fields: [purchaseOrderId], references: [id], onDelete: Cascade)
+  item          InventoryItem  @relation(fields: [itemId], references: [id])
+
+  @@index([purchaseOrderId])
+  @@index([itemId])
+  @@map("purchase_order_items")
 }
 
 model CashReconciliation {

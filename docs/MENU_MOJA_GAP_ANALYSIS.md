@@ -249,7 +249,17 @@ TARGET DOMAIN                    CURRENT STATE                        GAP CLASS
 
 **Documented limitations:** menu cache + table state caching offline not yet persisted (menu loads need server — POS search uses store state, degrade gracefully offline); KDS is read-only offline (stale view + indicator); conflict resolution relies on server status machine + table version guards (422/409 land in the retry queue); M-Pesa requires connectivity (STK push is server-initiated).
 
-### Tier 2 — INVENTORY FOUNDATION (next recommended)
+### Tier 2 — INVENTORY FOUNDATION ✅ EXECUTED (2026-08-12)
+1. ✅ **Models (migration 6)** — `InventoryItem` (unit, min/max stock, reorder level), `StockMovement` (immutable; signed quantity; type OPENING/PURCHASE/SALE/WASTE/ADJUSTMENT/TRANSFER; reference PURCHASE_ORDER/ORDER/MANUAL/OPENING; unit cost + total cost), `Supplier`, `PurchaseOrder` (DRAFT/ORDERED/PARTIAL/RECEIVED/CANCELLED) + `PurchaseOrderItem` (receivedQty).
+2. ✅ **Immutability principle** — stock levels are NEVER overwritten: always the sum of movement rows. Consumption movements rejected when stock would go negative (409 INSUFFICIENT_STOCK) and when signed wrongly (422).
+3. ✅ **Service** — `recordMovement` (validation + insufficient-stock guard), `getStockLevel(s)`, `getLowStockItems`, `receivePurchaseOrder` (creates PURCHASE movements per line, updates receivedQty + PARTIAL/RECEIVED status).
+4. ✅ **API** (`/api/v1/inventory`) — items CRUD (delete blocked with movement history → 409), movements list (filters + pagination) + record, low-stock, suppliers CRUD (delete blocked with POs), purchase orders CRUD + receive. All tenant-scoped + audited writes.
+5. ✅ **UI** — `/dashboard/inventory` page: Items (stock + low-stock badges, add/edit/delete), Movements (history + record modal), Suppliers (CRUD), Purchase Orders (create with line items + receive button). Sidebar + route wired.
+6. ✅ Tests — `tests/inventory.test.ts` (9): item create, stock-level computation + low-stock flags, delete protection, movement recording, insufficient-stock rejection, sign validation, supplier CRUD, PO create + receive movement creation.
+
+**Design choices (documented):** single `InventoryItem` entity (no separate Ingredient/InventoryLocation — single location per restaurant, batch/expiry deferred); WASTE/ADJUSTMENT recorded via StockMovement types (no separate tables); recipe-driven auto-deduction deferred to Phase 5.
+
+### Tier 2b — RECIPES & FOOD COSTING (next recommended)
 7. POS hardening: modifiers, split/partial payments, held orders (persisted), KDS station/actions, table merge/split, optimistic locking
 8. M-Pesa: state machine, PaymentAttempt/WebhookEvent, reconciliation dashboard, timeout/reversal handling
 9. Offline-first: local queues + sync + connectivity UI + PWA decision

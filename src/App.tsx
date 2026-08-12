@@ -39,6 +39,7 @@ const AnalyticsPage = lazy(() => import('@/pages/dashboard/AnalyticsPage'))
 const SurveillancePage = lazy(() => import('@/pages/dashboard/SurveillancePage'))
 const SettingsPage = lazy(() => import('@/pages/dashboard/SettingsPage'))
 const HelpPage = lazy(() => import('@/pages/dashboard/HelpPage'))
+const InventoryPage = lazy(() => import('@/pages/dashboard/InventoryPage'))
 const StaffLoginPage = lazy(() => import('@/pages/StaffLoginPage'))
 const KitchenDisplay = lazy(() => import('@/pages/dashboard/KitchenDisplay'))
 const CashierDashboard = lazy(() => import('@/pages/dashboard/CashierDashboard'))
@@ -127,6 +128,7 @@ function AppRoutes() {
             <Route path="payments" element={<PageTransition><PaymentsPage /></PageTransition>} />
             <Route path="analytics" element={<PageTransition><AnalyticsPage /></PageTransition>} />
             <Route path="surveillance" element={<PageTransition><SurveillancePage /></PageTransition>} />
+            <Route path="inventory" element={<PageTransition><InventoryPage /></PageTransition>} />
             <Route path="settings" element={<PageTransition><SettingsPage /></PageTransition>} />
             <Route path="help" element={<PageTransition><HelpPage /></PageTransition>} />
           </Route>

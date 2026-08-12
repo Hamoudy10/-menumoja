@@ -650,3 +650,63 @@ export const addCameraSchema = z.object({
 }).strict();
 
 export const updateCameraSchema = addCameraSchema.partial().strict();
+
+// Inventory schemas
+export const createInventoryItemSchema = z.object({
+  name: z.string().min(1).max(200),
+  nameSw: z.string().max(200).optional(),
+  category: z.string().max(100).optional(),
+  unit: z.enum(['KG','G','L','ML','PIECE','PACK','BOX','DOZEN','BAG','JAR']).default('PIECE'),
+  minStock: z.number().min(0).optional(),
+  maxStock: z.number().min(0).optional(),
+  reorderLevel: z.number().min(0).optional(),
+}).strict();
+
+export const updateInventoryItemSchema = createInventoryItemSchema.partial().strict();
+
+export const recordMovementSchema = z.object({
+  itemId: z.string().uuid('Invalid item ID'),
+  type: z.enum(['OPENING','PURCHASE','SALE','WASTE','ADJUSTMENT','TRANSFER_IN','TRANSFER_OUT']),
+  quantity: z.number().refine((v) => v !== 0, 'Quantity must be non-zero'),
+  unitCost: z.number().min(0).optional(),
+  referenceType: z.enum(['PURCHASE_ORDER','ORDER','MANUAL','OPENING']).default('MANUAL'),
+  referenceId: z.string().max(100).optional(),
+  notes: z.string().max(500).optional(),
+}).strict();
+
+export const createSupplierSchema = z.object({
+  name: z.string().min(1).max(200),
+  phone: z.string().max(30).optional(),
+  email: z.string().email('Invalid email').optional().or(z.literal('')),
+  address: z.string().max(300).optional(),
+  notes: z.string().max(500).optional(),
+}).strict();
+
+export const updateSupplierSchema = createSupplierSchema.partial().strict();
+
+export const createPurchaseOrderSchema = z.object({
+  supplierId: z.string().uuid('Invalid supplier ID').optional().nullable(),
+  expectedDelivery: z.string().datetime().optional().nullable(),
+  notes: z.string().max(500).optional(),
+  items: z.array(z.object({
+    itemId: z.string().uuid('Invalid item ID'),
+    quantity: z.number().min(0.01, 'Quantity must be at least 0.01'),
+    unitCost: z.number().min(0, 'Unit cost must be at least 0'),
+  })).min(1, 'At least one item is required').max(50, 'Maximum 50 items'),
+}).strict();
+
+export const updatePurchaseOrderSchema = z.object({
+  supplierId: z.string().uuid().optional().nullable(),
+  expectedDelivery: z.string().datetime().optional().nullable(),
+  notes: z.string().max(500).optional(),
+  status: z.enum(['DRAFT','ORDERED','CANCELLED']).optional(),
+  items: z.array(z.object({
+    itemId: z.string().uuid(),
+    quantity: z.number().min(0.01),
+    unitCost: z.number().min(0),
+  })).min(1).max(50).optional(),
+}).strict();
+
+export const receivePurchaseOrderSchema = z.object({
+  receivedQty: z.record(z.string().uuid(), z.number().min(0.01)).optional(),
+}).strict().default({});

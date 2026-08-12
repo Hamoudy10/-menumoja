@@ -17,6 +17,7 @@ import publicRoutes from '../src/routes/menu/public.routes';
 import orderRoutes from '../src/routes/orders/orders.routes';
 import paymentRoutes from '../src/routes/payments/payments.routes';
 import analyticsRoutes from '../src/routes/analytics/analytics.routes';
+import inventoryRoutes from '../src/routes/inventory/inventory.routes';
 
 jest.mock('../src/config/database', () => {
   const mockPrisma = {
@@ -120,6 +121,45 @@ jest.mock('../src/config/database', () => {
     reconciliationRecord: {
       findMany: jest.fn().mockResolvedValue([]),
       upsert: jest.fn().mockResolvedValue({}),
+      count: jest.fn().mockResolvedValue(0),
+    },
+    inventoryItem: {
+      findFirst: jest.fn(),
+      findMany: jest.fn().mockResolvedValue([]),
+      create: jest.fn(),
+      update: jest.fn(),
+      delete: jest.fn(),
+      count: jest.fn().mockResolvedValue(0),
+    },
+    stockMovement: {
+      findMany: jest.fn().mockResolvedValue([]),
+      create: jest.fn(),
+      count: jest.fn().mockResolvedValue(0),
+      aggregate: jest.fn().mockResolvedValue({ _sum: { quantity: 0 } }),
+      groupBy: jest.fn().mockResolvedValue([]),
+    },
+    supplier: {
+      findFirst: jest.fn(),
+      findMany: jest.fn().mockResolvedValue([]),
+      create: jest.fn(),
+      update: jest.fn(),
+      delete: jest.fn(),
+      count: jest.fn().mockResolvedValue(0),
+    },
+    purchaseOrder: {
+      findFirst: jest.fn(),
+      findUnique: jest.fn(),
+      findMany: jest.fn().mockResolvedValue([]),
+      create: jest.fn(),
+      update: jest.fn(),
+      count: jest.fn().mockResolvedValue(0),
+    },
+    purchaseOrderItem: {
+      findMany: jest.fn().mockResolvedValue([]),
+      create: jest.fn(),
+      createMany: jest.fn(),
+      deleteMany: jest.fn(),
+      update: jest.fn(),
       count: jest.fn().mockResolvedValue(0),
     },
     cashReconciliation: {
@@ -289,6 +329,7 @@ export function setupTestApp(): Express {
   app.use('/api/v1/orders', orderRoutes);
   app.use('/api/v1/payments', paymentRoutes);
   app.use('/api/v1/analytics', analyticsRoutes);
+  app.use('/api/v1/inventory', inventoryRoutes);
   app.get('/api/v1/health', (_req: Request, res: Response) => {
     res.json({ status: 'ok', timestamp: new Date().toISOString(), uptime: process.uptime(), version: '1.0.0' });
   });
