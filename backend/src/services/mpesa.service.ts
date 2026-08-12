@@ -3,6 +3,7 @@ import { AppError } from '../utils/errors';
 import * as mpesa from '../integrations/mpesa';
 import { sendSMS } from '../integrations/africasTalking';
 import { prisma } from '../config/database';
+import { upsertCustomer, recordCustomerSpend } from './customer.service';
 
 interface OrderService {
   getOrderById: (orderId: string) => Promise<OrderRecord | null>;
@@ -298,6 +299,17 @@ export async function handleCallback(
       orderNumber: order.orderNumber,
       paymentMethod: 'M-Pesa',
     });
+
+    // Customer identity + spend (best-effort)
+    const customerPhone = validCallback.phone || order.customerPhone || payment.phone;
+    if (customerPhone) {
+      try {
+        await upsertCustomer(order.restaurantId, { phone: customerPhone, source: 'QR' });
+        await recordCustomerSpend(order.restaurantId, customerPhone, Number(validCallback.amount || order.amount));
+      } catch (customerError) {
+        logger.error('Customer upsert failed (M-Pesa callback)', { error: customerError, restaurantId: order.restaurantId });
+      }
+    }
 
     try {
       const restaurantName = await orders.getRestaurantName(payment.orderId);

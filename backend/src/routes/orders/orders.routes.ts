@@ -6,6 +6,7 @@ import { authenticate, optionalAuth, enforceRestaurantScope, validate, validateQ
 import { AppError, NotFoundError, ValidationError } from '@/utils/errors';
 import { generateOrderNumber, calculateTotals, buildPaginationMeta } from '@/utils/helpers';
 import { getIdempotencyKey, findIdempotentOrder, recordIdempotency, isUniqueViolation } from '@/utils/idempotency';
+import { upsertCustomer } from '@/services/customer.service';
 import { updateOrderStatusSchema } from '@/utils/validation';
 import { mpesaService } from '@/services';
 import { onTableSeated, freeTableIfLastOrder } from '@/services/table.service';
@@ -321,6 +322,19 @@ router.post('/public/create',
 
     if (idempotencyKey) {
       await recordIdempotency(idempotencyKey, `pub:${sessionId}`, order.id);
+    }
+
+    // Customer identity (best-effort, never breaks ordering)
+    if (customerPhone) {
+      try {
+        await upsertCustomer(restaurantId, {
+          phone: customerPhone,
+          name: customerName || undefined,
+          source: 'QR',
+        });
+      } catch (customerError) {
+        logger.error('Customer upsert failed (order create)', { error: customerError, restaurantId });
+      }
     }
 
     logger.info('Order created', { orderId: order.id, orderNumber, restaurantId });

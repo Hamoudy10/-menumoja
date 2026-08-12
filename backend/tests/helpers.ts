@@ -19,6 +19,7 @@ import paymentRoutes from '../src/routes/payments/payments.routes';
 import analyticsRoutes from '../src/routes/analytics/analytics.routes';
 import inventoryRoutes from '../src/routes/inventory/inventory.routes';
 import recipeRoutes from '../src/routes/recipes/recipes.routes';
+import customerRoutes from '../src/routes/customers/customers.routes';
 
 jest.mock('../src/config/database', () => {
   const mockPrisma = {
@@ -84,6 +85,7 @@ jest.mock('../src/config/database', () => {
       findMany: jest.fn(),
       create: jest.fn(),
       update: jest.fn(),
+      updateMany: jest.fn(),
       count: jest.fn(),
       aggregate: jest.fn(),
     },
@@ -175,6 +177,15 @@ jest.mock('../src/config/database', () => {
       findMany: jest.fn().mockResolvedValue([]),
       create: jest.fn(),
       createMany: jest.fn(),
+    },
+    customer: {
+      findFirst: jest.fn(),
+      findUnique: jest.fn().mockResolvedValue(null),
+      findMany: jest.fn().mockResolvedValue([]),
+      create: jest.fn(),
+      update: jest.fn(),
+      delete: jest.fn(),
+      count: jest.fn().mockResolvedValue(0),
     },
     cashReconciliation: {
       findFirst: jest.fn(),
@@ -345,6 +356,7 @@ export function setupTestApp(): Express {
   app.use('/api/v1/analytics', analyticsRoutes);
   app.use('/api/v1/inventory', inventoryRoutes);
   app.use('/api/v1/recipes', recipeRoutes);
+  app.use('/api/v1/customers', customerRoutes);
   app.get('/api/v1/health', (_req: Request, res: Response) => {
     res.json({ status: 'ok', timestamp: new Date().toISOString(), uptime: process.uptime(), version: '1.0.0' });
   });

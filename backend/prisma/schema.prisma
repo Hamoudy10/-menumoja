@@ -202,6 +202,14 @@ enum PurchaseOrderStatus {
   CANCELLED
 }
 
+enum CustomerSource {
+  QR
+  POS
+  SMS
+  USSD
+  MANUAL
+}
+
 // ==============================
 // MODELS
 // ==============================
@@ -323,6 +331,7 @@ model Restaurant {
   suppliers              Supplier[]
   purchaseOrders         PurchaseOrder[]
   recipes                Recipe[]
+  customers              Customer[]
   aiConversations        AiConversation[]
   faqs                   RestaurantFaq[]
   aiGeneratedContents    AiGeneratedContent[]
@@ -1037,6 +1046,35 @@ model RecipeIngredient {
   @@index([recipeId])
   @@index([inventoryItemId])
   @@map("recipe_ingredients")
+}
+
+model Customer {
+  id                String         @id @default(uuid()) @db.Uuid
+  restaurantId      String         @map("restaurant_id") @db.Uuid
+  phone             String
+  name              String?
+  email             String?
+  source            CustomerSource @default(QR)
+  consentMarketing  Boolean        @default(false) @map("consent_marketing")
+  consentCollectedAt DateTime?     @map("consent_collected_at")
+  preferredChannel  String?        @map("preferred_channel")
+  firstVisit        DateTime       @default(now()) @map("first_visit")
+  lastVisit         DateTime       @default(now()) @map("last_visit")
+  totalVisits       Int            @default(1) @map("total_visits")
+  totalSpend        Decimal        @default(0) @map("total_spend") @db.Decimal(12, 2)
+  averageSpend      Decimal        @default(0) @map("average_spend") @db.Decimal(12, 2)
+  notes             String?
+  isOptedOut        Boolean        @default(false) @map("is_opted_out")
+  createdAt         DateTime       @default(now()) @map("created_at")
+  updatedAt         DateTime       @updatedAt @map("updated_at")
+
+  restaurant Restaurant @relation(fields: [restaurantId], references: [id], onDelete: Cascade)
+
+  @@unique([restaurantId, phone])
+  @@index([restaurantId])
+  @@index([lastVisit])
+  @@index([totalSpend])
+  @@map("customers")
 }
 
 model CashReconciliation {

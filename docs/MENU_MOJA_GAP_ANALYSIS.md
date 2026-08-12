@@ -276,7 +276,18 @@ TARGET DOMAIN                    CURRENT STATE                        GAP CLASS
 4. ✅ **UI** — `/dashboard/profitability`: period toggle, metric cards (gross/net/COGS/contribution), margin/orders/units/refunds tiles, and a 2×2 matrix with quadrant buckets, counts, and recommendations. Sidebar + route wired.
 5. ✅ Tests — `tests/profitability.test.ts` (4): full overview math (2,500 gross / 100 discounts / 200 refunds / 2,200 net / 600 COGS / 72.7% margin), empty period, four-way classification with exact medians, NO_COST_DATA handling.
 
-### Tier 3 — CUSTOMER CRM (next recommended)
+### Tier 3 — CUSTOMER CRM ✅ EXECUTED (2026-08-12)
+1. ✅ **Model (migration 8)** — `Customer`: phone (unique per restaurant), name, email, source (QR/POS/SMS/USSD/MANUAL), **explicit marketing consent** (`consentMarketing` + `consentCollectedAt`), opt-out flag, preferredChannel, firstVisit/lastVisit/totalVisits, cached totalSpend/averageSpend.
+2. ✅ **Identity resolution** — `upsertCustomer` dedupes by (restaurantId, phone) with P2002 race retry; hooked (best-effort, never breaks the primary flow) into: QR order creation, cash/card payment record, **M-Pesa callback success** (spend accrual via `recordCustomerSpend`). SMS/USSD sources ready for the same hook.
+3. ✅ **Favourites + segments** — detail endpoint derives favourite items/categories from order history and classifies **VIP / Frequent / New / Dormant / High spender / Lunch / Dinner / Weekend / Category-loyal** (multi-label).
+4. ✅ **Privacy** — `DELETE` anonymizes related order + payment PII then removes the customer; `GET /:id/export` returns everything stored; consent/opt-out editable per customer.
+5. ✅ **API** (`/api/v1/customers`) — list (search + segment filter + segment counts), detail, update (consent), export, delete. Tenant-scoped, audited writes.
+6. ✅ **UI** — `/dashboard/customers`: searchable list with spend/visits + segment chips, segment-count banner (click to filter), slide-in profile drawer (favourites, segments, recent orders, consent/opt-out/channel controls, JSON data export, privacy delete). Sidebar + route wired.
+7. ✅ Tests — `tests/customer.test.ts` (6): list + segment counts, favourites/detail, consent update, privacy deletion (order/payment PII nulled), export, segment classification rules.
+
+**Remaining in Tier 3:** backfill customers from historical orders (resumable migration job — see master plan §32), Deal-sensitive segment (needs per-order discount tracking), order-time COGS snapshots.
+
+### Tier 3b — SMART LOYALTY (next recommended)
 7. POS hardening: modifiers, split/partial payments, held orders (persisted), KDS station/actions, table merge/split, optimistic locking
 8. M-Pesa: state machine, PaymentAttempt/WebhookEvent, reconciliation dashboard, timeout/reversal handling
 9. Offline-first: local queues + sync + connectivity UI + PWA decision

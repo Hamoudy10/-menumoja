@@ -42,6 +42,7 @@ const HelpPage = lazy(() => import('@/pages/dashboard/HelpPage'))
 const InventoryPage = lazy(() => import('@/pages/dashboard/InventoryPage'))
 const RecipesPage = lazy(() => import('@/pages/dashboard/RecipesPage'))
 const ProfitabilityPage = lazy(() => import('@/pages/dashboard/ProfitabilityPage'))
+const CustomersPage = lazy(() => import('@/pages/dashboard/CustomersPage'))
 const StaffLoginPage = lazy(() => import('@/pages/StaffLoginPage'))
 const KitchenDisplay = lazy(() => import('@/pages/dashboard/KitchenDisplay'))
 const CashierDashboard = lazy(() => import('@/pages/dashboard/CashierDashboard'))
@@ -133,6 +134,7 @@ function AppRoutes() {
             <Route path="inventory" element={<PageTransition><InventoryPage /></PageTransition>} />
             <Route path="recipes" element={<PageTransition><RecipesPage /></PageTransition>} />
             <Route path="profitability" element={<PageTransition><ProfitabilityPage /></PageTransition>} />
+            <Route path="customers" element={<PageTransition><CustomersPage /></PageTransition>} />
             <Route path="settings" element={<PageTransition><SettingsPage /></PageTransition>} />
             <Route path="help" element={<PageTransition><HelpPage /></PageTransition>} />
           </Route>

@@ -10,6 +10,7 @@ import { initiateMpesaSchema, recordCashSchema, receiptListQuerySchema } from '@
 import { mpesaService } from '@/services';
 import { createReceiptForPayment, getReceiptById } from '@/services/receipt.service';
 import { computeReconciliation, runReconciliation, listReconciliations } from '@/services/reconciliation.service';
+import { upsertCustomer, recordCustomerSpend } from '@/services/customer.service';
 import { freeTableIfLastOrder } from '@/services/table.service';
 import * as mpesa from '@/integrations/mpesa';
 import { io } from '@/hooks/socket';
@@ -368,6 +369,8 @@ router.post('/cash/record',
         paymentStatus: true,
         status: true,
         tableId: true,
+        customerName: true,
+        customerPhone: true,
       },
     });
 
@@ -476,6 +479,20 @@ router.post('/cash/record',
     await freeTableIfLastOrder(restaurantId, orderId, order.tableId);
 
     const receipt = await createReceiptForPayment(payment.id);
+
+    // Customer identity + spend (best-effort)
+    if (order.customerPhone) {
+      try {
+        await upsertCustomer(restaurantId, {
+          phone: order.customerPhone,
+          name: order.customerName || undefined,
+          source: 'POS',
+        });
+        await recordCustomerSpend(restaurantId, order.customerPhone, Number(payment.amount));
+      } catch (customerError) {
+        logger.error('Customer upsert failed (cash payment)', { error: customerError, restaurantId });
+      }
+    }
 
     logger.info('Cash payment recorded', { orderId, amount, cashierId });
 
@@ -1056,7 +1073,7 @@ router.post('/card/record',
 
     const order = await prisma.order.findFirst({
       where: { id: orderId, restaurantId },
-      select: { id: true, totalAmount: true, paymentStatus: true, tableId: true },
+      select: { id: true, totalAmount: true, paymentStatus: true, tableId: true, customerName: true, customerPhone: true },
     });
 
     if (!order) throw new NotFoundError('Order not found', 'Agizo halikupatikana');
@@ -1108,6 +1125,20 @@ router.post('/card/record',
     await freeTableIfLastOrder(restaurantId, orderId, order.tableId);
 
     const receipt = await createReceiptForPayment(payment.id);
+
+    // Customer identity + spend (best-effort)
+    if (order.customerPhone) {
+      try {
+        await upsertCustomer(restaurantId, {
+          phone: order.customerPhone,
+          name: order.customerName || undefined,
+          source: 'POS',
+        });
+        await recordCustomerSpend(restaurantId, order.customerPhone, Number(payment.amount));
+      } catch (customerError) {
+        logger.error('Customer upsert failed (card payment)', { error: customerError, restaurantId });
+      }
+    }
 
     res.status(201).json({
       success: true,
