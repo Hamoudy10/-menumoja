@@ -42,6 +42,7 @@ import {
   customerRoutes,
   loyaltyRoutes,
   whatsappRoutes,
+  reservationRoutes,
 } from './routes';
 
 if (config.nodeEnv === 'production' && (!config.jwtAccessSecret || !config.jwtRefreshSecret || !config.encryptionKey)) {
@@ -127,6 +128,7 @@ app.use('/api/v1/recipes', recipeRoutes);
 app.use('/api/v1/customers', customerRoutes);
 app.use('/api/v1/loyalty', loyaltyRoutes);
 app.use('/api/v1/whatsapp', whatsappRoutes);
+app.use('/api/v1/reservations', reservationRoutes);
 
 app.get('/api/v1/health', async (_req: Request, res: Response) => {
   const checks: Record<string, string> = {};

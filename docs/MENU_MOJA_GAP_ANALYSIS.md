@@ -341,7 +341,16 @@ TARGET DOMAIN                    CURRENT STATE                        GAP CLASS
 
 **Documented:** AI-assistant upsell wiring deferred (chat already suggests items); deeper personalization (consent-based preferences) gated behind the CRM consent model.
 
-### Tier 5 — RESERVATIONS & WAITLIST (next recommended)
+### Tier 5 — RESERVATIONS & WAITLIST ✅ EXECUTED (2026-08-12)
+1. ✅ **Models (migration 12)** — `Reservation` (party size, reserved time, status CONFIRMED/CHECKED_IN/CANCELLED/NO_SHOW/COMPLETED, tableId, source) + `WaitlistEntry` (position, estimated wait, WAITING/SEATED/CANCELLED/NO_SHOW). Documented simplification: party details on the reservation row; table assignment via tableId (no separate Party/Assignment models).
+2. ✅ **Table integration** — creating a reservation suggests the first FREE table big enough for the party and marks it RESERVED; check-in marks it OCCUPIED; cancel/no-show frees it; waitlist seating marks the chosen table OCCUPIED and rejects unavailable tables (409).
+3. ✅ **Waitlist** — position auto-increment, estimated wait = position × 15 min, seat + cancel actions.
+4. ✅ **CRM integration** — customer upserted on reservation/waitlist creation; **consent-gated WhatsApp confirmation** (`reservation_confirm` template added).
+5. ✅ **API** (`/api/v1/reservations`) — reservations list (date filter) + create + update (validated transitions) + check-in/cancel/no-show; waitlist list/add/seat/cancel. Tenant-scoped, audited writes.
+6. ✅ **UI** — `/dashboard/reservations`: day view with reservations + waitlist side by side, create modals, one-tap check-in/cancel/no-show, auto-seat to the first free table. Sidebar + route wired.
+7. ✅ Tests — `tests/reservation.test.ts` (8): create + table suggestion/RESERVED, past-time rejection, check-in → OCCUPIED, cancel → FREE, invalid transition rejection, waitlist position/wait math, seat → OCCUPIED, unavailable-table rejection.
+
+### Tier 6 — eTIMS / KENYA COMPLIANCE (next recommended — requires KRA API verification)
 7. POS hardening: modifiers, split/partial payments, held orders (persisted), KDS station/actions, table merge/split, optimistic locking
 8. M-Pesa: state machine, PaymentAttempt/WebhookEvent, reconciliation dashboard, timeout/reversal handling
 9. Offline-first: local queues + sync + connectivity UI + PWA decision

@@ -255,6 +255,21 @@ enum CampaignDeliveryStatus {
   FAILED
 }
 
+enum ReservationStatus {
+  CONFIRMED
+  CHECKED_IN
+  CANCELLED
+  NO_SHOW
+  COMPLETED
+}
+
+enum WaitlistStatus {
+  WAITING
+  SEATED
+  CANCELLED
+  NO_SHOW
+}
+
 model AiUsageLog {
   id               String   @id @default(uuid()) @db.Uuid
   restaurantId     String   @map("restaurant_id") @db.Uuid
@@ -401,6 +416,8 @@ model Restaurant {
   purchaseOrders         PurchaseOrder[]
   recipes                Recipe[]
   customers              Customer[]
+  reservations           Reservation[]
+  waitlistEntries        WaitlistEntry[]
   loyaltyProgram         LoyaltyProgram?
   loyaltyRules           LoyaltyRule[]
   loyaltyAccounts        LoyaltyAccount[]
@@ -771,6 +788,7 @@ model RestaurantTable {
   qrCode     QrCode?         @relation(fields: [qrCodeId], references: [id])
   orders     Order[]
   sessions   TableSession[]
+  reservations Reservation[]
 
   @@unique([restaurantId, tableNumber])
   @@index([restaurantId])
@@ -1149,12 +1167,62 @@ model Customer {
 
   restaurant Restaurant @relation(fields: [restaurantId], references: [id], onDelete: Cascade)
   loyaltyAccount LoyaltyAccount?
+  reservations   Reservation[]
+  waitlistEntries WaitlistEntry[]
 
   @@unique([restaurantId, phone])
   @@index([restaurantId])
   @@index([lastVisit])
   @@index([totalSpend])
   @@map("customers")
+}
+
+model Reservation {
+  id            String            @id @default(uuid()) @db.Uuid
+  restaurantId  String            @map("restaurant_id") @db.Uuid
+  customerId    String?           @map("customer_id") @db.Uuid
+  customerName  String            @map("customer_name")
+  customerPhone String            @map("customer_phone")
+  partySize     Int               @map("party_size")
+  reservedAt    DateTime          @map("reserved_at")
+  status        ReservationStatus @default(CONFIRMED)
+  tableId       String?           @map("table_id") @db.Uuid
+  notes         String?
+  source        String            @default("MANUAL")
+  createdAt     DateTime          @default(now()) @map("created_at")
+  updatedAt     DateTime          @updatedAt @map("updated_at")
+
+  restaurant Restaurant     @relation(fields: [restaurantId], references: [id], onDelete: Cascade)
+  customer   Customer?      @relation(fields: [customerId], references: [id], onDelete: SetNull)
+  table      RestaurantTable? @relation(fields: [tableId], references: [id], onDelete: SetNull)
+
+  @@index([restaurantId])
+  @@index([reservedAt])
+  @@index([status])
+  @@map("reservations")
+}
+
+model WaitlistEntry {
+  id                   String         @id @default(uuid()) @db.Uuid
+  restaurantId         String         @map("restaurant_id") @db.Uuid
+  customerId           String?        @map("customer_id") @db.Uuid
+  customerName         String         @map("customer_name")
+  customerPhone        String         @map("customer_phone")
+  partySize            Int            @map("party_size")
+  position             Int
+  estimatedWaitMinutes Int            @default(15) @map("estimated_wait_minutes")
+  status               WaitlistStatus @default(WAITING)
+  seatedTableId        String?        @map("seated_table_id") @db.Uuid
+  seatedAt             DateTime?      @map("seated_at")
+  createdAt            DateTime       @default(now()) @map("created_at")
+  updatedAt            DateTime       @updatedAt @map("updated_at")
+
+  restaurant Restaurant     @relation(fields: [restaurantId], references: [id], onDelete: Cascade)
+  customer   Customer?      @relation(fields: [customerId], references: [id], onDelete: SetNull)
+
+  @@index([restaurantId])
+  @@index([status])
+  @@map("waitlist_entries")
 }
 
 model WhatsAppSettings {

@@ -46,6 +46,7 @@ const CustomersPage = lazy(() => import('@/pages/dashboard/CustomersPage'))
 const LoyaltyPage = lazy(() => import('@/pages/dashboard/LoyaltyPage'))
 const WhatsAppPage = lazy(() => import('@/pages/dashboard/WhatsAppPage'))
 const AIManagerPage = lazy(() => import('@/pages/dashboard/AIManagerPage'))
+const ReservationsPage = lazy(() => import('@/pages/dashboard/ReservationsPage'))
 const StaffLoginPage = lazy(() => import('@/pages/StaffLoginPage'))
 const KitchenDisplay = lazy(() => import('@/pages/dashboard/KitchenDisplay'))
 const CashierDashboard = lazy(() => import('@/pages/dashboard/CashierDashboard'))
@@ -141,6 +142,7 @@ function AppRoutes() {
             <Route path="loyalty" element={<PageTransition><LoyaltyPage /></PageTransition>} />
             <Route path="whatsapp" element={<PageTransition><WhatsAppPage /></PageTransition>} />
             <Route path="ai-manager" element={<PageTransition><AIManagerPage /></PageTransition>} />
+            <Route path="reservations" element={<PageTransition><ReservationsPage /></PageTransition>} />
             <Route path="settings" element={<PageTransition><SettingsPage /></PageTransition>} />
             <Route path="help" element={<PageTransition><HelpPage /></PageTransition>} />
           </Route>

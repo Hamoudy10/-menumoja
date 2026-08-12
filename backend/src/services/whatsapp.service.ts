@@ -22,6 +22,7 @@ export const DEFAULT_TEMPLATES: Record<string, string> = {
   promotion: 'Special offer at {{restaurantName}}! {{promotion}}. Show this message to redeem. Valid while stocks last. 🎁',
   winback: 'We miss you, {{customerName}}! 👋 Come back to {{restaurantName}} — {{promotion}}. See you soon!',
   birthday: 'Happy birthday, {{customerName}}! 🎂 Enjoy a special treat at {{restaurantName}} on us today. 🎉',
+  reservation_confirm: 'Reservation confirmed at {{restaurantName}}! 🪑 Party of {{partySize}} on {{reservedAt}}. See you soon!',
 };
 
 function normalizePhone(phone: string): string {

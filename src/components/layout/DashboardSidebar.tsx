@@ -1,7 +1,7 @@
 import { NavLink } from 'react-router-dom'
 import {
   LayoutDashboard, UtensilsCrossed, ShoppingCart, CreditCard,
-  BarChart3, Camera, Settings, HelpCircle, ChefHat, X, Table2, Megaphone, Package, PieChart, Users, Gift, MessageCircle, Bot,
+  BarChart3, Camera, Settings, HelpCircle, ChefHat, X, Table2, Megaphone, Package, PieChart, Users, Gift, MessageCircle, Bot, CalendarDays,
 } from 'lucide-react'
 import { useStore } from '@/store/useStore'
 
@@ -20,6 +20,7 @@ const menuItems = [
   { path: '/dashboard/loyalty', label: 'Loyalty', icon: Gift },
   { path: '/dashboard/whatsapp', label: 'WhatsApp', icon: MessageCircle },
   { path: '/dashboard/ai-manager', label: 'AI Manager', icon: Bot },
+  { path: '/dashboard/reservations', label: 'Reservations', icon: CalendarDays },
   { path: '/dashboard/surveillance', label: 'Surveillance', icon: Camera },
   { path: '/dashboard/settings', label: 'Settings', icon: Settings },
   { path: '/dashboard/help', label: 'Help', icon: HelpCircle },
