@@ -1,11 +1,12 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import { useParams, useNavigate, useSearchParams } from 'react-router-dom'
-import { ShoppingCart, Trash2, Minus, Plus, ArrowLeft, Smartphone, Banknote, Loader2, X, User } from 'lucide-react'
+import { ShoppingCart, Trash2, Minus, Plus, ArrowLeft, Smartphone, Banknote, Loader2, X, User, Sparkles } from 'lucide-react'
 import { useStore } from '@/store/useStore'
 import { Button } from '@/components/ui/Button'
 import { Input } from '@/components/ui/Input'
 import { showSuccessToast } from '@/components/ui/Toast'
+import * as menuApi from '@/api/menu'
 
 export default function MenuCart() {
   const { restaurantSlug } = useParams()
@@ -18,7 +19,17 @@ export default function MenuCart() {
   const [mpesaPhone, setMpesaPhone] = useState('')
   const [customerName, setCustomerName] = useState('')
   const [customerPhone, setCustomerPhone] = useState('')
-  const { cart, removeFromCart, updateCartQuantity, clearCart, placeOrder } = useStore()
+  const { cart, removeFromCart, updateCartQuantity, clearCart, placeOrder, addToCart } = useStore()
+  const [upsells, setUpsells] = useState<any[]>([])
+
+  useEffect(() => {
+    if (!restaurantSlug || cart.length === 0) { setUpsells([]); return }
+    let cancelled = false
+    menuApi.getMenuUpsells(restaurantSlug, cart.map((c) => c.item.id))
+      .then((data: any) => { if (!cancelled) setUpsells(Array.isArray(data) ? data : []) })
+      .catch(() => { if (!cancelled) setUpsells([]) })
+    return () => { cancelled = true }
+  }, [restaurantSlug, cart.map((c) => c.item.id).join(',')])
 
   const isTakeaway = !tableFromUrl
 
@@ -138,6 +149,35 @@ export default function MenuCart() {
                 </motion.div>
               ))}
             </div>
+
+            {upsells.length > 0 && (
+              <motion.div
+                initial={{ opacity: 0, y: 10 }}
+                animate={{ opacity: 1, y: 0 }}
+                className="bg-gradient-to-br from-secondary/10 to-accent/10 rounded-2xl p-4 border border-secondary/20 space-y-2"
+              >
+                <div className="flex items-center gap-2">
+                  <Sparkles className="w-4 h-4 text-secondary" />
+                  <h3 className="font-heading font-bold text-primary text-sm">Complete your meal</h3>
+                </div>
+                <p className="text-xs text-text-secondary -mt-1">Customers who ordered these also added:</p>
+                <div className="space-y-2">
+                  {upsells.map((u) => (
+                    <div key={u.id} className="flex items-center justify-between gap-2 bg-white rounded-xl p-2.5 border border-gray-100">
+                      <div className="min-w-0">
+                        <p className="text-sm font-medium text-primary truncate">{u.name}</p>
+                        <p className="text-[11px] text-text-secondary">
+                          KES {u.price.toLocaleString()} · {u.upsellPercentage}% of customers
+                        </p>
+                      </div>
+                      <Button size="sm" variant="outline" onClick={() => addToCart(u, '')}>
+                        <Plus className="w-3.5 h-3.5" /> Add
+                      </Button>
+                    </div>
+                  ))}
+                </div>
+              </motion.div>
+            )}
 
             <div className="bg-white rounded-2xl p-4 border border-gray-100 shadow-soft space-y-3">
               <div className="flex items-center justify-between text-sm">

@@ -332,7 +332,16 @@ TARGET DOMAIN                    CURRENT STATE                        GAP CLASS
 
 **Deferred (documented):** deeper forecasting (holidays/seasonality/promos) requires more history; LLM-phrased briefing polish optional; automated daily-briefing scheduling needs real BullMQ workers.
 
-### Tier 4c — SMART UPSELLING & PERSONALIZED MENU (next recommended)
+### Tier 4c — SMART UPSELLING & PERSONALIZED QR MENU ✅ EXECUTED (2026-08-12)
+1. ✅ **Basket analysis** (`upsell.service.ts`) — "customers ordering Burger add Fries 62% of the time" computed from paid orders in the last 90 days; per-item co-occurrence stats with percentages; **cart-aware suggestions** that exclude existing cart items and unavailable items, capped (max 3–5).
+2. ✅ **Personalized storefront** (`menu-personalization.service.ts`) — sections: Most Popular (by totalOrders), Best Value (highest-margin items with recipes), New, Promotions, **Recommended for You** (only from the session's OWN order history — anonymous sessions never get it), and **Complete your meal** (basket analysis on the provided cart). Privacy-respecting: aggregate-only for anonymous customers.
+3. ✅ **Public API** — `GET /menu/public/:slug/upsells?itemIds=` (with `upsellPercentage` per item) and `GET /menu/public/:slug/personalized?sessionId=&cartItemIds=`. Tenant-scoped by slug.
+4. ✅ **UI** — MenuCart shows a "Complete your meal" strip with one-tap add + percentages; MenuView shows Most Popular / Best Value / New horizontal strips with mini cards (add/qty steppers), session-id stored per restaurant.
+5. ✅ Tests — `tests/upsell.test.ts` (5): co-occurrence percentages (60%/30%), cart-item + availability exclusion, anonymous (no recommendation), session-based recommendation, upsell API. (Also fixed cross-test Once-queue pollution with per-test resets.)
+
+**Documented:** AI-assistant upsell wiring deferred (chat already suggests items); deeper personalization (consent-based preferences) gated behind the CRM consent model.
+
+### Tier 5 — RESERVATIONS & WAITLIST (next recommended)
 7. POS hardening: modifiers, split/partial payments, held orders (persisted), KDS station/actions, table merge/split, optimistic locking
 8. M-Pesa: state machine, PaymentAttempt/WebhookEvent, reconciliation dashboard, timeout/reversal handling
 9. Offline-first: local queues + sync + connectivity UI + PWA decision

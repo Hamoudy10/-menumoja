@@ -49,3 +49,14 @@ export const getPublicMenu = (slug: string) =>
 
 export const searchPublicMenu = (slug: string, query: string) =>
   api.get(`/menu/public/${slug}/search`, { params: { q: query } }).then(unwrap)
+
+export const getMenuUpsells = (slug: string, itemIds: string[]) =>
+  api.get(`/menu/public/${slug}/upsells`, { params: { itemIds: itemIds.join(',') } }).then(unwrap)
+
+export const getPersonalizedMenu = (slug: string, sessionId?: string, cartItemIds?: string[]) =>
+  api.get(`/menu/public/${slug}/personalized`, {
+    params: {
+      sessionId: sessionId || undefined,
+      cartItemIds: cartItemIds && cartItemIds.length > 0 ? cartItemIds.join(',') : undefined,
+    },
+  }).then(unwrap)

@@ -5,6 +5,8 @@ import { generalLimiter, optionalAuth } from '@/middleware';
 import { prisma } from '@/config/database';
 import { redis } from '@/config/redis';
 import logger from '@/utils/logger';
+import { getUpsellSuggestions } from '@/services/upsell.service';
+import { getPersonalizedMenu } from '@/services/menu-personalization.service';
 
 const router = Router();
 
@@ -316,6 +318,91 @@ router.get(
       success: true,
       data: items.map((item) => ({ ...item, price: Number(item.price) })),
       meta: { total: items.length, searchTerm: q },
+    });
+  })
+);
+
+// GET /:restaurantSlug/upsells?itemIds=a,b,c - basket-analysis suggestions
+router.get(
+  '/:restaurantSlug/upsells',
+  asyncHandler(async (req, res) => {
+    const restaurantSlug = String(req.params.restaurantSlug);
+    const cartItemIds = String(req.query.itemIds || '')
+      .split(',')
+      .map((s) => s.trim())
+      .filter(Boolean);
+
+    const restaurant = await prisma.restaurant.findUnique({
+      where: { slug: restaurantSlug, isActive: true },
+      select: { id: true },
+    });
+    if (!restaurant) {
+      throw new AppError(404, 'RESTAURANT_NOT_FOUND', 'Restaurant not found', 'Mgahawa haukupatikana');
+    }
+
+    const suggestions = cartItemIds.length > 0
+      ? await getUpsellSuggestions(restaurant.id, cartItemIds, 3)
+      : [];
+
+    const items = suggestions.length > 0
+      ? await prisma.menuItem.findMany({
+          where: { restaurantId: restaurant.id, id: { in: suggestions.map((s) => s.itemId) } },
+          select: {
+            id: true, name: true, price: true, photoUrl: true, description: true,
+            isAvailable: true, isTodaysSpecial: true, isFeatured: true, isNew: true,
+            category: { select: { name: true } },
+          },
+        })
+      : [];
+
+    res.json({
+      success: true,
+      data: items.map((item) => {
+        const stat = suggestions.find((s) => s.itemId === item.id);
+        return { ...item, price: Number(item.price), upsellPercentage: stat?.percentage || 0 };
+      }),
+    });
+  })
+);
+
+// GET /:restaurantSlug/personalized?sessionId=&cartItemIds= - storefront sections
+router.get(
+  '/:restaurantSlug/personalized',
+  optionalAuth,
+  asyncHandler(async (req, res) => {
+    const restaurantSlug = String(req.params.restaurantSlug);
+    const sessionId = req.query.sessionId ? String(req.query.sessionId) : undefined;
+    const cartItemIds = String(req.query.cartItemIds || '')
+      .split(',')
+      .map((s) => s.trim())
+      .filter(Boolean);
+
+    const restaurant = await prisma.restaurant.findUnique({
+      where: { slug: restaurantSlug, isActive: true },
+      select: { id: true },
+    });
+    if (!restaurant) {
+      throw new AppError(404, 'RESTAURANT_NOT_FOUND', 'Restaurant not found', 'Mgahawa haukupatikana');
+    }
+
+    const sections = await getPersonalizedMenu(restaurant.id, { sessionId, cartItemIds });
+
+    const serialize = (items: any[]) => items.map((i) => ({ ...i, price: Number(i.price) }));
+
+    res.json({
+      success: true,
+      data: {
+        mostPopular: serialize(sections.mostPopular),
+        bestValue: serialize(sections.bestValue),
+        newItems: serialize(sections.newItems),
+        promotions: sections.promotions.map((p) => ({
+          ...p,
+          specialPrice: p.specialPrice ? Number(p.specialPrice) : null,
+          menuItem: p.menuItem ? { ...p.menuItem, price: Number(p.menuItem.price) } : null,
+        })),
+        recommendedForYou: sections.recommendedForYou ? serialize(sections.recommendedForYou) : null,
+        completeYourMeal: sections.completeYourMeal ? serialize(sections.completeYourMeal) : null,
+      },
     });
   })
 );

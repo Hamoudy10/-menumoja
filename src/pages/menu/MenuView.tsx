@@ -1,7 +1,7 @@
 import { useState, useEffect, useCallback } from 'react'
 import { motion } from 'framer-motion'
 import { useParams, useNavigate } from 'react-router-dom'
-import { ShoppingCart, Plus, Minus, ChefHat, MapPin, Star, Search, Loader2, CheckCircle, Megaphone, Gift, PartyPopper, Percent, Tag, RotateCw } from 'lucide-react'
+import { ShoppingCart, Plus, Minus, ChefHat, MapPin, Star, Search, Loader2, CheckCircle, Megaphone, Gift, PartyPopper, Percent, Tag, RotateCw, TrendingUp, BadgePercent, Sparkles } from 'lucide-react'
 import { useStore } from '@/store/useStore'
 import { Badge } from '@/components/ui/Badge'
 import { BrandLoader } from '@/components/ui/BrandLoader'
@@ -30,6 +30,7 @@ export default function MenuView() {
   const [promotions, setPromotions] = useState<any[]>([])
   const [announcement, setAnnouncement] = useState('')
   const [justAdded, setJustAdded] = useState<string | null>(null)
+  const [sections, setSections] = useState<{ mostPopular: any[]; bestValue: any[]; newItems: any[] }>({ mostPopular: [], bestValue: [], newItems: [] })
 
   const cartCount = cart.reduce((s, i) => s + i.quantity, 0)
 
@@ -54,6 +55,18 @@ export default function MenuView() {
       setPromotions(data.promotions || [])
       if (cats.length > 0) setActiveCategory(cats[0]?.id || '')
       if (restaurant?.language) setLanguage(restaurant.language)
+
+      // personalized storefront sections (aggregate data for anonymous sessions)
+      try {
+        const sessionKey = `menuSession_${restaurantSlug}`
+        if (!sessionStorage.getItem(sessionKey)) sessionStorage.setItem(sessionKey, crypto.randomUUID())
+        const personalized = await menuApi.getPersonalizedMenu(restaurantSlug, sessionStorage.getItem(sessionKey) || undefined)
+        setSections({
+          mostPopular: personalized?.mostPopular || [],
+          bestValue: personalized?.bestValue || [],
+          newItems: personalized?.newItems || [],
+        })
+      } catch { /* personalization is best-effort */ }
 
       const settings = restaurant?.settings
       if (settings?.announcementActive && settings?.announcement) {
@@ -202,12 +215,52 @@ export default function MenuView() {
           </div>
         )}
 
+        {(sections.mostPopular.length > 0 || sections.bestValue.length > 0 || sections.newItems.length > 0) && (
+          <section className="space-y-4">
+            {sections.mostPopular.length > 0 && (
+              <div>
+                <h2 className="font-heading font-bold text-primary text-lg flex items-center gap-2 mb-2">
+                  <TrendingUp className="w-4 h-4 text-secondary" /> Most Popular
+                </h2>
+                <div className="flex gap-3 overflow-x-auto pb-2 -mx-4 px-4 snap-x">
+                  {sections.mostPopular.map((item) => (
+                    <MiniItemCard key={item.id} item={item} cart={cart} justAdded={justAdded} onAdd={(i) => { addToCart(i); setJustAdded(i.id); window.setTimeout(() => setJustAdded((c) => (c === i.id ? null : c)), 900) }} onUpdate={(id, q) => updateCartQuantity(id, q)} />
+                  ))}
+                </div>
+              </div>
+            )}
+            {sections.bestValue.length > 0 && (
+              <div>
+                <h2 className="font-heading font-bold text-primary text-lg flex items-center gap-2 mb-2">
+                  <BadgePercent className="w-4 h-4 text-success" /> Best Value
+                </h2>
+                <div className="flex gap-3 overflow-x-auto pb-2 -mx-4 px-4 snap-x">
+                  {sections.bestValue.map((item) => (
+                    <MiniItemCard key={item.id} item={item} cart={cart} justAdded={justAdded} onAdd={(i) => { addToCart(i); setJustAdded(i.id); window.setTimeout(() => setJustAdded((c) => (c === i.id ? null : c)), 900) }} onUpdate={(id, q) => updateCartQuantity(id, q)} />
+                  ))}
+                </div>
+              </div>
+            )}
+            {sections.newItems.length > 0 && (
+              <div>
+                <h2 className="font-heading font-bold text-primary text-lg flex items-center gap-2 mb-2">
+                  <Sparkles className="w-4 h-4 text-accent" /> New
+                </h2>
+                <div className="flex gap-3 overflow-x-auto pb-2 -mx-4 px-4 snap-x">
+                  {sections.newItems.map((item) => (
+                    <MiniItemCard key={item.id} item={item} cart={cart} justAdded={justAdded} onAdd={(i) => { addToCart(i); setJustAdded(i.id); window.setTimeout(() => setJustAdded((c) => (c === i.id ? null : c)), 900) }} onUpdate={(id, q) => updateCartQuantity(id, q)} />
+                  ))}
+                </div>
+              </div>
+            )}
+          </section>
+        )}
+
         {promotions.length > 0 && (
           <section className="space-y-3">
             <h2 className="font-heading font-bold text-primary text-lg flex items-center gap-2">
               <Star className="w-4 h-4 text-secondary" /> Specials & Offers
-            </h2>
-            <div className="flex gap-3 overflow-x-auto pb-2 -mx-4 px-4 snap-x">
+            </h2>            <div className="flex gap-3 overflow-x-auto pb-2 -mx-4 px-4 snap-x">
               {promotions.map((promo) => {
                 const Icon = PROMO_ICONS[promo.type] || Tag
                 const badgeCls = PROMO_BADGE[promo.type] || PROMO_BADGE.SPECIAL
@@ -387,6 +440,57 @@ export default function MenuView() {
           menuItems={menuCategories.flatMap((cat) => cat.items)}
         />
       )}
+    </div>
+  )
+}
+
+function MiniItemCard({ item, cart, justAdded, onAdd, onUpdate }: {
+  item: any
+  cart: any[]
+  justAdded: string | null
+  onAdd: (item: any) => void
+  onUpdate: (id: string, qty: number) => void
+}) {
+  const qty = cart.find((c) => c.item.id === item.id)?.quantity || 0
+  return (
+    <div className="w-[160px] shrink-0 snap-start bg-white rounded-2xl border border-gray-100 shadow-soft overflow-hidden">
+      {item.photoUrl ? (
+        <div className="h-20 overflow-hidden bg-gray-100">
+          <img src={item.photoUrl} alt={item.name} className="w-full h-full object-cover" onError={(e) => { (e.target as HTMLImageElement).style.display = 'none' }} />
+        </div>
+      ) : (
+        <div className="h-20 bg-gradient-to-br from-secondary/10 to-accent/10 flex items-center justify-center">
+          <ChefHat className="w-6 h-6 text-secondary/40" />
+        </div>
+      )}
+      <div className="p-3">
+        <p className="text-sm font-medium text-primary truncate">{item.name}</p>
+        <div className="flex items-center justify-between mt-1.5">
+          <span className="font-bold text-secondary text-sm">KES {Number(item.price).toLocaleString()}</span>
+          {qty === 0 ? (
+            <motion.button
+              whileTap={{ scale: 0.9 }}
+              onClick={() => onAdd({ ...item, price: Number(item.price) })}
+              className={`flex items-center gap-1 px-2.5 py-1 rounded-lg text-xs font-medium transition-all ${
+                justAdded === item.id ? 'bg-success text-white animate-pop-in' : 'bg-secondary text-white hover:bg-secondary-dark'
+              }`}
+            >
+              {justAdded === item.id ? <CheckCircle className="w-3 h-3" /> : <Plus className="w-3 h-3" />}
+              {justAdded === item.id ? 'Added' : 'Add'}
+            </motion.button>
+          ) : (
+            <div className="flex items-center gap-1">
+              <button onClick={() => onUpdate(item.id, qty - 1)} className="w-6 h-6 rounded-md border border-gray-200 flex items-center justify-center text-primary hover:bg-gray-50">
+                <Minus className="w-3 h-3" />
+              </button>
+              <span className="w-5 text-center font-semibold text-primary text-xs">{qty}</span>
+              <button onClick={() => onUpdate(item.id, qty + 1)} className="w-6 h-6 rounded-md bg-secondary text-white flex items-center justify-center hover:bg-secondary-dark">
+                <Plus className="w-3 h-3" />
+              </button>
+            </div>
+          )}
+        </div>
+      </div>
     </div>
   )
 }
