@@ -242,6 +242,19 @@ enum LoyaltyRewardStatus {
   CANCELLED
 }
 
+enum CampaignStatus {
+  DRAFT
+  SCHEDULED
+  SENT
+  CANCELLED
+}
+
+enum CampaignDeliveryStatus {
+  PENDING
+  SENT
+  FAILED
+}
+
 // ==============================
 // MODELS
 // ==============================
@@ -369,6 +382,9 @@ model Restaurant {
   loyaltyAccounts        LoyaltyAccount[]
   loyaltyTransactions    LoyaltyTransaction[]
   loyaltyRewards         LoyaltyReward[]
+  whatsappSettings       WhatsAppSettings?
+  messageTemplates       MessageTemplate[]
+  campaigns              Campaign[]
   aiConversations        AiConversation[]
   faqs                   RestaurantFaq[]
   aiGeneratedContents    AiGeneratedContent[]
@@ -1114,6 +1130,94 @@ model Customer {
   @@index([lastVisit])
   @@index([totalSpend])
   @@map("customers")
+}
+
+model WhatsAppSettings {
+  id            String   @id @default(uuid()) @db.Uuid
+  restaurantId  String   @unique @map("restaurant_id") @db.Uuid
+  enabled       Boolean  @default(false)
+  businessPhone String?  @map("business_phone")
+  createdAt     DateTime @default(now()) @map("created_at")
+  updatedAt     DateTime @updatedAt @map("updated_at")
+
+  restaurant Restaurant @relation(fields: [restaurantId], references: [id], onDelete: Cascade)
+
+  @@map("whatsapp_settings")
+}
+
+model MessageTemplate {
+  id           String   @id @default(uuid()) @db.Uuid
+  restaurantId String   @map("restaurant_id") @db.Uuid
+  name         String
+  channel      String   @default("whatsapp")
+  content      String   @db.Text
+  isActive     Boolean  @default(true) @map("is_active")
+  createdAt    DateTime @default(now()) @map("created_at")
+  updatedAt    DateTime @updatedAt @map("updated_at")
+
+  restaurant Restaurant @relation(fields: [restaurantId], references: [id], onDelete: Cascade)
+  campaigns  Campaign[]
+
+  @@index([restaurantId])
+  @@map("message_templates")
+}
+
+model Campaign {
+  id              String         @id @default(uuid()) @db.Uuid
+  restaurantId    String         @map("restaurant_id") @db.Uuid
+  name            String
+  status          CampaignStatus @default(DRAFT)
+  audienceSegment String?        @map("audience_segment")
+  templateId      String?        @map("template_id") @db.Uuid
+  message         String?        @db.Text
+  scheduledAt     DateTime?      @map("scheduled_at")
+  sentAt          DateTime?      @map("sent_at")
+  totalRecipients Int            @default(0) @map("total_recipients")
+  sentCount       Int            @default(0) @map("sent_count")
+  failedCount     Int            @default(0) @map("failed_count")
+  createdAt       DateTime       @default(now()) @map("created_at")
+  updatedAt       DateTime       @updatedAt @map("updated_at")
+
+  restaurant Restaurant          @relation(fields: [restaurantId], references: [id], onDelete: Cascade)
+  template  MessageTemplate?     @relation(fields: [templateId], references: [id], onDelete: SetNull)
+  deliveries CampaignDelivery[]
+  events     CampaignEvent[]
+
+  @@index([restaurantId])
+  @@index([status])
+  @@map("campaigns")
+}
+
+model CampaignDelivery {
+  id         String                 @id @default(uuid()) @db.Uuid
+  campaignId String                 @map("campaign_id") @db.Uuid
+  customerId String?                @map("customer_id") @db.Uuid
+  phone      String
+  status     CampaignDeliveryStatus @default(PENDING)
+  error      String?
+  sentAt     DateTime?              @map("sent_at")
+  createdAt  DateTime               @default(now()) @map("created_at")
+
+  campaign Campaign @relation(fields: [campaignId], references: [id], onDelete: Cascade)
+
+  @@index([campaignId])
+  @@map("campaign_deliveries")
+}
+
+model CampaignEvent {
+  id          String   @id @default(uuid()) @db.Uuid
+  campaignId  String   @map("campaign_id") @db.Uuid
+  customerId  String?  @map("customer_id") @db.Uuid
+  type        String
+  referenceId String?  @map("reference_id")
+  value       Decimal  @default(0) @db.Decimal(12, 2)
+  createdAt   DateTime @default(now()) @map("created_at")
+
+  campaign Campaign @relation(fields: [campaignId], references: [id], onDelete: Cascade)
+
+  @@index([campaignId])
+  @@index([customerId])
+  @@map("campaign_events")
 }
 
 model LoyaltyProgram {

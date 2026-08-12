@@ -298,7 +298,20 @@ TARGET DOMAIN                    CURRENT STATE                        GAP CLASS
 
 **Deferred (documented):** REFERRAL trigger (needs referral-link infrastructure), points expiry job (needs real BullMQ workers), loyalty notifications (WhatsApp phase).
 
-### Tier 3c — WHATSAPP / CUSTOMER ENGAGEMENT (next recommended)
+### Tier 3c — WHATSAPP / CUSTOMER ENGAGEMENT ✅ EXECUTED (2026-08-12)
+1. ✅ **Activated the dormant WhatsApp integration** (`integrations/whatsapp.ts` was dead code) — now the send layer for a full engagement system.
+2. ✅ **Models (migration 10)** — `WhatsAppSettings` (per-restaurant enable + business phone), `MessageTemplate` (placeholder templates), `Campaign` (segment/template/message/status/counters), `CampaignDelivery` (per-recipient PENDING/SENT/FAILED), `CampaignEvent` (conversion attribution).
+3. ✅ **Consent gate (hard)** — NO message without `consentMarketing && !isOptedOut` and a compatible preferred channel; channel-level toggle; transactional confirmations gated the same way.
+4. ✅ **Transactional flows** — order confirmation (on order create), payment receipt (cash/card/M-Pesa), order-ready (on READY transition). All best-effort, never break the primary flow.
+5. ✅ **Campaigns** — audience built from consenting customers (+ segment filter via CRM classifier), template/custom message, per-recipient deliveries, SENT/FAILED only (no claimed delivery/open stats), idempotent (SENT campaigns can't re-send).
+6. ✅ **Attribution** — paid orders from campaign-recipient customers within 7 days create CampaignEvent ORDER rows (revenue attributed per campaign).
+7. ✅ **API** (`/api/v1/whatsapp`) — settings, templates CRUD, campaigns CRUD + send. Tenant-scoped, audited writes.
+8. ✅ **UI** — `/dashboard/whatsapp`: settings (enable + number + consent/delivery notes), templates (placeholder editor), campaigns (segment picker, send, recipient/sent/failed counts). Sidebar + route wired.
+9. ✅ Tests — `tests/whatsapp.test.ts` (11): template compilation, consent/opt-out/disabled gates, send with compiled content, channel preference, campaign delivery recording (SENT + FAILED), re-send rejection, 7-day conversion attribution.
+
+**Documented:** delivery receipts/opens require Meta webhook wiring (not claimed); scheduled sends need real BullMQ workers; REFERRAL trigger still deferred.
+
+### Tier 4a — AI MENU ASSISTANT HARDENING (next recommended)
 7. POS hardening: modifiers, split/partial payments, held orders (persisted), KDS station/actions, table merge/split, optimistic locking
 8. M-Pesa: state machine, PaymentAttempt/WebhookEvent, reconciliation dashboard, timeout/reversal handling
 9. Offline-first: local queues + sync + connectivity UI + PWA decision

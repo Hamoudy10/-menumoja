@@ -5,6 +5,7 @@ import { sendSMS } from '../integrations/africasTalking';
 import { prisma } from '../config/database';
 import { upsertCustomer, recordCustomerSpend } from './customer.service';
 import { processPayment as processLoyaltyPayment } from './loyalty.service';
+import { sendTransactional, recordCampaignConversion } from './whatsapp.service';
 
 interface OrderService {
   getOrderById: (orderId: string) => Promise<OrderRecord | null>;
@@ -305,11 +306,18 @@ export async function handleCallback(
     const customerPhone = validCallback.phone || order.customerPhone || payment.phone;
     if (customerPhone) {
       try {
-        await upsertCustomer(order.restaurantId, { phone: customerPhone, source: 'QR' });
+        const customer = await upsertCustomer(order.restaurantId, { phone: customerPhone, source: 'QR' });
         await recordCustomerSpend(order.restaurantId, customerPhone, Number(validCallback.amount || order.amount));
         await processLoyaltyPayment(order.restaurantId, customerPhone, order.id);
+        await recordCampaignConversion(order.restaurantId, customer.id, order.id, Number(validCallback.amount || order.amount));
+        await sendTransactional(order.restaurantId, 'payment_receipt', customerPhone, {
+          amount: Number(validCallback.amount || order.amount),
+          orderNumber: order.orderNumber,
+          method: 'M-Pesa',
+          receiptNo: validCallback.mpesaReceiptNumber || '—',
+        });
       } catch (customerError) {
-        logger.error('Customer/loyalty processing failed (M-Pesa callback)', { error: customerError, restaurantId: order.restaurantId });
+        logger.error('Customer/notify processing failed (M-Pesa callback)', { error: customerError, restaurantId: order.restaurantId });
       }
     }
 

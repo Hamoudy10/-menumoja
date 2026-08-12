@@ -7,6 +7,7 @@ import { AppError, NotFoundError, ValidationError } from '@/utils/errors';
 import { generateOrderNumber, calculateTotals, buildPaginationMeta } from '@/utils/helpers';
 import { getIdempotencyKey, findIdempotentOrder, recordIdempotency, isUniqueViolation } from '@/utils/idempotency';
 import { upsertCustomer } from '@/services/customer.service';
+import { sendTransactional } from '@/services/whatsapp.service';
 import { updateOrderStatusSchema } from '@/utils/validation';
 import { mpesaService } from '@/services';
 import { onTableSeated, freeTableIfLastOrder } from '@/services/table.service';
@@ -332,8 +333,12 @@ router.post('/public/create',
           name: customerName || undefined,
           source: 'QR',
         });
+        await sendTransactional(restaurantId, 'order_confirm', customerPhone, {
+          orderNumber,
+          prepMinutes: estimatedPrepMinutes,
+        });
       } catch (customerError) {
-        logger.error('Customer upsert failed (order create)', { error: customerError, restaurantId });
+        logger.error('Customer/notify processing failed (order create)', { error: customerError, restaurantId });
       }
     }
 
@@ -1125,6 +1130,15 @@ router.put('/:id/status',
       logger.error('Failed to emit order:status-changed socket event', { error: socketError });
     }
 
+    // Order-ready WhatsApp notification (consent-gated, best-effort)
+    if (newStatus === 'READY' && order.customerPhone) {
+      try {
+        await sendTransactional(restaurantId, 'order_ready', order.customerPhone, { orderNumber: updated.orderNumber });
+      } catch (notifyError) {
+        logger.error('Order-ready notification failed', { error: notifyError, restaurantId });
+      }
+    }
+
     logger.info('Order status updated', { orderId: id, from: order.status, to: newStatus, userId: req.user?.userId });
 
     res.json({ success: true, data: updated });
@@ -1186,7 +1200,7 @@ router.put('/:id/hold',
 
     const order = await prisma.order.findFirst({
       where: { id, restaurantId },
-      select: { id: true, status: true, paymentStatus: true },
+      select: { id: true, status: true, paymentStatus: true, customerPhone: true },
     });
 
     if (!order) {

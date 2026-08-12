@@ -21,6 +21,7 @@ import inventoryRoutes from '../src/routes/inventory/inventory.routes';
 import recipeRoutes from '../src/routes/recipes/recipes.routes';
 import customerRoutes from '../src/routes/customers/customers.routes';
 import loyaltyRoutes from '../src/routes/loyalty/loyalty.routes';
+import whatsappRoutes from '../src/routes/whatsapp/whatsapp.routes';
 
 jest.mock('../src/config/database', () => {
   const mockPrisma = {
@@ -219,6 +220,34 @@ jest.mock('../src/config/database', () => {
       update: jest.fn().mockResolvedValue({}),
       count: jest.fn().mockResolvedValue(0),
     },
+    whatsAppSettings: {
+      findUnique: jest.fn().mockResolvedValue(null),
+      create: jest.fn().mockResolvedValue({}),
+      update: jest.fn().mockResolvedValue({}),
+    },
+    messageTemplate: {
+      findFirst: jest.fn().mockResolvedValue(null),
+      findMany: jest.fn().mockResolvedValue([]),
+      create: jest.fn().mockResolvedValue({}),
+      update: jest.fn().mockResolvedValue({}),
+      delete: jest.fn().mockResolvedValue({}),
+    },
+    campaign: {
+      findFirst: jest.fn().mockResolvedValue(null),
+      findMany: jest.fn().mockResolvedValue([]),
+      create: jest.fn().mockResolvedValue({}),
+      update: jest.fn().mockResolvedValue({}),
+      delete: jest.fn().mockResolvedValue({}),
+    },
+    campaignDelivery: {
+      findFirst: jest.fn().mockResolvedValue(null),
+      findMany: jest.fn().mockResolvedValue([]),
+      create: jest.fn().mockResolvedValue({}),
+    },
+    campaignEvent: {
+      findMany: jest.fn().mockResolvedValue([]),
+      create: jest.fn().mockResolvedValue({}),
+    },
     cashReconciliation: {
       findFirst: jest.fn(),
       findMany: jest.fn(),
@@ -390,6 +419,7 @@ export function setupTestApp(): Express {
   app.use('/api/v1/recipes', recipeRoutes);
   app.use('/api/v1/customers', customerRoutes);
   app.use('/api/v1/loyalty', loyaltyRoutes);
+  app.use('/api/v1/whatsapp', whatsappRoutes);
   app.get('/api/v1/health', (_req: Request, res: Response) => {
     res.json({ status: 'ok', timestamp: new Date().toISOString(), uptime: process.uptime(), version: '1.0.0' });
   });

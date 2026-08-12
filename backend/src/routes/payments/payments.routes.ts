@@ -12,6 +12,7 @@ import { createReceiptForPayment, getReceiptById } from '@/services/receipt.serv
 import { computeReconciliation, runReconciliation, listReconciliations } from '@/services/reconciliation.service';
 import { upsertCustomer, recordCustomerSpend } from '@/services/customer.service';
 import { processPayment as processLoyaltyPayment } from '@/services/loyalty.service';
+import { sendTransactional, recordCampaignConversion } from '@/services/whatsapp.service';
 import { freeTableIfLastOrder } from '@/services/table.service';
 import * as mpesa from '@/integrations/mpesa';
 import { io } from '@/hooks/socket';
@@ -484,15 +485,22 @@ router.post('/cash/record',
     // Customer identity + spend (best-effort)
     if (order.customerPhone) {
       try {
-        await upsertCustomer(restaurantId, {
+        const customer = await upsertCustomer(restaurantId, {
           phone: order.customerPhone,
           name: order.customerName || undefined,
           source: 'POS',
         });
         await recordCustomerSpend(restaurantId, order.customerPhone, Number(payment.amount));
         await processLoyaltyPayment(restaurantId, order.customerPhone, orderId);
+        await recordCampaignConversion(restaurantId, customer.id, orderId, Number(payment.amount));
+        await sendTransactional(restaurantId, 'payment_receipt', order.customerPhone, {
+          amount: Number(payment.amount),
+          orderNumber: order.orderNumber,
+          method: 'Cash',
+          receiptNo: receipt?.receiptNumber || '—',
+        });
       } catch (customerError) {
-        logger.error('Customer/loyalty processing failed (cash payment)', { error: customerError, restaurantId });
+        logger.error('Customer/notify processing failed (cash payment)', { error: customerError, restaurantId });
       }
     }
 
@@ -1075,7 +1083,7 @@ router.post('/card/record',
 
     const order = await prisma.order.findFirst({
       where: { id: orderId, restaurantId },
-      select: { id: true, totalAmount: true, paymentStatus: true, tableId: true, customerName: true, customerPhone: true },
+      select: { id: true, orderNumber: true, totalAmount: true, paymentStatus: true, tableId: true, customerName: true, customerPhone: true },
     });
 
     if (!order) throw new NotFoundError('Order not found', 'Agizo halikupatikana');
@@ -1131,15 +1139,22 @@ router.post('/card/record',
     // Customer identity + spend (best-effort)
     if (order.customerPhone) {
       try {
-        await upsertCustomer(restaurantId, {
+        const customer = await upsertCustomer(restaurantId, {
           phone: order.customerPhone,
           name: order.customerName || undefined,
           source: 'POS',
         });
         await recordCustomerSpend(restaurantId, order.customerPhone, Number(payment.amount));
         await processLoyaltyPayment(restaurantId, order.customerPhone, orderId);
+        await recordCampaignConversion(restaurantId, customer.id, orderId, Number(payment.amount));
+        await sendTransactional(restaurantId, 'payment_receipt', order.customerPhone, {
+          amount: Number(payment.amount),
+          orderNumber: order.orderNumber,
+          method: 'Card',
+          receiptNo: receipt?.receiptNumber || '—',
+        });
       } catch (customerError) {
-        logger.error('Customer/loyalty processing failed (card payment)', { error: customerError, restaurantId });
+        logger.error('Customer/notify processing failed (card payment)', { error: customerError, restaurantId });
       }
     }
 
