@@ -15,7 +15,7 @@ router.get(
   '/:restaurantSlug',
   optionalAuth,
   asyncHandler(async (req, res) => {
-    const { restaurantSlug } = req.params;
+    const restaurantSlug = String(req.params.restaurantSlug);
 
     const userAgent = req.headers['user-agent'] || '';
     const acceptLanguage = req.headers['accept-language'] || '';
@@ -232,7 +232,8 @@ router.get(
 router.get(
   '/:restaurantSlug/item/:itemId',
   asyncHandler(async (req, res) => {
-    const { restaurantSlug, itemId } = req.params;
+    const restaurantSlug = String(req.params.restaurantSlug);
+    const itemId = String(req.params.itemId);
 
     const restaurant = await prisma.restaurant.findUnique({
       where: { slug: restaurantSlug, isActive: true },
@@ -268,7 +269,7 @@ router.get(
 router.get(
   '/:restaurantSlug/search',
   asyncHandler(async (req, res) => {
-    const { restaurantSlug } = req.params;
+    const restaurantSlug = String(req.params.restaurantSlug);
     const q = (req.query.q as string) || '';
 
     if (!q.trim()) {

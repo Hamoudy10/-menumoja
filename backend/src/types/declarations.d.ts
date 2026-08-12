@@ -12,51 +12,15 @@ declare global {
       };
       restaurantId?: string;
       requestId?: string;
+      /**
+       * `params` and `query` are replaced at runtime by the validateParams /
+       * validateQuery middleware with the zod-parsed scalar shape, so the
+       * Express `string | string[]` typing does not apply to this app.
+       */
+      params: Record<string, string>;
+      query: Record<string, string | undefined>;
     }
   }
-}
-
-declare module '@prisma/client' {
-  class PrismaClient {
-    constructor(options?: any);
-    $connect(): Promise<void>;
-    $disconnect(): Promise<void>;
-    $transaction<T>(fn: (tx: any) => Promise<T>): Promise<T>;
-    $on(event: string, handler: (e: any) => void): void;
-    platformAdmin: any;
-    subscriptionPlan: any;
-    owner: any;
-    restaurant: any;
-    restaurantSettings: any;
-    openingHour: any;
-    restaurantBranch: any;
-    menuCategory: any;
-    menuItem: any;
-    menuItemSuggestion: any;
-    dailySpecialSchedule: any;
-    qrCode: any;
-    qrScan: any;
-    staff: any;
-    staffShift: any;
-    restaurantTable: any;
-    order: any;
-    orderItem: any;
-    payment: any;
-    cashReconciliation: any;
-    aiConversation: any;
-    restaurantFaq: any;
-    aiGeneratedContent: any;
-    camera: any;
-    cameraAlert: any;
-    analyticsDaily: any;
-    menuItemAnalytics: any;
-    searchAnalytic: any;
-    ussdSession: any;
-    smsLog: any;
-    notification: any;
-    $extends(args: any): any;
-  }
-  export { PrismaClient };
 }
 
 declare module 'bullmq' {

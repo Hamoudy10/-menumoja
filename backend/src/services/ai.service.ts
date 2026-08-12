@@ -1,7 +1,6 @@
 import logger from '../utils/logger';
 import { AppError } from '../utils/errors';
 import * as openai from '../integrations/openai';
-import * as cloudinary from '../integrations/cloudinary';
 import { PrismaClient } from '@prisma/client';
 
 const prisma = new PrismaClient();
@@ -26,24 +25,6 @@ interface MenuItemRecord {
 interface FaqRecord {
   question: string;
   answer: string;
-}
-
-interface RestaurantRecord {
-  id: string;
-  name: string;
-  cuisine?: string;
-  description?: string;
-  location?: string;
-  phone?: string;
-  socialMedia?: Record<string, any>;
-}
-
-interface ConversationRecord {
-  id: string;
-  restaurantId: string;
-  sessionId: string;
-  messages: Array<{ role: string; content: string }>;
-  metadata?: Record<string, any>;
 }
 
 export async function processCustomerMessage(
@@ -93,7 +74,7 @@ export async function processCustomerMessage(
       }),
     ]);
 
-    const menuContext = buildMenuContext(restaurant, menuItems);
+    const menuContext = buildMenuContext(restaurant, menuItems.map((m) => ({ ...m, price: Number(m.price) })));
     const faqContext = buildFaqContext(faqs);
 
     let conversation = await prisma.aiConversation.findFirst({
@@ -130,7 +111,7 @@ export async function processCustomerMessage(
       );
     } catch (error) {
       logger.warn('LLM unavailable, using local chef fallback', { error: (error as any)?.message, restaurantId });
-      result = buildSmartReply(sanitizedMessage, menuItems, faqs, restaurant, language);
+      result = buildSmartReply(sanitizedMessage, menuItems.map((m) => ({ ...m, price: Number(m.price) })), faqs, restaurant, language);
     }
 
     updatedMessages.push({ role: 'assistant', content: result.reply });
@@ -188,204 +169,6 @@ export async function processOwnerSetup(
       reply: 'I encountered an error. Please try again or contact support.',
       action: undefined,
     };
-  }
-}
-
-export async function generateAndSaveImage(
-  itemId: string,
-  prompt: string
-): Promise<{ imageUrl: string; thumbnailUrl: string }> {
-  try {
-    const menuItem = await prisma.menuItem.findUnique({
-      where: { id: itemId },
-      select: { id: true, name: true, restaurantId: true },
-    });
-
-    if (!menuItem) {
-      throw new AppError(404, 'ITEM_NOT_FOUND', 'Menu item not found', 'Bidhaa haikupatikana');
-    }
-
-    const aiImage = await openai.generateImage(prompt, menuItem.name);
-
-    if (!aiImage.imageUrl) {
-      throw new AppError(502, 'AI_IMAGE_FAILED', 'Failed to generate image', 'Imeshindwa kutengeneza picha');
-    }
-
-    const uploaded = await cloudinary.uploadImage(aiImage.imageUrl, `restaurants/${menuItem.restaurantId}/items`);
-
-    await prisma.menuItem.update({
-      where: { id: itemId },
-      data: {
-        imageUrl: uploaded.url,
-        imageThumbnail: uploaded.thumbnailUrl,
-      },
-    });
-
-    logger.info('Generated and saved AI image', { itemId, prompt: prompt.substring(0, 100) });
-
-    return { imageUrl: uploaded.url, thumbnailUrl: uploaded.thumbnailUrl };
-  } catch (error) {
-    if (error instanceof AppError) throw error;
-    logger.error('generateAndSaveImage failed', { error, itemId });
-    throw new AppError(502, 'IMAGE_GENERATION_FAILED', 'Failed to generate and save image', 'Imeshindwa kutengeneza na kuhifadhi picha');
-  }
-}
-
-export async function createDailySocialPosts(
-  restaurantId: string
-): Promise<void> {
-  try {
-    const restaurant = await prisma.restaurant.findUnique({
-      where: { id: restaurantId },
-      select: {
-        id: true,
-        name: true,
-        cuisine: true,
-        description: true,
-        location: true,
-        socialMedia: true,
-        phone: true,
-      },
-    });
-
-    if (!restaurant) {
-      logger.warn('Restaurant not found for social post generation', { restaurantId });
-      return;
-    }
-
-    const socialMedia = (restaurant.socialMedia || {}) as Record<string, any>;
-    const enabledPlatforms: string[] = [];
-
-    if (socialMedia.facebookPageId) enabledPlatforms.push('facebook');
-    if (socialMedia.instagramBusinessId) enabledPlatforms.push('instagram');
-    if (socialMedia.whatsappNumber) enabledPlatforms.push('whatsapp');
-
-    if (!enabledPlatforms.length) {
-      logger.info('No social media platforms configured', { restaurantId });
-      return;
-    }
-
-    const postTypes = ['daily_special', 'customer_favorite', 'behind_the_scenes', 'promotion'];
-    const postType = postTypes[Math.floor(Math.random() * postTypes.length)];
-
-    const restaurantInfo = {
-      name: restaurant.name,
-      cuisine: restaurant.cuisine,
-      description: restaurant.description,
-      location: restaurant.location,
-      phone: restaurant.phone,
-    };
-
-    for (const platform of enabledPlatforms) {
-      try {
-        const post = await openai.generateSocialPost(restaurantInfo, postType, platform, 'en');
-
-        const scheduledTime = new Date();
-        scheduledTime.setHours(scheduledTime.getHours() + 2);
-
-        await prisma.scheduledPost.create({
-          data: {
-            restaurantId,
-            platform,
-            caption: post.caption,
-            imageUrl: post.imageUrl,
-            hashtags: post.hashtags,
-            scheduledAt: scheduledTime,
-            status: 'pending',
-          },
-        });
-
-        logger.info('Scheduled social post', { restaurantId, platform, postType });
-      } catch (platformError) {
-        logger.error('Failed to create social post for platform', {
-          error: platformError,
-          restaurantId,
-          platform,
-        });
-      }
-    }
-  } catch (error) {
-    logger.error('createDailySocialPosts failed', { error, restaurantId });
-  }
-}
-
-export async function generateMenuDescriptions(
-  restaurantId: string
-): Promise<number> {
-  try {
-    const items = await prisma.menuItem.findMany({
-      where: {
-        restaurantId,
-        OR: [
-          { description: null },
-          { descriptionSwahili: null },
-        ],
-      },
-      select: { id: true, name: true, ingredients: true },
-    });
-
-    let generated = 0;
-
-    for (const item of items) {
-      try {
-        const ingredients = (item.ingredients as string[]) || [];
-        const desc = await openai.generateDescription(item.name, ingredients);
-
-        await prisma.menuItem.update({
-          where: { id: item.id },
-          data: {
-            description: desc.english,
-            descriptionSwahili: desc.swahili,
-          },
-        });
-
-        generated++;
-      } catch (itemError) {
-        logger.error('Failed to generate description for item', {
-          error: itemError,
-          itemId: item.id,
-        });
-      }
-    }
-
-    return generated;
-  } catch (error) {
-    logger.error('generateMenuDescriptions failed', { error, restaurantId });
-    throw error;
-  }
-}
-
-export async function analyzeFoodImage(
-  imageUrl: string,
-  restaurantId: string,
-  menuItemId?: string
-): Promise<{ anomalies: Array<{ type: string; confidence: number; description: string }> }> {
-  try {
-    const result = await openai.analyzeCameraImage(imageUrl);
-
-    if (result.anomalies.length > 0) {
-      await prisma.foodAnomaly.create({
-        data: {
-          restaurantId,
-          menuItemId: menuItemId || null,
-          imageUrl,
-          anomalies: result.anomalies as any,
-          detectedAt: new Date(),
-        },
-      });
-
-      logger.warn('Food anomalies detected', {
-        restaurantId,
-        anomalyCount: result.anomalies.length,
-        types: result.anomalies.map((a) => a.type),
-      });
-    }
-
-    return result;
-  } catch (error) {
-    if (error instanceof AppError) throw error;
-    logger.error('analyzeFoodImage failed', { error, restaurantId });
-    throw new AppError(502, 'IMAGE_ANALYSIS_FAILED', 'Failed to analyze food image', 'Imeshindwa kuchambua picha ya chakula');
   }
 }
 
@@ -643,33 +426,7 @@ function buildSmartReply(
   };
 }
 
-export async function getOrCreateConversation(
-  restaurantId: string,
-  sessionId: string
-): Promise<ConversationRecord> {
-  let conversation = await prisma.aiConversation.findFirst({
-    where: { restaurantId, sessionId },
-  });
-
-  if (!conversation) {
-    conversation = await prisma.aiConversation.create({
-      data: {
-        restaurantId,
-        sessionId,
-        messages: [],
-      },
-    });
-  }
-
-  return conversation;
-}
-
 export default {
   processCustomerMessage,
   processOwnerSetup,
-  generateAndSaveImage,
-  createDailySocialPosts,
-  generateMenuDescriptions,
-  analyzeFoodImage,
-  getOrCreateConversation,
 };

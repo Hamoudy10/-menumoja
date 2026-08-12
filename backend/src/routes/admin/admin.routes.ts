@@ -100,7 +100,7 @@ router.get('/restaurants', asyncHandler(async (req: AuthenticatedRequest, res: R
 }));
 
 router.get('/restaurants/:id', asyncHandler(async (req: AuthenticatedRequest, res: Response) => {
-  const restaurantId = req.params.id;
+  const restaurantId = String(req.params.id);
 
   const restaurant = await prisma.restaurant.findUnique({
     where: { id: restaurantId },
@@ -140,7 +140,7 @@ router.get('/restaurants/:id', asyncHandler(async (req: AuthenticatedRequest, re
 }));
 
 router.put('/restaurants/:id/suspend', validate(suspendSchema), asyncHandler(async (req: AuthenticatedRequest, res: Response) => {
-  const restaurantId = req.params.id;
+  const restaurantId = String(req.params.id);
   const { reason } = req.body as z.infer<typeof suspendSchema>;
 
   const restaurant = await prisma.restaurant.findUnique({
@@ -188,7 +188,7 @@ router.put('/restaurants/:id/suspend', validate(suspendSchema), asyncHandler(asy
 }));
 
 router.put('/restaurants/:id/activate', asyncHandler(async (req: AuthenticatedRequest, res: Response) => {
-  const restaurantId = req.params.id;
+  const restaurantId = String(req.params.id);
 
   const restaurant = await prisma.restaurant.findUnique({
     where: { id: restaurantId },
@@ -279,7 +279,7 @@ router.get('/owners', asyncHandler(async (req: AuthenticatedRequest, res: Respon
 }));
 
 router.get('/owners/:id', asyncHandler(async (req: AuthenticatedRequest, res: Response) => {
-  const ownerId = req.params.id;
+  const ownerId = String(req.params.id);
 
   const owner = await prisma.owner.findUnique({
     where: { id: ownerId },
@@ -519,7 +519,7 @@ router.get('/support-tickets', asyncHandler(async (req: AuthenticatedRequest, re
 }));
 
 router.post('/support-tickets/:id/reply', validate(replyTicketSchema), asyncHandler(async (req: AuthenticatedRequest, res: Response) => {
-  const ticketId = req.params.id;
+  const ticketId = String(req.params.id);
   const { message } = req.body as z.infer<typeof replyTicketSchema>;
 
   const ticket = await prisma.notification.findUnique({
@@ -556,7 +556,7 @@ router.post('/support-tickets/:id/reply', validate(replyTicketSchema), asyncHand
 }));
 
 router.put('/support-tickets/:id/close', asyncHandler(async (req: AuthenticatedRequest, res: Response) => {
-  const ticketId = req.params.id;
+  const ticketId = String(req.params.id);
 
   const ticket = await prisma.notification.findUnique({ where: { id: ticketId } });
   if (!ticket) {

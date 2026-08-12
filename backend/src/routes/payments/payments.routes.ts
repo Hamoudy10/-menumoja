@@ -572,7 +572,7 @@ router.get('/receipts/:id',
   validateParams(idParamSchema),
   asyncHandler(async (req, res) => {
     const restaurantId = (req as any).restaurantId;
-    const { id } = req.params;
+    const id = String(req.params.id);
 
     const receipt = await getReceiptById(String(id));
     if (receipt.restaurantId !== restaurantId) {
@@ -596,7 +596,7 @@ router.get('/:id',
   validateParams(idParamSchema),
   asyncHandler(async (req, res) => {
     const restaurantId = (req as any).restaurantId;
-    const { id } = req.params;
+    const id = String(req.params.id);
 
     const payment = await prisma.payment.findFirst({
       where: { id, restaurantId },

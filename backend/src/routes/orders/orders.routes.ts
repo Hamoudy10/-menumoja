@@ -537,7 +537,7 @@ router.post('/',
 router.get('/public/:orderId/status',
   validateParams(orderIdParamSchema),
   asyncHandler(async (req, res) => {
-    const { orderId } = req.params;
+    const orderId = String(req.params.orderId);
 
     const order = await prisma.order.findUnique({
       where: { id: orderId },
@@ -944,7 +944,7 @@ router.get('/:id',
   validateParams(idParamSchema),
   asyncHandler(async (req, res) => {
     const restaurantId = (req as any).restaurantId;
-    const { id } = req.params;
+    const id = String(req.params.id);
 
     const order = await prisma.order.findFirst({
       where: { id, restaurantId },
@@ -1011,7 +1011,7 @@ router.put('/:id/status',
   validate(updateOrderStatusSchema),
   asyncHandler(async (req, res) => {
     const restaurantId = (req as any).restaurantId;
-    const { id } = req.params;
+    const id = String(req.params.id);
     const { status, reason } = req.body;
 
     const newStatus = status.toUpperCase();
@@ -1120,7 +1120,7 @@ router.put('/:id/assign-waiter',
   validate(assignWaiterSchema),
   asyncHandler(async (req, res) => {
     const restaurantId = (req as any).restaurantId;
-    const { id } = req.params;
+    const id = String(req.params.id);
     const { waiterId } = req.body;
 
     const order = await prisma.order.findFirst({
@@ -1161,7 +1161,7 @@ router.post('/:id/complaint',
   enforceRestaurantScope,
   asyncHandler(async (req, res) => {
     const restaurantId = (req as any).restaurantId;
-    const orderId = req.params.id;
+    const orderId = String(req.params.id);
     const { type, description, evidence } = req.body;
 
     const order = await prisma.order.findFirst({
@@ -1191,7 +1191,7 @@ router.delete('/:id',
   validate(cancelOrderSchema),
   asyncHandler(async (req, res) => {
     const restaurantId = (req as any).restaurantId;
-    const { id } = req.params;
+    const id = String(req.params.id);
     const { reason } = req.body;
 
     const order = await prisma.order.findFirst({

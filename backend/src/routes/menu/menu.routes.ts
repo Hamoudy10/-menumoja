@@ -97,7 +97,7 @@ router.put(
   validate(updateCategorySchema),
   asyncHandler(async (req, res) => {
     const restaurantId = (req as any).restaurantId;
-    const { id } = req.params;
+    const id = String(req.params.id);
     const data = req.body;
 
     const category = await prisma.menuCategory.findFirst({
@@ -142,7 +142,7 @@ router.delete(
   auditLog,
   asyncHandler(async (req, res) => {
     const restaurantId = (req as any).restaurantId;
-    const { id } = req.params;
+    const id = String(req.params.id);
     const { reassignToCategoryId } = req.query;
 
     const category = await prisma.menuCategory.findFirst({
@@ -276,7 +276,7 @@ router.get(
   '/items/:id',
   asyncHandler(async (req, res) => {
     const restaurantId = (req as any).restaurantId;
-    const { id } = req.params;
+    const id = String(req.params.id);
 
     const item = await prisma.menuItem.findFirst({
       where: { id, restaurantId },
@@ -366,7 +366,7 @@ router.put(
   validate(updateItemSchema),
   asyncHandler(async (req, res) => {
     const restaurantId = (req as any).restaurantId;
-    const { id } = req.params;
+    const id = String(req.params.id);
     const data = req.body;
 
     const item = await prisma.menuItem.findFirst({
@@ -437,7 +437,7 @@ router.delete(
   auditLog,
   asyncHandler(async (req, res) => {
     const restaurantId = (req as any).restaurantId;
-    const { id } = req.params;
+    const id = String(req.params.id);
 
     const item = await prisma.menuItem.findFirst({
       where: { id, restaurantId },
@@ -496,7 +496,7 @@ router.put(
   auditLog,
   asyncHandler(async (req, res) => {
     const restaurantId = (req as any).restaurantId;
-    const { id } = req.params;
+    const id = String(req.params.id);
 
     const item = await prisma.menuItem.findFirst({
       where: { id, restaurantId },
@@ -582,7 +582,7 @@ router.post(
   auditLog,
   asyncHandler(async (req, res) => {
     const restaurantId = (req as any).restaurantId;
-    const { id } = req.params;
+    const id = String(req.params.id);
 
     const original = await prisma.menuItem.findFirst({
       where: { id, restaurantId },

@@ -30,8 +30,9 @@ Tier 0 (Foundation) of `MENU_MOJA_GAP_ANALYSIS.md` has been executed. Verified s
 
 ### CURRENT VERIFICATION STATE (all green)
 
-- Backend: `tsc --noEmit` ✅ · `npm test` ✅ (7 suites / 55 tests)
+- Backend: `tsc --noEmit` ✅ (checked against **real generated Prisma types** — the loose `@prisma/client` stub in `src/types/declarations.d.ts` was removed on 2026-08-12 after it masked ~150 pre-existing type errors; Express 5 `string | string[]` params coerced with `String()`/`Number()`, `Decimal` prices converted, and 5 dead+broken `ai.service` functions referencing non-existent models/fields removed) · `npm test` ✅ (7 suites / 55 tests)
 - Frontend: `tsc -b` ✅ · `npm run lint` ✅ (0 errors / 698 warnings) · `npm run build` ✅
+- `backend/package.json` now has `postinstall: prisma generate` so installs always produce real client types (no more local/CI type divergence)
 
 ---
 

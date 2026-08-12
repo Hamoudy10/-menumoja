@@ -213,7 +213,7 @@ async function handleCategorySelected(session: SessionData, input: string, save:
     return `END Hakuna bidhaa katika kategoria hii.\n\nHamna bidhaa katika kategoria hii.`;
   }
 
-  return buildItemMenu(items);
+  return buildItemMenu(items.map((i) => ({ ...i, price: Number(i.price) })));
 }
 
 async function handleItemSelected(
@@ -240,7 +240,7 @@ async function handleItemSelected(
 
   const index = parseInt(input) - 1;
   if (isNaN(index) || !items[index]) {
-    return `CON Chaguo batili. Jaribu tena.\n\n${buildItemMenu(items)}`;
+    return `CON Chaguo batili. Jaribu tena.\n\n${buildItemMenu(items.map((i) => ({ ...i, price: Number(i.price) })))}`;
   }
 
   session.selectedItem = {

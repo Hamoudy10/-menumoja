@@ -80,7 +80,7 @@ router.get('/unread-count', asyncHandler(async (req: AuthenticatedRequest, res: 
 
 router.put('/:id/read', asyncHandler(async (req: AuthenticatedRequest, res: Response) => {
   const user = req.user!;
-  const notificationId = req.params.id;
+  const notificationId = String(req.params.id);
 
   const notification = await prisma.notification.findUnique({ where: { id: notificationId } });
 
@@ -131,7 +131,7 @@ router.put('/read-all', asyncHandler(async (req: AuthenticatedRequest, res: Resp
 
 router.delete('/:id', asyncHandler(async (req: AuthenticatedRequest, res: Response) => {
   const user = req.user!;
-  const notificationId = req.params.id;
+  const notificationId = String(req.params.id);
 
   const notification = await prisma.notification.findUnique({ where: { id: notificationId } });
 

@@ -400,9 +400,9 @@ router.post('/generate/social-post',
       select: {
         id: true,
         name: true,
-        cuisine: true,
+        businessType: true,
         description: true,
-        location: true,
+        city: true,
         phone: true,
       },
     });
@@ -413,9 +413,9 @@ router.post('/generate/social-post',
 
     const restaurantInfo: Record<string, any> = {
       name: restaurant.name,
-      cuisine: restaurant.cuisine || '',
+      cuisine: restaurant.businessType || '',
       description: restaurant.description || '',
-      location: restaurant.location || '',
+      location: restaurant.city || '',
       phone: restaurant.phone || '',
     };
 
@@ -509,7 +509,7 @@ router.post('/generate/social-post',
 router.get('/conversations/:sessionId',
   validateParams(sessionIdParamSchema),
   asyncHandler(async (req, res) => {
-    const { sessionId } = req.params;
+    const sessionId = String(req.params.sessionId);
     const restaurantId = req.query.restaurantId as string | undefined;
 
     const where: any = { sessionId };

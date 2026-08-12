@@ -419,7 +419,7 @@ router.put(
   validate(updateTableSchema),
   asyncHandler(async (req, res) => {
     const restaurantId = (req as any).restaurantId;
-    const { tableId } = req.params;
+    const tableId = String(req.params.tableId);
     const data = req.body;
 
     const table = await prisma.restaurantTable.findFirst({
@@ -463,7 +463,7 @@ router.delete(
   auditLog,
   asyncHandler(async (req, res) => {
     const restaurantId = (req as any).restaurantId;
-    const { tableId } = req.params;
+    const tableId = String(req.params.tableId);
 
     const table = await prisma.restaurantTable.findFirst({
       where: { id: tableId, restaurantId },
@@ -504,7 +504,7 @@ router.put(
   validate(updateTableStatusSchema),
   asyncHandler(async (req, res) => {
     const restaurantId = (req as any).restaurantId;
-    const { tableId } = req.params;
+    const tableId = String(req.params.tableId);
     const { status } = req.body;
 
     const table = await prisma.restaurantTable.findFirst({ where: { id: tableId, restaurantId } });
@@ -541,7 +541,7 @@ router.put(
   validate(updateTableSessionSchema),
   asyncHandler(async (req, res) => {
     const restaurantId = (req as any).restaurantId;
-    const { tableId } = req.params;
+    const tableId = String(req.params.tableId);
     const { action, guestCount } = req.body;
 
     const table = await prisma.restaurantTable.findFirst({ where: { id: tableId, restaurantId } });
@@ -634,7 +634,7 @@ router.put(
   validate(updateZoneSchema),
   asyncHandler(async (req, res) => {
     const restaurantId = (req as any).restaurantId;
-    const { zoneId } = req.params;
+    const zoneId = String(req.params.zoneId);
 
     const zone = await prisma.tableZone.findFirst({ where: { id: zoneId, restaurantId } });
     if (!zone) {
@@ -656,7 +656,7 @@ router.delete(
   auditLog,
   asyncHandler(async (req, res) => {
     const restaurantId = (req as any).restaurantId;
-    const { zoneId } = req.params;
+    const zoneId = String(req.params.zoneId);
 
     const zone = await prisma.tableZone.findFirst({ where: { id: zoneId, restaurantId } });
     if (!zone) {
@@ -753,7 +753,7 @@ router.put(
   validate(updatePromotionSchema),
   asyncHandler(async (req, res) => {
     const restaurantId = (req as any).restaurantId;
-    const { promotionId } = req.params;
+    const promotionId = String(req.params.promotionId);
     const data = req.body;
 
     const promotion = await prisma.promotion.findFirst({ where: { id: promotionId, restaurantId } });
@@ -796,7 +796,7 @@ router.delete(
   auditLog,
   asyncHandler(async (req, res) => {
     const restaurantId = (req as any).restaurantId;
-    const { promotionId } = req.params;
+    const promotionId = String(req.params.promotionId);
 
     const promotion = await prisma.promotion.findFirst({ where: { id: promotionId, restaurantId } });
     if (!promotion) {
@@ -922,7 +922,7 @@ router.put(
   validate(updateStaffSchema),
   asyncHandler(async (req, res) => {
     const restaurantId = (req as any).restaurantId;
-    const { staffId } = req.params;
+    const staffId = String(req.params.staffId);
     const data = req.body;
 
     const staff = await prisma.staff.findFirst({
@@ -989,7 +989,7 @@ router.delete(
   auditLog,
   asyncHandler(async (req, res) => {
     const restaurantId = (req as any).restaurantId;
-    const { staffId } = req.params;
+    const staffId = String(req.params.staffId);
 
     const staff = await prisma.staff.findFirst({
       where: { id: staffId, restaurantId },
@@ -1027,7 +1027,7 @@ router.post(
   auditLog,
   asyncHandler(async (req, res) => {
     const restaurantId = (req as any).restaurantId;
-    const { staffId } = req.params;
+    const staffId = String(req.params.staffId);
 
     const staff = await prisma.staff.findFirst({
       where: { id: staffId, restaurantId },

@@ -236,7 +236,7 @@ router.get(
   '/:id',
   asyncHandler(async (req, res) => {
     const restaurantId = (req as any).restaurantId;
-    const { id } = req.params;
+    const id = String(req.params.id);
 
     const qrCode = await prisma.qrCode.findFirst({
       where: { id, restaurantId },
@@ -293,7 +293,7 @@ router.put(
   auditLog,
   asyncHandler(async (req, res) => {
     const restaurantId = (req as any).restaurantId;
-    const { id } = req.params;
+    const id = String(req.params.id);
     const { label, tableNumber } = req.body;
 
     const qrCode = await prisma.qrCode.findFirst({
@@ -351,7 +351,7 @@ router.delete(
   auditLog,
   asyncHandler(async (req, res) => {
     const restaurantId = (req as any).restaurantId;
-    const { id } = req.params;
+    const id = String(req.params.id);
 
     const qrCode = await prisma.qrCode.findFirst({
       where: { id, restaurantId },
@@ -382,7 +382,7 @@ router.get(
   '/:id/download',
   asyncHandler(async (req, res) => {
     const restaurantId = (req as any).restaurantId;
-    const { id } = req.params;
+    const id = String(req.params.id);
 
     const qrCode = await prisma.qrCode.findFirst({
       where: { id, restaurantId },
@@ -447,7 +447,7 @@ router.get(
   '/:id/pdf',
   asyncHandler(async (req, res) => {
     const restaurantId = (req as any).restaurantId;
-    const { id } = req.params;
+    const id = String(req.params.id);
 
     const qrCode = await prisma.qrCode.findFirst({
       where: { id, restaurantId },
@@ -526,7 +526,7 @@ router.get(
 router.post(
   '/scan/:qrCodeId',
   asyncHandler(async (req, res) => {
-    const { qrCodeId } = req.params;
+    const qrCodeId = String(req.params.qrCodeId);
     const { deviceType, browser, sessionId, language } = req.body;
 
     const qrCode = await prisma.qrCode.findUnique({

@@ -15,7 +15,7 @@ const router = Router();
 // Stream proxy — no auth middleware (img tags can't send headers).
 // Uses signed JWT token from /cameras/:id/stream-token as query param.
 router.get('/:id/stream', asyncHandler(async (req: AuthenticatedRequest, res: Response) => {
-  const cameraId = req.params.id;
+  const cameraId = String(req.params.id);
   const token = (req.query.token as string) || '';
 
   try {
@@ -194,7 +194,7 @@ router.post('/', validate(addCameraSchema), asyncHandler(async (req: Authenticat
 router.get('/alert', asyncHandler(async (req: AuthenticatedRequest, res: Response) => {
   const restaurantId = (req as any).restaurantId;
   const { page, perPage } = parsePagination(req.query as any);
-  const isReviewed = req.query.isReviewed as string | undefined;
+  const isReviewed = String(req.query.isReviewed ?? "");
 
   const where: any = { restaurantId };
   if (isReviewed === 'true') where.isReviewed = true;
@@ -225,7 +225,7 @@ router.get('/alert', asyncHandler(async (req: AuthenticatedRequest, res: Respons
 
 router.put('/alert/:alertId/review', asyncHandler(async (req: AuthenticatedRequest, res: Response) => {
   const restaurantId = (req as any).restaurantId;
-  const alertId = req.params.alertId;
+  const alertId = String(req.params.alertId);
 
   const alert = await prisma.cameraAlert.findFirst({
     where: { id: alertId, restaurantId },
@@ -245,7 +245,7 @@ router.put('/alert/:alertId/review', asyncHandler(async (req: AuthenticatedReque
 
 router.get('/:id', asyncHandler(async (req: AuthenticatedRequest, res: Response) => {
   const restaurantId = (req as any).restaurantId;
-  const cameraId = req.params.id;
+  const cameraId = String(req.params.id);
 
   const camera = await prisma.camera.findFirst({
     where: { id: cameraId, restaurantId },
@@ -273,7 +273,7 @@ router.get('/:id', asyncHandler(async (req: AuthenticatedRequest, res: Response)
 
 router.put('/:id', validate(updateCameraSchema), asyncHandler(async (req: AuthenticatedRequest, res: Response) => {
   const restaurantId = (req as any).restaurantId;
-  const cameraId = req.params.id;
+  const cameraId = String(req.params.id);
 
   const existing = await prisma.camera.findFirst({
     where: { id: cameraId, restaurantId },
@@ -322,7 +322,7 @@ router.put('/:id', validate(updateCameraSchema), asyncHandler(async (req: Authen
 
 router.delete('/:id', asyncHandler(async (req: AuthenticatedRequest, res: Response) => {
   const restaurantId = (req as any).restaurantId;
-  const cameraId = req.params.id;
+  const cameraId = String(req.params.id);
 
   const camera = await prisma.camera.findFirst({
     where: { id: cameraId, restaurantId },
@@ -340,7 +340,7 @@ router.delete('/:id', asyncHandler(async (req: AuthenticatedRequest, res: Respon
 
 router.post('/:id/test', asyncHandler(async (req: AuthenticatedRequest, res: Response) => {
   const restaurantId = (req as any).restaurantId;
-  const cameraId = req.params.id;
+  const cameraId = String(req.params.id);
 
   const camera = await prisma.camera.findFirst({
     where: { id: cameraId, restaurantId },
@@ -394,7 +394,7 @@ router.post('/:id/test', asyncHandler(async (req: AuthenticatedRequest, res: Res
 
 router.post('/:id/stream-token', asyncHandler(async (req: AuthenticatedRequest, res: Response) => {
   const restaurantId = (req as any).restaurantId;
-  const cameraId = req.params.id;
+  const cameraId = String(req.params.id);
 
   const camera = await prisma.camera.findFirst({
     where: { id: cameraId, restaurantId },
@@ -421,7 +421,7 @@ router.post('/:id/stream-token', asyncHandler(async (req: AuthenticatedRequest, 
 
 router.get('/:id/alerts', asyncHandler(async (req: AuthenticatedRequest, res: Response) => {
   const restaurantId = (req as any).restaurantId;
-  const cameraId = req.params.id;
+  const cameraId = String(req.params.id);
 
   const camera = await prisma.camera.findFirst({
     where: { id: cameraId, restaurantId },
