@@ -14,6 +14,7 @@ const menuItems = [
   { path: '/dashboard/payments', label: 'Payments', icon: CreditCard },
   { path: '/dashboard/analytics', label: 'Analytics', icon: BarChart3 },
   { path: '/dashboard/inventory', label: 'Inventory', icon: Package },
+  { path: '/dashboard/recipes', label: 'Recipes & Costing', icon: ChefHat },
   { path: '/dashboard/surveillance', label: 'Surveillance', icon: Camera },
   { path: '/dashboard/settings', label: 'Settings', icon: Settings },
   { path: '/dashboard/help', label: 'Help', icon: HelpCircle },

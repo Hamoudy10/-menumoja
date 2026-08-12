@@ -38,6 +38,7 @@ import {
   smsRoutes,
   notificationRoutes,
   inventoryRoutes,
+  recipeRoutes,
 } from './routes';
 
 if (config.nodeEnv === 'production' && (!config.jwtAccessSecret || !config.jwtRefreshSecret || !config.encryptionKey)) {
@@ -119,6 +120,7 @@ app.use('/api/v1/ussd', ussdRoutes);
 app.use('/api/v1/sms', smsRoutes);
 app.use('/api/v1/notifications', notificationRoutes);
 app.use('/api/v1/inventory', inventoryRoutes);
+app.use('/api/v1/recipes', recipeRoutes);
 
 app.get('/api/v1/health', async (_req: Request, res: Response) => {
   const checks: Record<string, string> = {};

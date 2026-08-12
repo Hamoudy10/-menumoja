@@ -259,7 +259,17 @@ TARGET DOMAIN                    CURRENT STATE                        GAP CLASS
 
 **Design choices (documented):** single `InventoryItem` entity (no separate Ingredient/InventoryLocation — single location per restaurant, batch/expiry deferred); WASTE/ADJUSTMENT recorded via StockMovement types (no separate tables); recipe-driven auto-deduction deferred to Phase 5.
 
-### Tier 2b — RECIPES & FOOD COSTING (next recommended)
+### Tier 2b — RECIPES & FOOD COSTING ✅ EXECUTED (2026-08-12)
+1. ✅ **Models (migration 7)** — `Recipe` (versioned per menu item, `@@unique([menuItemId, version])`, active flag) + `RecipeIngredient` with **`unitCostSnapshot`** captured at save time — ingredient cost changes never rewrite historical versions.
+2. ✅ **Versioning** — create → v1; every edit saves vN+1 and deactivates the previous (history preserved, never deleted).
+3. ✅ **Costing service** — `getItemCurrentCost` (most recent costed movement, purchases preferred), `getRecipeCost`, `getMenuItemCosting` (`cost = Σ(qty × snapshot)`, `contribution = price − cost`, `margin % = contribution/price × 100`), `getAllMenuItemCostings` (feeds the recipes UI and the upcoming menu-engineering engine).
+4. ✅ **API** (`/api/v1/recipes`) — status (all items + costing), active recipe + versions, create (v1), update (new version), per-item costing, single version. Tenant-scoped + audited writes.
+5. ✅ **UI** — `/dashboard/recipes`: item cards with price/cost/margin + contribution, active-recipe breakdown, version-preservation note, recipe editor (ingredient picker with current costs from inventory, quantity, live estimate). Sidebar + route wired. Inventory item list now includes `lastUnitCost`.
+6. ✅ Tests — `tests/recipe.test.ts` (7): v1 creation with cost snapshots, v2 save preserving v1 (deactivation, not deletion), active-recipe conflict, costing math (375 cost / 625 contribution / 62.5% margin), no-recipe zero cost, status listing, tenant scoping.
+
+**Remaining in Tier 2:** order-time COGS snapshotting + menu engineering (STAR/PLOW HORSE/PUZZLE/DOG) → Tier 2c.
+
+### Tier 2c — PROFITABILITY & MENU ENGINEERING (next recommended)
 7. POS hardening: modifiers, split/partial payments, held orders (persisted), KDS station/actions, table merge/split, optimistic locking
 8. M-Pesa: state machine, PaymentAttempt/WebhookEvent, reconciliation dashboard, timeout/reversal handling
 9. Offline-first: local queues + sync + connectivity UI + PWA decision

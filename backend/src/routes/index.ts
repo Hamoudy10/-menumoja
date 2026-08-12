@@ -13,3 +13,4 @@ export { default as ussdRoutes } from './ussd/ussd.routes';
 export { default as smsRoutes } from './sms/sms.routes';
 export { default as notificationRoutes } from './notifications/notifications.routes';
 export { default as inventoryRoutes } from './inventory/inventory.routes';
+export { default as recipeRoutes } from './recipes/recipes.routes';

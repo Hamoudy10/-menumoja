@@ -106,11 +106,24 @@ export async function getStockLevels(restaurantId: string): Promise<any[]> {
 
   const levelMap = new Map(movements.map((m) => [m.itemId, Number(m._sum.quantity || 0)]));
 
+  // Current unit cost per item (most recent costed movement, purchases first)
+  const costedMovements = await prisma.stockMovement.findMany({
+    where: { restaurantId, unitCost: { not: null } },
+    orderBy: [{ type: 'asc' }, { createdAt: 'desc' }],
+    select: { itemId: true, unitCost: true },
+    take: 500,
+  });
+  const costMap = new Map<string, number>();
+  for (const m of costedMovements) {
+    if (!costMap.has(m.itemId)) costMap.set(m.itemId, Number(m.unitCost || 0));
+  }
+
   return items.map((item) => {
     const stock = levelMap.get(item.id) || 0;
     return {
       ...item,
       stock,
+      lastUnitCost: costMap.get(item.id) || 0,
       lowStock: stock < Number(item.reorderLevel),
       outOfStock: stock <= 0,
     };
@@ -123,6 +136,20 @@ export async function getStockLevels(restaurantId: string): Promise<any[]> {
 export async function getLowStockItems(restaurantId: string): Promise<any[]> {
   const levels = await getStockLevels(restaurantId);
   return levels.filter((i) => i.isActive && i.lowStock);
+}
+
+/**
+ * Returns the current unit cost of an item from its movement history:
+ * the most recent movement that carried a unit cost (purchases preferred).
+ * Returns 0 when no cost data exists.
+ */
+export async function getItemCurrentCost(restaurantId: string, itemId: string): Promise<number> {
+  const movement = await prisma.stockMovement.findFirst({
+    where: { restaurantId, itemId, unitCost: { not: null } },
+    orderBy: [{ type: 'asc' }, { createdAt: 'desc' }],
+    select: { unitCost: true },
+  });
+  return movement?.unitCost ? Number(movement.unitCost) : 0;
 }
 
 /**

@@ -322,6 +322,7 @@ model Restaurant {
   stockMovements         StockMovement[]
   suppliers              Supplier[]
   purchaseOrders         PurchaseOrder[]
+  recipes                Recipe[]
   aiConversations        AiConversation[]
   faqs                   RestaurantFaq[]
   aiGeneratedContents    AiGeneratedContent[]
@@ -469,14 +470,15 @@ model MenuItem {
   createdAt               DateTime   @default(now()) @map("created_at")
   updatedAt               DateTime   @updatedAt @map("updated_at")
 
-  restaurant        Restaurant            @relation(fields: [restaurantId], references: [id], onDelete: Cascade)
-  category          MenuCategory          @relation(fields: [categoryId], references: [id])
-  suggestions       MenuItemSuggestion[]  @relation("MenuItemSuggestions")
-  suggestedBy       MenuItemSuggestion[]  @relation("SuggestedByMenuItems")
-  dailySpecials     DailySpecialSchedule[]
-  promotions        Promotion[]
-  orderItems        OrderItem[]
+  restaurant    Restaurant         @relation(fields: [restaurantId], references: [id], onDelete: Cascade)
+  category      MenuCategory       @relation(fields: [categoryId], references: [id])
+  suggestions   MenuItemSuggestion[]  @relation("MenuItemSuggestions")
+  suggestedBy   MenuItemSuggestion[]  @relation("SuggestedByMenuItems")
+  dailySpecials DailySpecialSchedule[]
+  promotions    Promotion[]
+  orderItems    OrderItem[]
   menuItemAnalytics MenuItemAnalytics[]
+  recipes       Recipe[]
 
   @@index([restaurantId])
   @@index([categoryId])
@@ -912,6 +914,7 @@ model InventoryItem {
   restaurant    Restaurant         @relation(fields: [restaurantId], references: [id], onDelete: Cascade)
   movements     StockMovement[]
   purchaseItems PurchaseOrderItem[]
+  recipeIngredients RecipeIngredient[]
 
   @@index([restaurantId])
   @@map("inventory_items")
@@ -997,6 +1000,43 @@ model PurchaseOrderItem {
   @@index([purchaseOrderId])
   @@index([itemId])
   @@map("purchase_order_items")
+}
+
+model Recipe {
+  id           String   @id @default(uuid()) @db.Uuid
+  restaurantId String   @map("restaurant_id") @db.Uuid
+  menuItemId   String   @map("menu_item_id") @db.Uuid
+  version      Int
+  name         String?
+  notes        String?
+  isActive     Boolean  @default(true) @map("is_active")
+  createdAt    DateTime @default(now()) @map("created_at")
+  updatedAt    DateTime @updatedAt @map("updated_at")
+
+  restaurant  Restaurant          @relation(fields: [restaurantId], references: [id], onDelete: Cascade)
+  menuItem    MenuItem            @relation(fields: [menuItemId], references: [id], onDelete: Cascade)
+  ingredients RecipeIngredient[]
+
+  @@unique([menuItemId, version])
+  @@index([restaurantId])
+  @@index([menuItemId])
+  @@map("recipes")
+}
+
+model RecipeIngredient {
+  id                 String   @id @default(uuid()) @db.Uuid
+  recipeId           String   @map("recipe_id") @db.Uuid
+  inventoryItemId    String   @map("inventory_item_id") @db.Uuid
+  quantity           Decimal  @db.Decimal(10, 2)
+  unitCostSnapshot   Decimal  @map("unit_cost_snapshot") @db.Decimal(10, 2)
+  createdAt          DateTime @default(now()) @map("created_at")
+
+  recipe        Recipe        @relation(fields: [recipeId], references: [id], onDelete: Cascade)
+  inventoryItem InventoryItem @relation(fields: [inventoryItemId], references: [id])
+
+  @@index([recipeId])
+  @@index([inventoryItemId])
+  @@map("recipe_ingredients")
 }
 
 model CashReconciliation {
