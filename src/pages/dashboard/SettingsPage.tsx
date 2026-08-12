@@ -4,7 +4,7 @@ import {
   User, Palette, QrCode, Users, Bell, CreditCard, Globe, Crown, Trash2, Edit3,
   Plus, X, Shield, Moon, Sun, Save, Loader2, CheckCircle2, Download,
   Image, Palette as PaletteIcon, Type, Smartphone, Banknote,
-  Phone, ArrowLeftRight, Dices,
+  Phone, ArrowLeftRight, Dices, Sparkles,
 } from 'lucide-react'
 import { useStore } from '@/store/useStore'
 import { useTranslation } from 'react-i18next'
@@ -28,6 +28,7 @@ const settingsSections = [
   { id: 'notifications', labelKey: 'settings.notifications', icon: Bell },
   { id: 'payments', labelKey: 'settings.paymentSettings', icon: CreditCard },
   { id: 'language', labelKey: 'settings.language', icon: Globe },
+  { id: 'aiUsage', labelKey: 'AI Usage', icon: Sparkles },
   { id: 'subscription', labelKey: 'settings.subscription', icon: Crown },
   { id: 'delete', labelKey: 'settings.deleteAccount', icon: Trash2 },
 ]
@@ -1033,6 +1034,11 @@ export default function SettingsPage() {
           </div>
         )
 
+      case 'aiUsage':
+        return (
+          <AiUsageSection />
+        )
+
       case 'subscription': {
         const planName = (typeof restaurant?.plan === 'string' ? restaurant.plan : (restaurant?.plan as any)?.name || 'business').toLowerCase()
         return (
@@ -1121,6 +1127,75 @@ export default function SettingsPage() {
           </div>
         </div>
       </div>
+    </div>
+  )
+}
+
+function AiUsageSection() {
+  const [period, setPeriod] = useState<'today' | 'week' | 'month'>('today')
+  const [usage, setUsage] = useState<any>(null)
+  const [loading, setLoading] = useState(true)
+
+  useEffect(() => {
+    let cancelled = false
+    setLoading(true)
+    import('@/api/ai').then((aiApi) =>
+      aiApi.getAiUsage(period)
+        .then((data: any) => { if (!cancelled) setUsage(data) })
+        .catch(() => { if (!cancelled) setUsage(null) })
+        .finally(() => { if (!cancelled) setLoading(false) })
+    )
+    return () => { cancelled = true }
+  }, [period])
+
+  if (loading) {
+    return <Skeleton variant="card" className="h-48" />
+  }
+
+  return (
+    <div className="space-y-4">
+      <div className="flex items-center gap-1.5">
+        {(['today', 'week', 'month'] as const).map((p) => (
+          <button
+            key={p}
+            onClick={() => setPeriod(p)}
+            className={`px-3 py-1.5 rounded-lg text-sm font-semibold transition-colors ${period === p ? 'bg-secondary text-white' : 'bg-black/5 dark:bg-white/10 text-text-secondary'}`}
+          >
+            {p === 'today' ? 'Today' : p === 'week' ? 'This Week' : 'This Month'}
+          </button>
+        ))}
+      </div>
+
+      <div className="grid grid-cols-3 gap-3">
+        <div className="rounded-xl bg-black/5 dark:bg-white/5 p-4">
+          <p className="font-accent text-xs text-text-secondary uppercase tracking-wider">Requests</p>
+          <p className="font-heading text-2xl font-bold text-text-primary dark:text-white mt-1">{usage?.requests ?? 0}</p>
+        </div>
+        <div className="rounded-xl bg-black/5 dark:bg-white/5 p-4">
+          <p className="font-accent text-xs text-text-secondary uppercase tracking-wider">Tokens</p>
+          <p className="font-heading text-2xl font-bold text-text-primary dark:text-white mt-1">{(usage?.totalTokens ?? 0).toLocaleString()}</p>
+        </div>
+        <div className="rounded-xl bg-black/5 dark:bg-white/5 p-4">
+          <p className="font-accent text-xs text-text-secondary uppercase tracking-wider">Est. Cost (KES)</p>
+          <p className="font-heading text-2xl font-bold text-text-primary dark:text-white mt-1">{Number(usage?.estimatedCostKes ?? 0).toFixed(4)}</p>
+        </div>
+      </div>
+
+      <p className="text-xs text-text-secondary">
+        Daily token budget: {(usage?.dailyTokenBudget ?? 0).toLocaleString()} — when exceeded, the AI chat automatically falls back to the built-in chef assistant so restaurant operations never depend on the AI.
+      </p>
+
+      {(usage?.byFeature ?? []).length > 0 && (
+        <div className="space-y-1.5">
+          <p className="font-accent text-xs text-text-secondary uppercase tracking-wider">By feature</p>
+          {(usage?.byFeature ?? []).map((f: any) => (
+            <div key={f.feature} className="flex items-center justify-between text-sm py-1 border-b border-black/5 dark:border-white/5 last:border-0">
+              <span className="text-text-primary dark:text-white">{f.feature.replace(/_/g, ' ')}</span>
+              <span className="font-accent text-xs text-text-secondary">{f.requests} req · {f.tokens.toLocaleString()} tokens · KES {Number(f.estimatedCostKes).toFixed(4)}</span>
+            </div>
+          ))}
+        </div>
+      )}
     </div>
   )
 }

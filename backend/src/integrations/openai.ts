@@ -12,6 +12,7 @@ const MAX_HISTORY_MESSAGES = 20;
 let aiClient: OpenAI | null = null;
 
 const AI_MODEL = config.aiProvider === 'deepseek' ? config.deepseekModel : 'gpt-4o';
+export const MODEL_NAME = AI_MODEL;
 const AI_BASE_URL = config.aiProvider === 'deepseek' ? 'https://api.deepseek.com/v1' : undefined;
 
 function getClient(): OpenAI {
@@ -83,6 +84,8 @@ ${faqContext || 'No FAQ context provided.'}
 Guidelines:
 - Be friendly, warm and concise
 - For restaurant questions (menu, ingredients, allergens, prices, hours, payments, contact, delivery, recommendations): answer strictly from the context above; never invent dishes, prices or policies
+- NEVER quote a "KES" price that is not listed in the Menu Context — if unsure, say the price is available in the menu rather than guessing
+- NEVER state dietary/allergen facts (halal, vegan, gluten-free, nuts) unless they are listed in the context
 - For general questions (small talk, jokes, fun facts, weather, math, travel, recipes, food culture, trivia, advice): answer naturally and helpfully from your general knowledge, then if relevant, gently tie it back to the restaurant (e.g. suggest a dish)
 - Keep responses under 200 words
 - Use a light, warm tone with occasional emojis
@@ -160,6 +163,7 @@ export async function customerChat(
   reply: string;
   suggestedItems: string[];
   quickReplies: string[];
+  usage?: { promptTokens: number; completionTokens: number };
 }> {
   return withRetry(async () => {
     const client = getClient();
@@ -177,6 +181,10 @@ export async function customerChat(
     });
 
     const reply = response.choices[0]?.message?.content || 'Sorry, I could not process that. Please try again.';
+    const usage = {
+      promptTokens: response.usage?.prompt_tokens || 0,
+      completionTokens: response.usage?.completion_tokens || 0,
+    };
 
     const completion = await client.chat.completions.create({
       model: AI_MODEL,
@@ -195,11 +203,12 @@ export async function customerChat(
 
     const quickReplies = ['View Menu', 'Place Order', 'Contact Restaurant', 'Operating Hours', 'Specials'];
 
-    return { reply, suggestedItems, quickReplies };
+    return { reply, suggestedItems, quickReplies, usage };
   }, {
     reply: 'Sorry, I am having trouble connecting. Please try again in a moment.',
     suggestedItems: [],
     quickReplies: ['View Menu', 'Place Order', 'Contact Restaurant'],
+    usage: { promptTokens: 0, completionTokens: 0 },
   });
 }
 

@@ -311,7 +311,18 @@ TARGET DOMAIN                    CURRENT STATE                        GAP CLASS
 
 **Documented:** delivery receipts/opens require Meta webhook wiring (not claimed); scheduled sends need real BullMQ workers; REFERRAL trigger still deferred.
 
-### Tier 4a — AI MENU ASSISTANT HARDENING (next recommended)
+### Tier 4a — AI MENU ASSISTANT HARDENING ✅ EXECUTED (2026-08-12)
+1. ✅ **Usage tracking (migration 11)** — `AiUsageLog`: every LLM call logged with real token counts (surfaced from the OpenAI SDK response), provider/model, latency, prompt version, cached flag, and **estimated cost in KES** (DeepSeek/OpenAI price tables × USD→KES).
+2. ✅ **Daily budget** — 200K tokens/restaurant/day; when exceeded, customer chat silently uses the rule-based chef fallback. **AI failure never affects operations.**
+3. ✅ **Response caching** — customer-chat replies cached in Redis keyed by menu fingerprint + language + message (1h TTL). Repeated questions cost nothing; menu changes invalidate automatically via the fingerprint. Cache hits are logged as `cached: true`.
+4. ✅ **Grounding enforcement** — the LLM prompt now explicitly forbids inventing prices/dietary/allergen facts, AND a post-processor verifies every "KES <amount>" in the reply against the served menu prices (±1 rounding). Failed replies are rejected and replaced with the rule-based chef. **The model can no longer invent prices.**
+5. ✅ **Prompt versioning** — `PROMPT_VERSION` constant recorded on every usage row.
+6. ✅ **Owner view** — `GET /ai/usage?period=` (requests/tokens/cost + per-feature breakdown + budget) and an **AI Usage card in Settings** with period toggle.
+7. ✅ Tests — `tests/ai-usage.test.ts` (10): grounding pass/reject, token + KES estimation, cache round-trip, fingerprint stability, budget under/over, usage API + tenant scoping, usage-log shape.
+
+**Remaining in Tier 4:** structured function-calling tools (current design = retrieval + grounding, which achieves the same no-hallucination guarantee more simply), AI Restaurant Manager + daily briefing (Tier 4b).
+
+### Tier 4b — AI RESTAURANT MANAGER (next recommended)
 7. POS hardening: modifiers, split/partial payments, held orders (persisted), KDS station/actions, table merge/split, optimistic locking
 8. M-Pesa: state machine, PaymentAttempt/WebhookEvent, reconciliation dashboard, timeout/reversal handling
 9. Offline-first: local queues + sync + connectivity UI + PWA decision

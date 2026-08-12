@@ -22,3 +22,6 @@ export const generateFaq = (data: any) =>
 
 export const generateSocialPost = (data: any) =>
   api.post('/ai/generate/social-post', data).then(unwrap)
+
+export const getAiUsage = (period?: string) =>
+  api.get('/ai/usage', { params: period ? { period } : {} }).then(unwrap)

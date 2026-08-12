@@ -3,6 +3,7 @@ import { z } from 'zod';
 import { prisma } from '@/config/database';
 import { authenticate, enforceRestaurantScope, validate, validateParams, aiChatLimiter, asyncHandler } from '@/middleware';
 import { AppError, NotFoundError } from '@/utils/errors';
+import { getUsageSummary } from '@/services/ai-usage.service';
 import { generateDescriptionSchema, generateImageSchema } from '@/utils/validation';
 import { aiService } from '@/services';
 import * as openai from '@/integrations/openai';
@@ -558,6 +559,18 @@ router.get('/conversations/:sessionId',
         updatedAt: conversation.updatedAt,
       },
     });
+  })
+);
+
+// GET /usage?period=today|week|month - AI cost & token usage for the owner
+router.get('/usage',
+  authenticate,
+  enforceRestaurantScope,
+  asyncHandler(async (req: any, res: any) => {
+    const restaurantId = (req as any).restaurantId;
+    const period = req.query.period === 'week' || req.query.period === 'month' ? req.query.period : 'today';
+    const summary = await getUsageSummary(restaurantId, period);
+    res.json({ success: true, data: summary });
   })
 );
 

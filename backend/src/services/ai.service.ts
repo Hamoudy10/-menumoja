@@ -2,8 +2,114 @@ import logger from '../utils/logger';
 import { AppError } from '../utils/errors';
 import * as openai from '../integrations/openai';
 import { PrismaClient } from '@prisma/client';
+import {
+  recordAiUsage,
+  isWithinDailyBudget,
+  getCachedReply,
+  setCachedReply,
+  cacheKeyForChat,
+  computeMenuFingerprint,
+  verifyGrounding,
+  providerName,
+  providerForModel,
+} from './ai-usage.service';
 
 const prisma = new PrismaClient();
+
+interface MenuRecord {
+  id: string;
+  name: string;
+  description?: string;
+  price: number;
+  category?: { name: string };
+  imageUrl?: string;
+  totalOrders?: number;
+  isVegetarian?: boolean;
+  isVegan?: boolean;
+  isGlutenFree?: boolean;
+  isHalal?: boolean;
+  isTodaysSpecial?: boolean;
+  isFeatured?: boolean;
+  spiceLevel?: string;
+}
+
+/**
+ * Guarded customer chat: budget → cache → LLM → grounding → fallback.
+ * Every LLM call is logged with real token usage and estimated cost.
+ */
+async function runGuardedCustomerChat(
+  restaurantId: string,
+  sessionId: string,
+  message: string,
+  language: string,
+  menuContext: string,
+  faqContext: string,
+  menuItems: MenuRecord[],
+  faqs: Array<{ question: string; answer: string }>,
+  restaurantName: string | undefined,
+  conversation: Array<{ role: string; content: string }>
+): Promise<{ reply: string; suggestedItems: string[]; quickReplies: string[] }> {
+  const fallbackReply = () =>
+    buildSmartReply(message, menuItems, faqs, { name: restaurantName, cuisine: undefined }, language);
+
+  // 1. Daily budget — exceeded → rule-based chef (restaurant ops must survive)
+  if (!(await isWithinDailyBudget(restaurantId))) {
+    logger.warn('AI daily token budget exceeded — using rule-based chef', { restaurantId });
+    return fallbackReply();
+  }
+
+  // 2. Cache — repeated questions cost nothing
+  const fingerprint = computeMenuFingerprint(menuItems);
+  const cacheKey = cacheKeyForChat(restaurantId, language, message, fingerprint);
+  const cachedReply = await getCachedReply(cacheKey);
+  if (cachedReply) {
+    await recordAiUsage({
+      restaurantId,
+      sessionId,
+      feature: 'CUSTOMER_CHAT',
+      provider: providerName(),
+      model: 'cached',
+      promptTokens: 0,
+      completionTokens: 0,
+      cached: true,
+    });
+    return {
+      reply: cachedReply,
+      suggestedItems: [],
+      quickReplies: ['View Menu', 'Place Order', 'Contact Restaurant'],
+    };
+  }
+
+  // 3. LLM call
+  const startedAt = Date.now();
+  const llmResult = await openai.customerChat(restaurantId, conversation, language, menuContext, faqContext);
+  const latencyMs = Date.now() - startedAt;
+  const promptTokens = llmResult.usage?.promptTokens || 0;
+  const completionTokens = llmResult.usage?.completionTokens || 0;
+
+  await recordAiUsage({
+    restaurantId,
+    sessionId,
+    feature: 'CUSTOMER_CHAT',
+    provider: providerName(),
+    model: providerForModel(openai.MODEL_NAME),
+    promptTokens,
+    completionTokens,
+    latencyMs,
+  });
+
+  // 4. Grounding — never let an invented price reach the customer
+  const prices = menuItems.map((m) => m.price);
+  if (!verifyGrounding(llmResult.reply, prices)) {
+    logger.warn('AI reply failed grounding — using rule-based chef', { restaurantId });
+    return fallbackReply();
+  }
+
+  // 5. Cache the grounded reply
+  await setCachedReply(cacheKey, llmResult.reply);
+
+  return { reply: llmResult.reply, suggestedItems: llmResult.suggestedItems, quickReplies: llmResult.quickReplies };
+}
 
 interface MenuItemRecord {
   id: string;
@@ -100,18 +206,16 @@ export async function processCustomerMessage(
       updatedMessages.splice(0, updatedMessages.length - 40);
     }
 
+    const normalizedMenu = menuItems.map((m) => ({ ...m, price: Number(m.price) }));
     let result: { reply: string; suggestedItems: string[]; quickReplies: string[] };
+
     try {
-      result = await openai.customerChat(
-        restaurantId,
-        updatedMessages,
-        language,
-        menuContext,
-        faqContext
-      );
+      // Guardrails: daily budget → cache → LLM → grounding verification →
+      // rule-based fallback. Logs every call with real token usage + cost.
+      result = await runGuardedCustomerChat(restaurantId, sessionId, sanitizedMessage, language, menuContext, faqContext, normalizedMenu, faqs, restaurant?.name, updatedMessages);
     } catch (error) {
       logger.warn('LLM unavailable, using local chef fallback', { error: (error as any)?.message, restaurantId });
-      result = buildSmartReply(sanitizedMessage, menuItems.map((m) => ({ ...m, price: Number(m.price) })), faqs, restaurant, language);
+      result = buildSmartReply(sanitizedMessage, normalizedMenu, faqs, restaurant, language);
     }
 
     updatedMessages.push({ role: 'assistant', content: result.reply });
