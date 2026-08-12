@@ -576,6 +576,7 @@ model Staff {
   assignedOrders      Order[]         @relation("WaiterOrders")
   cashierPayments     Payment[]       @relation("CashierPayments")
   reconciliations     CashReconciliation[]
+  receipts            Receipt[]
 
   @@index([restaurantId])
   @@map("staff")
@@ -704,6 +705,7 @@ model Order {
   waiter     Staff?           @relation("WaiterOrders", fields: [waiterId], references: [id])
   items      OrderItem[]
   payments   Payment[]
+  receipts   Receipt[]
 
   @@index([restaurantId])
   @@index([status])
