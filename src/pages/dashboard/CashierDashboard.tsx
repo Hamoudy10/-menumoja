@@ -22,6 +22,9 @@ import * as tablesApi from '@/api/tables'
 import NumberPad from '@/components/pos/NumberPad'
 import FloorCanvas from '@/components/floor/FloorCanvas'
 import { useRestaurantTheme } from '@/hooks/useRestaurantTheme'
+import { offlineQueue, isNetworkError, type SyncStatus } from '@/utils/offline.ts'
+import { flushOfflineQueue } from '@/utils/offlineSync.ts'
+import { WifiOff } from 'lucide-react'
 
 const ITEMS_PER_PAGE = 20
 
@@ -32,6 +35,43 @@ export default function CashierDashboard() {
   const staffName = localStorage.getItem('staffName') || 'Cashier'
   const [isFullscreen, setIsFullscreen] = useState(false)
   const [playSound, setPlaySound] = useState(true)
+  const [syncStatus, setSyncStatus] = useState<SyncStatus>(offlineQueue.getStatus())
+  const [pendingSync, setPendingSync] = useState(offlineQueue.getPendingCount())
+
+  const refreshSyncUi = () => {
+    setSyncStatus(offlineQueue.getStatus())
+    setPendingSync(offlineQueue.getPendingCount())
+  }
+
+  const runSync = useCallback(async () => {
+    if (offlineQueue.getPendingCount() === 0) {
+      refreshSyncUi()
+      return
+    }
+    setSyncStatus('syncing')
+    try {
+      await flushOfflineQueue()
+    } catch { /* status set by queue */ }
+    refreshSyncUi()
+    if (offlineQueue.getPendingCount() === 0) {
+      fetchOrders()
+      showSuccessToast('Offline orders synced')
+    } else {
+      showErrorToast('Some offline orders failed to sync')
+    }
+  }, [])
+
+  useEffect(() => {
+    const onOnline = () => { refreshSyncUi(); runSync() }
+    const onOffline = () => { offlineQueue.setStatus('offline'); refreshSyncUi() }
+    window.addEventListener('online', onOnline)
+    window.addEventListener('offline', onOffline)
+    runSync()
+    return () => {
+      window.removeEventListener('online', onOnline)
+      window.removeEventListener('offline', onOffline)
+    }
+  }, [runSync])
 
   const handleSignOut = () => {
     localStorage.removeItem('staffAccessToken')
@@ -371,13 +411,48 @@ export default function CashierDashboard() {
         time: new Date().toLocaleString('en-KE', { hour12: true }),
         date: new Date().toLocaleDateString('en-KE'),
         staffName,
+        pendingSync: false,
       })
       setShowReceipt(true)
       showSuccessToast(`Payment recorded!${paymentMethod === 'cash' ? ` Change: KES ${change.toLocaleString()}` : ''}`)
       setSelectedOrder(null); setCashReceived(''); setDiscount(''); setTipAmount('')
       setServiceChargePercent(''); setCashierNote('')
       fetchOrders()
-    } catch { showErrorToast('Payment failed') }
+    } catch (err: any) {
+      if ((paymentMethod === 'cash' || paymentMethod === 'card') && isNetworkError(err) && selectedOrder) {
+        const paymentPayload = paymentMethod === 'cash'
+          ? {
+              orderId: selectedOrder.id, amount: orderTotal,
+              amountTendered: parseFloat(cashReceived),
+              discount: parseFloat(discount) || 0,
+            }
+          : { orderId: selectedOrder.id, amount: orderTotal }
+        offlineQueue.enqueue(paymentMethod === 'cash' ? 'recordCashPayment' : 'recordCardPayment', paymentPayload, paymentKeyRef.current || crypto.randomUUID())
+        refreshSyncUi()
+        setLastPayment({
+          receiptNo: genReceiptNo(), orderNumber: selectedOrder.orderNumber,
+          table: selectedOrder.tableNumber, items: selectedOrder.items,
+          subtotal: selectedOrder.items.reduce((s: number, i: any) => s + i.price * i.quantity, 0),
+          discount: parseFloat(discount) || 0,
+          total: orderTotal, method: paymentMethod,
+          cashReceived: parseFloat(cashReceived) || 0, change,
+          tip: parseFloat(tipAmount) || 0, serviceCharge: parseFloat(serviceChargePercent) || 0,
+          customerName: selectedOrder.customerName,
+          customerPhone: selectedOrder.customerPhone,
+          time: new Date().toLocaleString('en-KE', { hour12: true }),
+          date: new Date().toLocaleDateString('en-KE'),
+          staffName,
+          pendingSync: true,
+        })
+        paymentKeyRef.current = null
+        setShowReceipt(true)
+        showSuccessToast('Payment saved offline — will sync when back online')
+        setSelectedOrder(null); setCashReceived(''); setDiscount(''); setTipAmount('')
+        setServiceChargePercent(''); setCashierNote('')
+      } else {
+        showErrorToast('Payment failed')
+      }
+    }
     finally { setProcessing(false) }
   }
 
@@ -421,22 +496,46 @@ export default function CashierDashboard() {
     if (newOrderItems.length === 0) { showErrorToast('Add at least one item'); return }
     setQuickCreating(true)
     if (!quickOrderKeyRef.current) quickOrderKeyRef.current = crypto.randomUUID()
+    const payload = {
+      tableNumber: parseInt(newOrderTable) || 0,
+      customerName: newOrderCustomer || undefined,
+      items: newOrderItems.map((item) => ({
+        menuItemId: item.id, quantity: item.qty,
+        specialInstructions: item.instructions,
+      })),
+      source: 'POS',
+    }
     try {
-      const res = await ordersApi.createPosOrder({
-        tableNumber: parseInt(newOrderTable) || 0,
-        customerName: newOrderCustomer || undefined,
-        items: newOrderItems.map((item) => ({
-          menuItemId: item.id, quantity: item.qty,
-          specialInstructions: item.instructions,
-        })),
-        source: 'POS',
-      }, quickOrderKeyRef.current)
+      const res = await ordersApi.createPosOrder(payload, quickOrderKeyRef.current)
       quickOrderKeyRef.current = null
       showSuccessToast(`Order #${res.orderNumber || res.id?.slice(0, 6)} created`)
       setShowCreateModal(false); setNewOrderTable(''); setNewOrderCustomer('')
       setNewOrderItems([]); setNewOrderSearch('')
       fetchOrders()
-    } catch { showErrorToast('Failed to create order') }
+    } catch (err: any) {
+      if (isNetworkError(err)) {
+        offlineQueue.enqueue('createPosOrder', payload, quickOrderKeyRef.current || crypto.randomUUID())
+        refreshSyncUi()
+        const tempOrder = {
+          id: `local-${quickOrderKeyRef.current}`,
+          orderNumber: `LOCAL-${new Date().toLocaleTimeString('en-KE', { hour12: false }).replace(/:/g, '')}`,
+          tableNumber: parseInt(newOrderTable) || 0,
+          customerName: newOrderCustomer || undefined,
+          items: newOrderItems.map((item: any) => ({ name: item.name, quantity: item.qty, price: item.price || 0 })),
+          total: newOrderItems.reduce((s: number, i: any) => s + (i.price || 0) * i.qty, 0),
+          status: 'PENDING',
+          paymentStatus: 'UNPAID',
+          createdAt: new Date().toISOString(),
+          pendingSync: true,
+        }
+        setOrders((prev) => [tempOrder, ...prev])
+        showSuccessToast('Order saved offline — will sync when back online')
+        setShowCreateModal(false); setNewOrderTable(''); setNewOrderCustomer('')
+        setNewOrderItems([]); setNewOrderSearch('')
+      } else {
+        showErrorToast('Failed to create order')
+      }
+    }
     finally { setQuickCreating(false) }
   }
 
@@ -586,6 +685,23 @@ export default function CashierDashboard() {
                 <Badge size="sm" variant={stats.pendingCount > 0 ? 'warning' : 'default'}>{stats.pendingCount}</Badge>
               </div>
               <div className="flex items-center gap-1">
+                {syncStatus !== 'online' && (
+                  <button
+                    onClick={runSync}
+                    title={pendingSync > 0 ? `${pendingSync} offline item(s) — click to sync` : 'Sync status'}
+                    className={`px-2 py-1 rounded-lg text-[10px] font-bold flex items-center gap-1 ${
+                      syncStatus === 'syncing'
+                        ? 'bg-amber-500/10 text-amber-600 animate-pulse'
+                        : syncStatus === 'offline'
+                          ? 'bg-red-500/10 text-red-500'
+                          : 'bg-red-500/10 text-red-500'
+                    }`}
+                  >
+                    <WifiOff className="h-3 w-3" />
+                    {syncStatus === 'syncing' ? 'SYNCING' : syncStatus === 'offline' ? 'OFFLINE' : 'SYNC ERROR'}
+                    {pendingSync > 0 && ` (${pendingSync})`}
+                  </button>
+                )}
                 <button onClick={() => setPlaySound(!playSound)} className={`p-1.5 rounded-lg ${playSound ? 'hover:bg-black/5' : 'text-text-secondary/40'}`}>
                   {playSound ? <Volume2 className="h-4 w-4" /> : <Music className="h-4 w-4" />}
                 </button>
@@ -842,8 +958,10 @@ export default function CashierDashboard() {
                     <p className="text-text-secondary">Tel: {restaurant?.phone || ''}</p>
                     <div className="mt-2 pt-2 border-t border-dashed border-gray-300">
                       <p className="font-bold">ETR RECEIPT</p>
-                      <p className="text-[10px] text-text-secondary">Serial: {lastPayment?.receiptNo}</p>
-                      <p className="text-[10px] text-text-secondary">Date: {lastPayment?.date}</p>
+                      {lastPayment?.pendingSync && (
+                        <p className="text-[10px] font-bold text-amber-600 bg-amber-100 rounded px-1">PENDING SYNC — will upload when online</p>
+                      )}
+                      <p className="text-[10px] text-text-secondary">Serial: {lastPayment?.receiptNo}</p>                      <p className="text-[10px] text-text-secondary">Date: {lastPayment?.date}</p>
                       <p className="text-[10px] text-text-secondary">Time: {lastPayment?.time}</p>
                     </div>
                   </div>

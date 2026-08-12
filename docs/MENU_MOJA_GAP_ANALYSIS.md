@@ -239,7 +239,17 @@ TARGET DOMAIN                    CURRENT STATE                        GAP CLASS
 
 **Remaining in Tier 1b:** REVERSED ingestion (Safaricom B2C/C2B reversal events — needs eTIMS-class API work), scheduled nightly reconciliation (blocked on real BullMQ workers), UNKNOWN-state handling.
 
-### Tier 1c — OFFLINE-FIRST (next recommended)
+### Tier 1c — OFFLINE-FIRST ✅ EXECUTED (2026-08-12)
+1. ✅ **Offline mutation queue** (`src/utils/offline.ts`) — localStorage-backed ordered queue for POS order creation + cash/card payment recording; every mutation carries its own idempotency key (server-side dedupe makes replays safe); bounded attempts (5) then SYNC ERROR; storage adapter injected for testability.
+2. ✅ **Sync layer** (`src/utils/offlineSync.ts`) — maps queued mutations to the real API calls with their keys.
+3. ✅ **POS integration** — quick-order creation and cash/card payments fall back to the queue on network errors with optimistic local UI (temp order row / receipt with "PENDING SYNC" banner); auto-flush on reconnect and on mount; manual retry via the header pill.
+4. ✅ **Status UI** — ONLINE (hidden) / OFFLINE / SYNCING / SYNC ERROR pill in the cashier header with pending count, click to retry. KDS already has its online/offline indicator (Tier 1a).
+5. ✅ **Frontend test framework** — vitest added (`npm test`), CI step wired; 9 unit tests: ordered enqueue, idempotency-key dedupe, localStorage durability across instances, ordered flush, retry-on-failure, attempt bounding → sync_error, status transitions, clear, network-error detection.
+6. ✅ No backend changes — the queue reuses existing endpoints + idempotency.
+
+**Documented limitations:** menu cache + table state caching offline not yet persisted (menu loads need server — POS search uses store state, degrade gracefully offline); KDS is read-only offline (stale view + indicator); conflict resolution relies on server status machine + table version guards (422/409 land in the retry queue); M-Pesa requires connectivity (STK push is server-initiated).
+
+### Tier 2 — INVENTORY FOUNDATION (next recommended)
 7. POS hardening: modifiers, split/partial payments, held orders (persisted), KDS station/actions, table merge/split, optimistic locking
 8. M-Pesa: state machine, PaymentAttempt/WebhookEvent, reconciliation dashboard, timeout/reversal handling
 9. Offline-first: local queues + sync + connectivity UI + PWA decision
