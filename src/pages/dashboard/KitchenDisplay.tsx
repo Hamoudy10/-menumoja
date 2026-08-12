@@ -62,7 +62,7 @@ export default function KitchenDisplay() {
     try {
       await updateOrderStatus(orderId, newStatus)
       showSuccessToast(`Order marked as ${newStatus}`)
-    } catch {}
+    } catch { /* error toast handled in store */ }
     finally { setBusyId(null) }
   }
 

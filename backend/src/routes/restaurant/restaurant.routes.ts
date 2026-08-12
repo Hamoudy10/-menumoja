@@ -6,7 +6,6 @@ import { prisma } from '@/config/database';
 import logger from '@/utils/logger';
 import { emitTableStatusChanged } from '@/hooks/socket';
 import { invalidateMenuCache } from '@/utils/cache';
-import { uploadImage as cloudinaryUpload } from '@/integrations/cloudinary';
 
 const router = Router();
 
@@ -84,6 +83,9 @@ router.put(
             where: { slug, id: { not: restaurantId } },
           });
           counter++;
+          if (counter > 1000) {
+            throw new AppError(409, 'SLUG_GENERATION_FAILED', 'Could not generate a unique slug', 'Imeshindwa kutengeneza slug ya kipekee');
+          }
         }
         return slug;
       })();
@@ -167,6 +169,7 @@ router.post(
     }
 
     try {
+      const { uploadImage: cloudinaryUpload } = await import('@/integrations/cloudinary');
       const uploaded = await cloudinaryUpload(buffer, folder || `logos/${restaurantId}`);
       res.json({ success: true, data: { url: uploaded.url } });
     } catch (error) {

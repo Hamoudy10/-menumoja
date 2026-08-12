@@ -157,7 +157,7 @@ describe('POST /api/v1/auth/staff/login', () => {
     const staff = await createTestStaff(restaurant.id);
 
     (prisma.restaurant.findUnique as jest.Mock).mockResolvedValue(restaurant);
-    (prisma.staff.findFirst as jest.Mock).mockResolvedValue(staff);
+    (prisma.staff.findMany as jest.Mock).mockResolvedValue([staff]);
 
     const res = await request(app)
       .post('/api/v1/auth/staff/login')
@@ -172,7 +172,7 @@ describe('POST /api/v1/auth/staff/login', () => {
   it('should fail with wrong PIN', async () => {
     const restaurant = await createTestRestaurant(uuidv4());
     (prisma.restaurant.findUnique as jest.Mock).mockResolvedValue(restaurant);
-    (prisma.staff.findFirst as jest.Mock).mockResolvedValue(null);
+    (prisma.staff.findMany as jest.Mock).mockResolvedValue([]);
 
     const res = await request(app)
       .post('/api/v1/auth/staff/login')

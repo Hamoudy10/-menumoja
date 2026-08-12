@@ -5,6 +5,7 @@ import { prisma } from '@/config/database';
 import { authenticate, optionalAuth, enforceRestaurantScope, validate, validateQuery, validateParams, generalLimiter, orderCreateLimiter, auditLog, asyncHandler } from '@/middleware';
 import { AppError, NotFoundError, ValidationError } from '@/utils/errors';
 import { generateOrderNumber, calculateTotals, buildPaginationMeta } from '@/utils/helpers';
+import { getIdempotencyKey, findIdempotentOrder, recordIdempotency, isUniqueViolation } from '@/utils/idempotency';
 import { updateOrderStatusSchema } from '@/utils/validation';
 import { mpesaService } from '@/services';
 import { onTableSeated, freeTableIfLastOrder } from '@/services/table.service';
@@ -115,6 +116,25 @@ router.post('/public/create',
     }
 
     sessionId = sessionId || uuidv4();
+
+    const idempotencyKey = getIdempotencyKey(req);
+    if (idempotencyKey) {
+      const existing = await findIdempotentOrder(idempotencyKey, `pub:${sessionId}`);
+      if (existing) {
+        logger.info('Reusing idempotent customer order', { orderId: existing.id, orderNumber: existing.orderNumber });
+        res.status(201).json({
+          success: true,
+          data: {
+            orderId: existing.id,
+            orderNumber: existing.orderNumber,
+            estimatedPrepMinutes: existing.estimatedPrepMinutes,
+            totalAmount: Number(existing.totalAmount),
+            idempotentReplay: true,
+          },
+        });
+        return;
+      }
+    }
 
     const recentOrder = await prisma.order.findFirst({
       where: {
@@ -237,43 +257,70 @@ router.post('/public/create',
       10
     );
 
-    const order = await prisma.order.create({
-      data: {
-        orderNumber,
-        restaurantId,
-        tableId: tableId || null,
-        tableNumber: tableNumberValue,
-        sessionId,
-        status: 'PENDING',
-        paymentStatus: 'UNPAID',
-        paymentMethod: paymentMethod === 'mpesa' ? 'MPESA' : paymentMethod === 'card' ? 'CARD' : 'CASH',
-        subtotal: totals.subtotal,
-        serviceCharge: totals.serviceCharge,
-        taxAmount: totals.tax,
-        tipAmount: 0,
-        totalAmount: totals.total,
-        specialNotes: specialNotes || null,
-        estimatedPrepMinutes,
-        customerName: customerName || null,
-        customerPhone: customerPhone || null,
-        items: {
-          create: orderItems.map((oi: { menuItemId: string; quantity: number; specialInstructions: string | null; price: number }) => {
-            const menuItem = menuItems.find((m) => m.id === oi.menuItemId)!;
-            return {
-              menuItemId: oi.menuItemId,
-              itemName: menuItem.name,
-              itemPrice: oi.price,
-              quantity: oi.quantity,
-              specialInstructions: oi.specialInstructions,
-              subtotal: oi.price * oi.quantity,
-            };
-          }),
+    let order: any;
+    try {
+      order = await prisma.order.create({
+        data: {
+          orderNumber,
+          restaurantId,
+          tableId: tableId || null,
+          tableNumber: tableNumberValue,
+          sessionId,
+          status: 'PENDING',
+          paymentStatus: 'UNPAID',
+          paymentMethod: paymentMethod === 'mpesa' ? 'MPESA' : paymentMethod === 'card' ? 'CARD' : 'CASH',
+          subtotal: totals.subtotal,
+          serviceCharge: totals.serviceCharge,
+          taxAmount: totals.tax,
+          tipAmount: 0,
+          totalAmount: totals.total,
+          specialNotes: specialNotes || null,
+          estimatedPrepMinutes,
+          customerName: customerName || null,
+          customerPhone: customerPhone || null,
+          idempotencyKey: idempotencyKey || null,
+          items: {
+            create: orderItems.map((oi: { menuItemId: string; quantity: number; specialInstructions: string | null; price: number }) => {
+              const menuItem = menuItems.find((m) => m.id === oi.menuItemId)!;
+              return {
+                menuItemId: oi.menuItemId,
+                itemName: menuItem.name,
+                itemPrice: oi.price,
+                quantity: oi.quantity,
+                specialInstructions: oi.specialInstructions,
+                subtotal: oi.price * oi.quantity,
+              };
+            }),
+          },
         },
-      },
-      include: {
-        items: true,
-      },
-    });
+        include: {
+          items: true,
+        },
+      });
+    } catch (error) {
+      if (idempotencyKey && isUniqueViolation(error)) {
+        const existing = await findIdempotentOrder(idempotencyKey, `pub:${sessionId}`);
+        if (existing) {
+          logger.info('Idempotency race resolved — returning existing customer order', { orderId: existing.id });
+          res.status(201).json({
+            success: true,
+            data: {
+              orderId: existing.id,
+              orderNumber: existing.orderNumber,
+              estimatedPrepMinutes: existing.estimatedPrepMinutes,
+              totalAmount: Number(existing.totalAmount),
+              idempotentReplay: true,
+            },
+          });
+          return;
+        }
+      }
+      throw error;
+    }
+
+    if (idempotencyKey) {
+      await recordIdempotency(idempotencyKey, `pub:${sessionId}`, order.id);
+    }
 
     logger.info('Order created', { orderId: order.id, orderNumber, restaurantId });
 
@@ -340,6 +387,26 @@ router.post('/',
   validate(posOrderSchema),
   asyncHandler(async (req, res) => {
     const restaurantId = (req as any).restaurantId;
+    const idempotencyKey = getIdempotencyKey(req);
+
+    if (idempotencyKey) {
+      const existing = await findIdempotentOrder(idempotencyKey, `pos:${restaurantId}`);
+      if (existing) {
+        logger.info('Reusing idempotent POS order', { orderId: existing.id, orderNumber: existing.orderNumber, restaurantId });
+        res.status(201).json({
+          success: true,
+          data: {
+            orderId: existing.id,
+            orderNumber: existing.orderNumber,
+            estimatedPrepMinutes: existing.estimatedPrepMinutes,
+            totalAmount: Number(existing.totalAmount),
+            idempotentReplay: true,
+          },
+        });
+        return;
+      }
+    }
+
     const { tableNumber, customerName, customerPhone, items, notes, paymentMethod } = req.body;
 
     const resolvedItems: Array<{ menuItemId: string | null; name: string; price: number; quantity: number; specialInstructions: string | null }> = [];
@@ -393,38 +460,65 @@ router.post('/',
       10
     );
 
-    const order = await prisma.order.create({
-      data: {
-        orderNumber: generateOrderNumber(restaurantId),
-        restaurantId,
-        tableId: null,
-        tableNumber: tableNumber || null,
-        sessionId: uuidv4(),
-        status: 'PENDING',
-        paymentStatus: 'UNPAID',
-        paymentMethod: paymentMethod === 'mpesa' ? 'MPESA' : paymentMethod === 'card' ? 'CARD' : 'CASH',
-        subtotal: totals.subtotal,
-        serviceCharge: totals.serviceCharge,
-        taxAmount: totals.tax,
-        tipAmount: 0,
-        totalAmount: totals.total,
-        specialNotes: notes || null,
-        estimatedPrepMinutes,
-        customerName: customerName || null,
-        customerPhone: customerPhone || null,
-        items: {
-          create: resolvedItems.map((i) => ({
-            menuItemId: i.menuItemId,
-            itemName: i.name,
-            itemPrice: i.price,
-            quantity: i.quantity,
-            specialInstructions: i.specialInstructions,
-            subtotal: i.price * i.quantity,
-          })),
+    let order: any;
+    try {
+      order = await prisma.order.create({
+        data: {
+          orderNumber: generateOrderNumber(restaurantId),
+          restaurantId,
+          tableId: null,
+          tableNumber: tableNumber || null,
+          sessionId: uuidv4(),
+          status: 'PENDING',
+          paymentStatus: 'UNPAID',
+          paymentMethod: paymentMethod === 'mpesa' ? 'MPESA' : paymentMethod === 'card' ? 'CARD' : 'CASH',
+          subtotal: totals.subtotal,
+          serviceCharge: totals.serviceCharge,
+          taxAmount: totals.tax,
+          tipAmount: 0,
+          totalAmount: totals.total,
+          specialNotes: notes || null,
+          estimatedPrepMinutes,
+          customerName: customerName || null,
+          customerPhone: customerPhone || null,
+          idempotencyKey: idempotencyKey || null,
+          items: {
+            create: resolvedItems.map((i) => ({
+              menuItemId: i.menuItemId,
+              itemName: i.name,
+              itemPrice: i.price,
+              quantity: i.quantity,
+              specialInstructions: i.specialInstructions,
+              subtotal: i.price * i.quantity,
+            })),
+          },
         },
-      },
-      include: { items: true },
-    });
+        include: { items: true },
+      });
+    } catch (error) {
+      if (idempotencyKey && isUniqueViolation(error)) {
+        const existing = await findIdempotentOrder(idempotencyKey, `pos:${restaurantId}`);
+        if (existing) {
+          logger.info('Idempotency race resolved — returning existing POS order', { orderId: existing.id, restaurantId });
+          res.status(201).json({
+            success: true,
+            data: {
+              orderId: existing.id,
+              orderNumber: existing.orderNumber,
+              estimatedPrepMinutes: existing.estimatedPrepMinutes,
+              totalAmount: Number(existing.totalAmount),
+              idempotentReplay: true,
+            },
+          });
+          return;
+        }
+      }
+      throw error;
+    }
+
+    if (idempotencyKey) {
+      await recordIdempotency(idempotencyKey, `pos:${restaurantId}`, order.id);
+    }
 
     logger.info('POS order created', { orderId: order.id, orderNumber: order.orderNumber, restaurantId });
 

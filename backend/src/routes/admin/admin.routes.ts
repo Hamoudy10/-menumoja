@@ -441,6 +441,37 @@ router.get('/revenue', asyncHandler(async (req: AuthenticatedRequest, res: Respo
   });
 }));
 
+// ==================== AUDIT LOGS ====================
+
+router.get('/audit-logs', asyncHandler(async (req: AuthenticatedRequest, res: Response) => {
+  const { page, perPage } = parsePagination(req.query as any);
+  const { action, restaurantId, userId } = req.query as Record<string, string | undefined>;
+
+  const where: any = {};
+  if (action) where.action = { contains: action, mode: 'insensitive' };
+  if (restaurantId) where.restaurantId = restaurantId;
+  if (userId) where.userId = userId;
+
+  const [logs, total] = await Promise.all([
+    prisma.auditLog.findMany({
+      where,
+      include: {
+        restaurant: { select: { id: true, name: true } },
+      },
+      orderBy: { createdAt: 'desc' },
+      skip: (page - 1) * perPage,
+      take: perPage,
+    }),
+    prisma.auditLog.count({ where }),
+  ]);
+
+  res.json({
+    success: true,
+    data: logs,
+    meta: buildPaginationMeta(total, page, perPage),
+  });
+}));
+
 // ==================== SUPPORT TICKETS ====================
 
 router.get('/support-tickets', asyncHandler(async (req: AuthenticatedRequest, res: Response) => {

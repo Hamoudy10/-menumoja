@@ -10,13 +10,13 @@ process.env.NODE_ENV = 'test';
 process.env.FRONTEND_URL = 'http://localhost:5173';
 process.env.DATABASE_URL = 'postgresql://test:test@localhost:5432/menumoja_test';
 
-import { authRoutes } from '../src/routes';
-import { restaurantRoutes } from '../src/routes';
-import { menuRoutes } from '../src/routes';
-import { publicRoutes } from '../src/routes';
-import { orderRoutes } from '../src/routes';
-import { paymentRoutes } from '../src/routes';
-import { analyticsRoutes } from '../src/routes';
+import authRoutes from '../src/routes/auth/auth.routes';
+import restaurantRoutes from '../src/routes/restaurant/restaurant.routes';
+import menuRoutes from '../src/routes/menu/menu.routes';
+import publicRoutes from '../src/routes/menu/public.routes';
+import orderRoutes from '../src/routes/orders/orders.routes';
+import paymentRoutes from '../src/routes/payments/payments.routes';
+import analyticsRoutes from '../src/routes/analytics/analytics.routes';
 
 jest.mock('../src/config/database', () => {
   const mockPrisma = {
@@ -90,11 +90,19 @@ jest.mock('../src/config/database', () => {
     },
     payment: {
       findFirst: jest.fn(),
+      findUnique: jest.fn(),
       findMany: jest.fn(),
       create: jest.fn(),
       update: jest.fn(),
       updateMany: jest.fn(),
       count: jest.fn(),
+    },
+    receipt: {
+      findFirst: jest.fn().mockResolvedValue(null),
+      findUnique: jest.fn().mockResolvedValue(null),
+      findMany: jest.fn().mockResolvedValue([]),
+      create: jest.fn(),
+      count: jest.fn().mockResolvedValue(0),
     },
     cashReconciliation: {
       findFirst: jest.fn(),
@@ -142,6 +150,16 @@ jest.mock('../src/config/database', () => {
     },
     menuItemAnalytics: {
       findMany: jest.fn(),
+    },
+    promotion: {
+      findMany: jest.fn().mockResolvedValue([]),
+      findFirst: jest.fn().mockResolvedValue(null),
+      create: jest.fn(),
+      update: jest.fn(),
+      delete: jest.fn(),
+    },
+    auditLog: {
+      create: jest.fn().mockResolvedValue({ id: uuidv4() }),
     },
     $transaction: jest.fn((fn: any) => fn(mockPrisma)),
   };
@@ -194,9 +212,9 @@ jest.mock('../src/hooks/socket', () => ({
 jest.mock('../src/services', () => ({
   mpesaService: {
     initiatePayment: jest.fn().mockResolvedValue({
-      MerchantRequestID: 'test-mid',
-      CheckoutRequestID: 'test-checkout',
-      ResponseDescription: 'Success. Request accepted for processing',
+      merchantRequestId: 'test-mid',
+      checkoutRequestId: 'test-checkout',
+      responseDescription: 'Success. Request accepted for processing',
     }),
     handleCallback: jest.fn().mockResolvedValue({ success: true, message: 'Payment processed' }),
     initiateRefund: jest.fn().mockResolvedValue({ success: true }),
@@ -243,8 +261,8 @@ export function setupTestApp(): Express {
 
   app.use('/api/v1/auth', authRoutes);
   app.use('/api/v1/restaurant', restaurantRoutes);
-  app.use('/api/v1/menu', menuRoutes);
   app.use('/api/v1/menu/public', publicRoutes);
+  app.use('/api/v1/menu', menuRoutes);
   app.use('/api/v1/orders', orderRoutes);
   app.use('/api/v1/payments', paymentRoutes);
   app.use('/api/v1/analytics', analyticsRoutes);
@@ -267,7 +285,7 @@ export async function createTestOwner(overrides: Record<string, any> = {}): Prom
     fullName: 'Test Owner',
     email: 'test@menumoja.co.ke',
     phone: '+254712345678',
-    passwordHash: '$2a$12$LJ3m4ys3Lk0TSwHnbfOMiOXPm1Qlq5GzYK5mBx5s5L5z5k5L5z5kO',
+    passwordHash: '$2a$10$so63E3e06x5LrqTAbV2FFOwnRdSrPjrgZkYcQNTBGlkzvczeqR7Qq', // bcrypt('TestPass123')
     isVerified: true,
     role: 'owner',
     createdAt: new Date(),
@@ -385,7 +403,7 @@ export async function createTestStaff(restaurantId: string, overrides: Record<st
     restaurantId,
     fullName: 'Test Staff',
     phone: '+254723456789',
-    pinHash: '$2a$12$LJ3m4ys3Lk0TSwHnbfOMiOXPm1Qlq5GzYK5mBx5s5L5z5k5L5z5kO',
+    pinHash: '$2a$10$WQ1LrNxfTz5yvDlnNEFhTevlNFEgcjSV.uEdkI6ZtJrCxLE0UXBwe', // bcrypt('123456')
     role: 'WAITER',
     isActive: true,
     lastLogin: null,

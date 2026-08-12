@@ -129,6 +129,67 @@ const steps: Step[] = [
   },
 ]
 
+function StepItem({ step, index, isActive, onActivate }: { step: Step; index: number; isActive: boolean; onActivate: () => void }) {
+  const Icon = step.icon
+  const stepRef = useInView({
+    threshold: 0.5,
+    onChange: (inView) => {
+      if (inView) onActivate()
+    },
+  })
+
+  return (
+    <motion.div
+      ref={stepRef.ref}
+      initial={{ opacity: 0, x: -20 }}
+      whileInView={{ opacity: 1, x: 0 }}
+      viewport={{ once: true, margin: '-50px' }}
+      transition={{ delay: index * 0.15, duration: 0.5 }}
+      className="relative lg:text-center group"
+    >
+      <div className="flex items-start lg:items-center gap-4 lg:flex-col">
+        <div
+          className={`relative z-10 w-10 h-10 sm:w-12 sm:h-12 rounded-full flex items-center justify-center shrink-0 transition-all duration-500 ${
+            isActive
+              ? 'bg-gradient-to-br from-secondary to-accent shadow-lg shadow-secondary/30'
+              : 'bg-white/10 border border-white/20'
+          }`}
+        >
+          <Icon
+            className={`w-4 h-4 sm:w-5 sm:h-5 ${
+              isActive ? 'text-white' : 'text-white/40'
+            }`}
+          />
+          <span
+            className={`absolute -top-1 -right-1 w-4 h-4 sm:w-5 sm:h-5 rounded-full flex items-center justify-center text-[8px] sm:text-[10px] font-bold ${
+              isActive ? 'bg-accent text-primary' : 'bg-white/20 text-white/60'
+            }`}
+          >
+            {step.number}
+          </span>
+        </div>
+
+        <div className="lg:mt-3">
+          <h3
+            className={`font-heading font-bold text-base sm:text-lg mb-1 transition-colors duration-300 ${
+              isActive ? 'text-white' : 'text-white/50'
+            }`}
+          >
+            {step.title}
+          </h3>
+          <p
+            className={`text-xs sm:text-sm font-body leading-relaxed transition-colors duration-300 max-w-xs ${
+              isActive ? 'text-white/60' : 'text-white/30'
+            }`}
+          >
+            {step.description}
+          </p>
+        </div>
+      </div>
+    </motion.div>
+  )
+}
+
 export function HowItWorks() {
   const [activeStep, setActiveStep] = useState(0)
   const sectionRef = useRef<HTMLElement>(null)
@@ -183,68 +244,9 @@ export function HowItWorks() {
               />
 
               <div className="relative space-y-8 lg:space-y-0 lg:grid lg:grid-cols-4 lg:gap-4">
-                {steps.map((step, index) => {
-                  const Icon = step.icon
-                  const isActive = index <= activeStep
-                  const stepRef = useInView({
-                    threshold: 0.5,
-                    onChange: (inView) => {
-                      if (inView) setActiveStep(index)
-                    },
-                  })
-
-                  return (
-                    <motion.div
-                      key={step.number}
-                      ref={stepRef.ref}
-                      initial={{ opacity: 0, x: -20 }}
-                      whileInView={{ opacity: 1, x: 0 }}
-                      viewport={{ once: true, margin: '-50px' }}
-                      transition={{ delay: index * 0.15, duration: 0.5 }}
-                      className="relative lg:text-center group"
-                    >
-                      <div className="flex items-start lg:items-center gap-4 lg:flex-col">
-                        <div
-                          className={`relative z-10 w-10 h-10 sm:w-12 sm:h-12 rounded-full flex items-center justify-center shrink-0 transition-all duration-500 ${
-                            isActive
-                              ? 'bg-gradient-to-br from-secondary to-accent shadow-lg shadow-secondary/30'
-                              : 'bg-white/10 border border-white/20'
-                          }`}
-                        >
-                          <Icon
-                            className={`w-4 h-4 sm:w-5 sm:h-5 ${
-                              isActive ? 'text-white' : 'text-white/40'
-                            }`}
-                          />
-                          <span
-                            className={`absolute -top-1 -right-1 w-4 h-4 sm:w-5 sm:h-5 rounded-full flex items-center justify-center text-[8px] sm:text-[10px] font-bold ${
-                              isActive ? 'bg-accent text-primary' : 'bg-white/20 text-white/60'
-                            }`}
-                          >
-                            {step.number}
-                          </span>
-                        </div>
-
-                        <div className="lg:mt-3">
-                          <h3
-                            className={`font-heading font-bold text-base sm:text-lg mb-1 transition-colors duration-300 ${
-                              isActive ? 'text-white' : 'text-white/50'
-                            }`}
-                          >
-                            {step.title}
-                          </h3>
-                          <p
-                            className={`text-xs sm:text-sm font-body leading-relaxed transition-colors duration-300 max-w-xs ${
-                              isActive ? 'text-white/60' : 'text-white/30'
-                            }`}
-                          >
-                            {step.description}
-                          </p>
-                        </div>
-                      </div>
-                    </motion.div>
-                  )
-                })}
+                {steps.map((step, index) => (
+                  <StepItem key={step.number} step={step} index={index} isActive={index <= activeStep} onActivate={() => setActiveStep(index)} />
+                ))}
               </div>
             </div>
           </div>

@@ -52,6 +52,7 @@ describe('POST /api/v1/payments/cash/record', () => {
     const staff = await createTestStaff(restaurant.id);
     const token = generateTestToken(staff.id, 'cashier', restaurant.id);
     const orderId = uuidv4();
+    const paymentId = uuidv4();
 
     const order = {
       id: orderId,
@@ -63,7 +64,7 @@ describe('POST /api/v1/payments/cash/record', () => {
 
     (prisma.order.findFirst as jest.Mock).mockResolvedValue(order);
     (prisma.payment.create as jest.Mock).mockResolvedValue({
-      id: uuidv4(),
+      id: paymentId,
       orderId,
       paymentMethod: 'CASH',
       amount: 500,
@@ -74,6 +75,24 @@ describe('POST /api/v1/payments/cash/record', () => {
     });
     (prisma.order.update as jest.Mock).mockResolvedValue({ ...order, paymentStatus: 'PAID' });
     (prisma.cashReconciliation.findFirst as jest.Mock).mockResolvedValue(null);
+    (prisma.payment.findUnique as jest.Mock).mockResolvedValue({
+      id: paymentId,
+      restaurantId: restaurant.id,
+      orderId,
+      paymentMethod: 'CASH',
+      amount: 500,
+      status: 'PAID',
+      cashierId: staff.id,
+      order: {
+        id: orderId,
+        orderNumber: 'ORD-001',
+        customerName: null,
+        customerPhone: null,
+        taxAmount: 500,
+        restaurant: { name: 'Test Restaurant', kraPin: null, vatRegNo: null, businessRegNo: null, address: '123 Test Street', city: 'Mombasa', phone: '+254712345678' },
+        items: [{ itemName: 'Pizza', quantity: 1, itemPrice: 500, subtotal: 500 }],
+      },
+    });
 
     const res = await request(app)
       .post('/api/v1/payments/cash/record')
@@ -84,6 +103,77 @@ describe('POST /api/v1/payments/cash/record', () => {
     expect(res.body.success).toBe(true);
     expect(res.body.data.paymentId).toBeDefined();
     expect(res.body.data.amount).toBe(500);
+  });
+
+  it('creates a server-side receipt with a unique receipt number', async () => {
+    const owner = await createTestOwner();
+    const restaurant = await createTestRestaurant(owner.id);
+    const staff = await createTestStaff(restaurant.id);
+    const token = generateTestToken(staff.id, 'cashier', restaurant.id);
+    const orderId = uuidv4();
+    const paymentId = uuidv4();
+
+    const order = {
+      id: orderId,
+      orderNumber: 'ORD-001',
+      totalAmount: 500,
+      paymentStatus: 'UNPAID',
+      status: 'SERVED',
+    };
+
+    (prisma.order.findFirst as jest.Mock).mockResolvedValue(order);
+    (prisma.payment.create as jest.Mock).mockResolvedValue({
+      id: paymentId,
+      orderId,
+      paymentMethod: 'CASH',
+      amount: 500,
+      status: 'PAID',
+      cashReceived: 1000,
+      changeGiven: 500,
+      processedAt: new Date(),
+    });
+    (prisma.order.update as jest.Mock).mockResolvedValue({ ...order, paymentStatus: 'PAID' });
+    (prisma.cashReconciliation.findFirst as jest.Mock).mockResolvedValue(null);
+    (prisma.payment.findUnique as jest.Mock).mockResolvedValue({
+      id: paymentId,
+      restaurantId: restaurant.id,
+      orderId,
+      paymentMethod: 'CASH',
+      amount: 500,
+      status: 'PAID',
+      cashierId: staff.id,
+      order: {
+        id: orderId,
+        orderNumber: 'ORD-001',
+        customerName: null,
+        customerPhone: null,
+        taxAmount: 500,
+        restaurant: { name: 'Test Restaurant', kraPin: null, vatRegNo: null, businessRegNo: null, address: '123 Test Street', city: 'Mombasa', phone: '+254712345678' },
+        items: [{ itemName: 'Pizza', quantity: 1, itemPrice: 500, subtotal: 500 }],
+      },
+    });
+    (prisma.receipt.findFirst as jest.Mock).mockResolvedValue(null);
+    (prisma.receipt.create as jest.Mock).mockResolvedValue({
+      id: uuidv4(),
+      receiptNumber: `RCP-${restaurant.id.slice(-4).toUpperCase()}-20260812-ABCDEF`,
+      orderNumber: 'ORD-001',
+      amount: 500,
+      items: [{ itemName: 'Pizza' }],
+      restaurantSnapshot: { name: 'Test Restaurant' },
+    });
+
+    const res = await request(app)
+      .post('/api/v1/payments/cash/record')
+      .set(getAuthHeader(token))
+      .send({ orderId, amount: 500, amountTendered: 1000 })
+      .expect(201);
+
+    expect(prisma.receipt.create).toHaveBeenCalledTimes(1);
+    const receiptData = (prisma.receipt.create as jest.Mock).mock.calls[0][0].data;
+    expect(receiptData.receiptNumber).toMatch(/^RCP-/);
+    expect(receiptData.paymentId).toBe(paymentId);
+    expect(receiptData.restaurantSnapshot.name).toBe('Test Restaurant');
+    expect(receiptData.items).toHaveLength(1);
   });
 });
 

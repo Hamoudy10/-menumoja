@@ -288,7 +288,7 @@ export default function SettingsPage() {
       setNewStaff({ name: '', phone: '', role: 'waiter', pin: '', email: '', employeeNumber: '', nationalId: '', kraPin: '', nhifNumber: '', nssfNumber: '', dateOfBirth: '', address: '', emergencyName: '', emergencyPhone: '', emergencyRelation: '', nextOfKin: '', nextOfKinPhone: '', nextOfKinRelation: '', bankName: '', bankBranch: '', bankAccount: '', monthlySalary: '', hourlyRate: '', leaveDays: '', startDate: '', notes: '' })
       setShowAddStaff(false)
       setEditingStaffId(null)
-    } catch {} finally { setStaffSaving(false) }
+    } catch { /* error toast handled in store */ } finally { setStaffSaving(false) }
   }
 
   const handleSaveNotifications = async () => {
@@ -809,7 +809,7 @@ export default function SettingsPage() {
                           className="p-1.5 rounded-lg hover:bg-blue-100 dark:hover:bg-blue-900/30 text-text-secondary hover:text-blue-500 transition-colors">
                           <Edit3 className="h-3.5 w-3.5" />
                         </button>
-                        <button onClick={async () => { if (confirm('Remove this staff member?')) { try { await removeStaff(member.id); showSuccessToast('Staff removed') } catch {} } }}
+                        <button onClick={async () => { if (confirm('Remove this staff member?')) { try { await removeStaff(member.id); showSuccessToast('Staff removed') } catch { /* error toast handled in store */ } } }}
                           className="p-1.5 rounded-lg hover:bg-red-100 dark:hover:bg-red-900/30 text-text-secondary hover:text-red-500 transition-colors">
                           <Trash2 className="h-3.5 w-3.5" />
                         </button>

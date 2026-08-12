@@ -136,7 +136,7 @@ export default function MenuManager() {
           try {
             await removeItem(cat.id, id)
             deleted++
-          } catch {}
+          } catch { /* item already gone or permission error — continue bulk delete */ }
         }
       }
     } finally {
@@ -259,7 +259,7 @@ export default function MenuManager() {
               try {
                 const { reorderCategories } = await import('@/api/menu')
                 await reorderCategories(newOrder.map((cat: any, i: number) => ({ id: cat.id, sortOrder: i })))
-              } catch {}
+              } catch { /* reorder failure is non-fatal — local order retained */ }
               setReordering(false)
             }}>
               {categoriesOrder.map((cat) => (

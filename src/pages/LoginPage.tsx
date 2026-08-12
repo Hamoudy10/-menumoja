@@ -43,7 +43,7 @@ export default function LoginPage() {
     try {
       await login(data.email, data.password)
       navigate('/dashboard')
-    } catch { } finally { setLoading(false) }
+    } catch { /* error toast handled in store */ } finally { setLoading(false) }
   }
 
   const handleGoogleSuccess = async (credentialResponse: any) => {
@@ -51,7 +51,7 @@ export default function LoginPage() {
     try {
       await loginWithGoogle(credentialResponse.credential)
       navigate('/dashboard')
-    } catch { } finally { setLoading(false) }
+    } catch { /* error toast handled in store */ } finally { setLoading(false) }
   }
 
   const handleStaffLogin = async () => {

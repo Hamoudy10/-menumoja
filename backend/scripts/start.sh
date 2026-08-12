@@ -1,8 +1,8 @@
 #!/bin/sh
 set -eo pipefail
 
-echo "=== Syncing database schema ==="
-npx prisma db push --accept-data-loss 2>&1
+echo "=== Applying database migrations ==="
+npx prisma migrate deploy 2>&1
 
 echo "=== Checking if seed needed ==="
 node -e "

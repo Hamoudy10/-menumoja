@@ -227,7 +227,7 @@ describe('GET /api/v1/orders/export', () => {
       .query({ startDate: '2025-01-01T00:00:00.000Z', endDate: '2025-01-31T23:59:59.999Z' })
       .expect(200);
 
-    expect(res.headers['content-type']).toBe('text/csv');
+    expect(res.headers['content-type']).toMatch(/text\/csv/);
     expect(res.text).toContain('ORD-001');
   });
 });

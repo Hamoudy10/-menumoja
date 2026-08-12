@@ -197,7 +197,7 @@ export default function ThemeProvider({ children }: { children: React.ReactNode 
       const next = { ...prev, ...config }
       try {
         localStorage.setItem('app-theme', JSON.stringify(next))
-      } catch {}
+      } catch { /* storage unavailable */ }
       return next
     })
   }, [])

@@ -48,8 +48,10 @@ describe('PUT /api/v1/restaurant/me', () => {
     const restaurant = await createTestRestaurant(owner.id);
     const token = generateTestToken(owner.id, 'owner', restaurant.id);
 
-    (prisma.restaurant.findFirst as jest.Mock).mockResolvedValue(restaurant);
+    (prisma.restaurant.findFirst as jest.Mock).mockResolvedValue(null);
     (prisma.restaurant.findFirst as jest.Mock).mockResolvedValueOnce(restaurant);
+    (prisma.restaurant.findFirst as jest.Mock).mockResolvedValueOnce(null);
+    (prisma.qrCode.findMany as jest.Mock).mockResolvedValue([]);
     (prisma.restaurant.update as jest.Mock).mockResolvedValue({ ...restaurant, name: 'Updated Restaurant', slug: 'updated-restaurant' });
 
     const res = await request(app)

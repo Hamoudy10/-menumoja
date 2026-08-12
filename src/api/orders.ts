@@ -26,14 +26,14 @@ export const getOrderHistory = (params?: any) =>
 export const getKitchenOrders = () =>
   api.get('/orders/kitchen').then(unwrap)
 
-export const placeOrder = (data: any) =>
-  api.post('/orders/public/create', data).then(unwrap)
+export const placeOrder = (data: any, idempotencyKey?: string) =>
+  api.post('/orders/public/create', data, idempotencyKey ? { headers: { 'Idempotency-Key': idempotencyKey } } : undefined).then(unwrap)
 
 export const getOrderStatus = (orderId: string) =>
   api.get(`/orders/public/${orderId}/status`).then(unwrap)
 
-export const createPosOrder = (data: any) =>
-  api.post('/orders', data).then(unwrap)
+export const createPosOrder = (data: any, idempotencyKey?: string) =>
+  api.post('/orders', data, idempotencyKey ? { headers: { 'Idempotency-Key': idempotencyKey } } : undefined).then(unwrap)
 
 export const addOrderNote = (id: string, note: string) =>
   api.put(`/orders/${id}/note`, { note }).then(unwrap)

@@ -64,7 +64,7 @@ export default function DashboardLayout() {
         }
 
         localStorage.setItem('last_notif_count', currentCount.toString())
-      } catch {}
+      } catch { /* notification polling failure is non-fatal */ }
     }, 15000)
 
     return () => clearInterval(poll)

@@ -1,6 +1,7 @@
 import { Response, NextFunction } from 'express';
 import { AuthenticatedRequest } from '../types';
 import logger from '../utils/logger';
+import { prisma } from '../config/database';
 import { v4 as uuidv4 } from 'uuid';
 
 const STATE_CHANGING_METHODS = ['POST', 'PUT', 'PATCH', 'DELETE'];
@@ -16,6 +17,36 @@ const SENSITIVE_PATHS = [
 
 function isSensitivePath(path: string): boolean {
   return SENSITIVE_PATHS.some((p) => path.startsWith(p));
+}
+
+/**
+ * Persists an audit entry to the audit_logs table.
+ * Fire-and-forget: a persistence failure must never break the request.
+ */
+function persistAuditEntry(entry: Record<string, any>): void {
+  prisma.auditLog
+    .create({
+      data: {
+        restaurantId: entry.restaurantId || null,
+        userId: entry.userId === 'anonymous' || entry.userId === 'system' ? null : entry.userId,
+        role: entry.role,
+        action: entry.action || `${entry.method} ${entry.path}`,
+        resourceType: entry.resourceType,
+        resourceId: entry.resourceId,
+        method: entry.method,
+        path: entry.path,
+        statusCode: entry.statusCode,
+        durationMs: entry.duration,
+        requestId: entry.requestId,
+        ipAddress: entry.clientInfo?.ip,
+        userAgent: entry.clientInfo?.userAgent,
+        details: entry.details || entry.body || undefined,
+        sensitivity: entry.sensitivity,
+      },
+    })
+    .catch((error) => {
+      logger.warn('Audit log persistence failed', { error: error.message, auditId: entry.auditId });
+    });
 }
 
 function sanitizeBody(body: Record<string, any>): Record<string, any> {
@@ -95,6 +126,9 @@ export function auditLog(
         };
       }
 
+      auditEntry.requestId = (req as any).requestId;
+      persistAuditEntry(auditEntry);
+
       if (_res.statusCode >= 400) {
         logger.warn('Audit: state change', auditEntry);
       } else {
@@ -127,5 +161,6 @@ export function createAuditEntry(
     restaurantId,
   };
 
+  persistAuditEntry(entry);
   logger.info('Audit: custom entry', entry);
 }

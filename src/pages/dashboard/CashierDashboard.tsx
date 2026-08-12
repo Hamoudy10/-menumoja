@@ -94,6 +94,7 @@ export default function CashierDashboard() {
 
   const soundRef = useRef<HTMLAudioElement | null>(null)
   const posRef = useRef<HTMLDivElement>(null)
+  const quickOrderKeyRef = useRef<string | null>(null)
 
   useEffect(() => {
     soundRef.current = new Audio('data:audio/wav;base64,UklGRnoGAABXQVZFZm10IBAAAAABAAEAQB8AAEAfAAABAAgAZGF0YQoGAACAf39/f4B/f3+AgH9/f3+Af39/gIB/f39/gH9/f4CAf39/f4B/f3+AgH9/f3+Af39/gIB/f39/gH9/f4B/f3+AgICAgICA')
@@ -176,6 +177,7 @@ export default function CashierDashboard() {
       return
     }
     setNewOrderTable(String(table?.tableNumber || ''))
+    quickOrderKeyRef.current = null
     setShowCreateModal(true)
   }
 
@@ -316,16 +318,19 @@ export default function CashierDashboard() {
       const tip = parseFloat(tipAmount) || 0
       const sc = parseFloat(serviceChargePercent) || 0
       const scAmount = sc > 0 ? (selectedOrder.total || 0) * (sc / 100) : 0
+      let paidReceiptNumber: string | null = null
 
       if (paymentMethod === 'cash') {
         if (parseFloat(cashReceived) < orderTotal) { showErrorToast('Insufficient amount'); setProcessing(false); return }
-        await paymentsApi.recordCashPayment({
+        const res = await paymentsApi.recordCashPayment({
           orderId: selectedOrder.id, amount: orderTotal,
           amountTendered: parseFloat(cashReceived),
           discount: parseFloat(discount) || 0,
         })
+        paidReceiptNumber = res?.receiptNumber || null
       } else if (paymentMethod === 'card') {
-        await paymentsApi.recordCardPayment(selectedOrder.id, orderTotal)
+        const res = await paymentsApi.recordCardPayment(selectedOrder.id, orderTotal)
+        paidReceiptNumber = res?.receiptNumber || null
       } else if (paymentMethod === 'mpesa') {
         if (!mpesaPhone) { showErrorToast('Enter customer phone'); setProcessing(false); return }
         await paymentsApi.initiateMpesa(selectedOrder.id, mpesaPhone)
@@ -339,7 +344,7 @@ export default function CashierDashboard() {
       if (cashierNote) await ordersApi.addOrderNote(selectedOrder.id, cashierNote).catch(() => {})
 
       playKaChing()
-      const receiptNo = genReceiptNo()
+      const receiptNo = paidReceiptNumber || genReceiptNo()
       const subtotal = selectedOrder.items.reduce((s: number, i: any) => s + i.price * i.quantity, 0)
       setLastPayment({
         receiptNo, orderNumber: selectedOrder.orderNumber,
@@ -357,7 +362,7 @@ export default function CashierDashboard() {
       setShowReceipt(true)
       showSuccessToast(`Payment recorded!${paymentMethod === 'cash' ? ` Change: KES ${change.toLocaleString()}` : ''}`)
       setSelectedOrder(null); setCashReceived(''); setDiscount(''); setTipAmount('')
-      setServiceChargePercent(''); setCashierNote(''),
+      setServiceChargePercent(''); setCashierNote('')
       fetchOrders()
     } catch { showErrorToast('Payment failed') }
     finally { setProcessing(false) }
@@ -394,6 +399,7 @@ export default function CashierDashboard() {
     if (!newOrderTable && !newOrderCustomer) { showErrorToast('Enter table or customer name'); return }
     if (newOrderItems.length === 0) { showErrorToast('Add at least one item'); return }
     setQuickCreating(true)
+    if (!quickOrderKeyRef.current) quickOrderKeyRef.current = crypto.randomUUID()
     try {
       const res = await ordersApi.createPosOrder({
         tableNumber: parseInt(newOrderTable) || 0,
@@ -403,7 +409,8 @@ export default function CashierDashboard() {
           specialInstructions: item.instructions,
         })),
         source: 'POS',
-      })
+      }, quickOrderKeyRef.current)
+      quickOrderKeyRef.current = null
       showSuccessToast(`Order #${res.orderNumber || res.id?.slice(0, 6)} created`)
       setShowCreateModal(false); setNewOrderTable(''); setNewOrderCustomer('')
       setNewOrderItems([]); setNewOrderSearch('')
@@ -562,7 +569,7 @@ export default function CashierDashboard() {
                   {playSound ? <Volume2 className="h-4 w-4" /> : <Music className="h-4 w-4" />}
                 </button>
                 <RefreshButton refreshing={refreshing} onClick={refreshAll} title="Refresh" className="w-8 h-8 bg-transparent border-0 shadow-none" />
-                <button onClick={() => setShowCreateModal(true)} className="p-1.5 rounded-lg hover:bg-black/5 text-secondary" title="Quick Order">
+                <button onClick={() => { quickOrderKeyRef.current = null; setShowCreateModal(true) }} className="p-1.5 rounded-lg hover:bg-black/5 text-secondary" title="Quick Order">
                   <Plus className="h-4 w-4" />
                 </button>
                 {heldOrders.length > 0 && (

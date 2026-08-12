@@ -7,6 +7,7 @@ import { AppError, NotFoundError, ValidationError } from '@/utils/errors';
 import { formatKES, buildPaginationMeta } from '@/utils/helpers';
 import { initiateMpesaSchema, recordCashSchema, receiptListQuerySchema } from '@/utils/validation';
 import { mpesaService } from '@/services';
+import { createReceiptForPayment, getReceiptById } from '@/services/receipt.service';
 import { freeTableIfLastOrder } from '@/services/table.service';
 import * as mpesa from '@/integrations/mpesa';
 import { io } from '@/hooks/socket';
@@ -200,6 +201,14 @@ router.post('/mpesa/callback',
       );
 
       if (result.success) {
+        try {
+          const payment = await createPaymentService().getPaymentByCheckoutRequestId(checkoutRequestId);
+          if (payment) {
+            await createReceiptForPayment(payment.id);
+          }
+        } catch (receiptError) {
+          logger.error('Receipt generation after M-Pesa callback failed', { error: receiptError });
+        }
         logger.info('M-Pesa callback processed successfully', { checkoutRequestId, message: result.message });
         return res.json({ ResultCode: 0, ResultDesc: 'Success' });
       } else {
@@ -367,6 +376,8 @@ router.post('/cash/record',
 
     await freeTableIfLastOrder(restaurantId, orderId, order.tableId);
 
+    const receipt = await createReceiptForPayment(payment.id);
+
     logger.info('Cash payment recorded', { orderId, amount, cashierId });
 
     res.status(201).json({
@@ -378,6 +389,8 @@ router.post('/cash/record',
         amountTendered: Number(payment.cashReceived),
         change: Number(payment.changeGiven),
         processedAt: payment.processedAt,
+        receiptId: receipt?.id || null,
+        receiptNumber: receipt?.receiptNumber || null,
       },
     });
   })
@@ -548,6 +561,31 @@ router.get(
           : null,
       })),
       meta: buildPaginationMeta(total, safePage, safePerPage),
+    });
+  })
+);
+
+// GET /receipts/:id - Single server-side receipt (must precede /:id)
+router.get('/receipts/:id',
+  authenticate,
+  enforceRestaurantScope,
+  validateParams(idParamSchema),
+  asyncHandler(async (req, res) => {
+    const restaurantId = (req as any).restaurantId;
+    const { id } = req.params;
+
+    const receipt = await getReceiptById(String(id));
+    if (receipt.restaurantId !== restaurantId) {
+      throw new NotFoundError('Receipt not found', 'Risiti haikupatikana');
+    }
+
+    res.json({
+      success: true,
+      data: {
+        ...receipt,
+        amount: Number(receipt.amount),
+        vatAmount: Number(receipt.vatAmount),
+      },
     });
   })
 );
@@ -877,7 +915,17 @@ router.post('/card/record',
 
     await freeTableIfLastOrder(restaurantId, orderId, order.tableId);
 
-    res.status(201).json({ success: true, data: payment });
+    const receipt = await createReceiptForPayment(payment.id);
+
+    res.status(201).json({
+      success: true,
+      data: {
+        ...payment,
+        amount: Number(payment.amount),
+        receiptId: receipt?.id || null,
+        receiptNumber: receipt?.receiptNumber || null,
+      },
+    });
   })
 );
 

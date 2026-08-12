@@ -177,7 +177,7 @@ export default function Step6QRGeneration({ onNext, onPrev }: Props) {
     if (navigator.share) {
       try {
         await navigator.share({ title: `${onboarding.restaurantName || 'Menu'} - MenuMoja`, url })
-      } catch {}
+      } catch { /* user cancelled share */ }
     } else {
       await navigator.clipboard.writeText(url)
     }

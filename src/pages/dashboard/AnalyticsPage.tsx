@@ -77,7 +77,7 @@ export default function AnalyticsPage() {
       } else {
         setPaymentSplit([])
       }
-    } catch {} finally { setLoading(false) }
+    } catch { /* partial analytics failure tolerated */ } finally { setLoading(false) }
   }
 
   useEffect(() => { fetchData(period) }, [period])

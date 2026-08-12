@@ -65,7 +65,7 @@ interface AppState {
   fetchOrders: (params?: any) => Promise<void>
   fetchLiveOrders: () => Promise<void>
   updateOrderStatus: (id: string, status: string) => Promise<void>
-  placeOrder: (data: any) => Promise<any>
+  placeOrder: (data: any, idempotencyKey?: string) => Promise<any>
   addOrder: (order: any) => void
 
   tables: FloorTable[]
@@ -619,9 +619,9 @@ export const useStore = create<AppState>((set) => ({
       throw err
     }
   },
-  placeOrder: async (data) => {
+  placeOrder: async (data, idempotencyKey) => {
     try {
-      const res = await ordersApi.placeOrder(data)
+      const res = await ordersApi.placeOrder(data, idempotencyKey)
       const order = res.order || (res.orderId ? { id: res.orderId, orderNumber: res.orderNumber, ...res } : res)
       set((s) => ({ orders: [order, ...s.orders] }))
       toast.success('Order placed!')

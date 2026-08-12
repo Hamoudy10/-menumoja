@@ -32,6 +32,10 @@ export default function MenuCart() {
       showSuccessToast('Please enter your name so we know who the order is for')
       return
     }
+    const cartKey = `orderKey_${restaurantSlug}`
+    if (!sessionStorage.getItem(cartKey)) {
+      sessionStorage.setItem(cartKey, crypto.randomUUID())
+    }
     setPlacing(true)
     try {
       const order = await placeOrder({
@@ -49,7 +53,8 @@ export default function MenuCart() {
         customerName: isTakeaway ? customerName.trim() : undefined,
         customerPhone: (method === 'mpesa' ? mpesaPhone : customerPhone.trim()) || undefined,
         specialInstructions: '',
-      })
+      }, sessionStorage.getItem(cartKey) || undefined)
+      sessionStorage.removeItem(cartKey)
       clearCart()
       sessionStorage.setItem(`activeOrder_${restaurantSlug}`, JSON.stringify({ id: order.id, orderNumber: order.orderNumber, tableNumber: tableFromUrl ? parseInt(tableFromUrl) : 0, time: Date.now() }))
       showSuccessToast('Order placed!')

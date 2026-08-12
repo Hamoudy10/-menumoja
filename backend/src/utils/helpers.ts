@@ -13,6 +13,14 @@ export function generateOrderNumber(restaurantId: string): string {
   return `ORD-${shortId}-${timestamp}-${random}`;
 }
 
+export function generateReceiptNumber(restaurantId: string): string {
+  const now = new Date();
+  const datePart = `${now.getFullYear()}${String(now.getMonth() + 1).padStart(2, '0')}${String(now.getDate()).padStart(2, '0')}`;
+  const random = uuidv4().split('-')[0].toUpperCase().slice(0, 6);
+  const shortId = restaurantId.slice(-4).toUpperCase();
+  return `RCP-${shortId}-${datePart}-${random}`;
+}
+
 export function generateSlug(name: string): string {
   return slugifyLib(name, {
     lower: true,
