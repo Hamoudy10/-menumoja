@@ -11,6 +11,7 @@ import { mpesaService } from '@/services';
 import { createReceiptForPayment, getReceiptById } from '@/services/receipt.service';
 import { computeReconciliation, runReconciliation, listReconciliations } from '@/services/reconciliation.service';
 import { upsertCustomer, recordCustomerSpend } from '@/services/customer.service';
+import { processPayment as processLoyaltyPayment } from '@/services/loyalty.service';
 import { freeTableIfLastOrder } from '@/services/table.service';
 import * as mpesa from '@/integrations/mpesa';
 import { io } from '@/hooks/socket';
@@ -489,8 +490,9 @@ router.post('/cash/record',
           source: 'POS',
         });
         await recordCustomerSpend(restaurantId, order.customerPhone, Number(payment.amount));
+        await processLoyaltyPayment(restaurantId, order.customerPhone, orderId);
       } catch (customerError) {
-        logger.error('Customer upsert failed (cash payment)', { error: customerError, restaurantId });
+        logger.error('Customer/loyalty processing failed (cash payment)', { error: customerError, restaurantId });
       }
     }
 
@@ -1135,8 +1137,9 @@ router.post('/card/record',
           source: 'POS',
         });
         await recordCustomerSpend(restaurantId, order.customerPhone, Number(payment.amount));
+        await processLoyaltyPayment(restaurantId, order.customerPhone, orderId);
       } catch (customerError) {
-        logger.error('Customer upsert failed (card payment)', { error: customerError, restaurantId });
+        logger.error('Customer/loyalty processing failed (card payment)', { error: customerError, restaurantId });
       }
     }
 

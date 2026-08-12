@@ -287,7 +287,18 @@ TARGET DOMAIN                    CURRENT STATE                        GAP CLASS
 
 **Remaining in Tier 3:** backfill customers from historical orders (resumable migration job — see master plan §32), Deal-sensitive segment (needs per-order discount tracking), order-time COGS snapshots.
 
-### Tier 3b — SMART LOYALTY (next recommended)
+### Tier 3b — SMART LOYALTY ✅ EXECUTED (2026-08-12)
+1. ✅ **Models (migration 9)** — `LoyaltyProgram` (points per KES, expiry days), `LoyaltyRule` (trigger/reward/date window/usage limit), `LoyaltyAccount` (balance + totals), `LoyaltyTransaction` (**immutable ledger**: EARN/REDEEM/ADJUST/EXPIRE with reason + reference), `LoyaltyReward` (ISSUED/REDEEMED/EXPIRED/CANCELLED). Customer gained `dateOfBirth` (birthday trigger).
+2. ✅ **Points** — earned as `floor(spend ÷ points-per-KES)` on every confirmed payment (M-Pesa callback, cash, card); balance is always the ledger sum, never overwritten; redemption blocked if balance insufficient (409).
+3. ✅ **Rule engine** — triggers VISIT_COUNT, SPEND_THRESHOLD, ITEM_COUNT, CATEGORY_PURCHASE, INACTIVITY, BIRTHDAY; rewards FREE_ITEM, DISCOUNT, FIXED_AMOUNT, PERCENTAGE, POINTS, BUNDLE. Rules are date-windowed + active-flagged.
+4. ✅ **Abuse prevention** — per-customer usage limit per rule enforced at issue time; rewards single-use (double redemption → 409); redemption requires ISSUED + not expired.
+5. ✅ **API** (`/api/v1/loyalty`) — program get/update, rules CRUD, accounts list/detail, audited manual point adjustments, rewards list/redeem/cancel. Tenant-scoped.
+6. ✅ **UI** — `/dashboard/loyalty`: Program settings, Rules builder (trigger/reward pickers, item links), Accounts (balances, ledger, manual adjust, rewards) and Rewards (issue/redeem). Sidebar + route wired.
+7. ✅ Tests — `tests/loyalty.test.ts` (9): points math + ledger row, insufficient-balance rejection, FREE_ITEM issue on rule match, usage-limit enforcement, ITEM_COUNT + CATEGORY_PURCHASE triggers, single redemption + double-redemption rejection.
+
+**Deferred (documented):** REFERRAL trigger (needs referral-link infrastructure), points expiry job (needs real BullMQ workers), loyalty notifications (WhatsApp phase).
+
+### Tier 3c — WHATSAPP / CUSTOMER ENGAGEMENT (next recommended)
 7. POS hardening: modifiers, split/partial payments, held orders (persisted), KDS station/actions, table merge/split, optimistic locking
 8. M-Pesa: state machine, PaymentAttempt/WebhookEvent, reconciliation dashboard, timeout/reversal handling
 9. Offline-first: local queues + sync + connectivity UI + PWA decision

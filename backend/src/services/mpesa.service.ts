@@ -4,6 +4,7 @@ import * as mpesa from '../integrations/mpesa';
 import { sendSMS } from '../integrations/africasTalking';
 import { prisma } from '../config/database';
 import { upsertCustomer, recordCustomerSpend } from './customer.service';
+import { processPayment as processLoyaltyPayment } from './loyalty.service';
 
 interface OrderService {
   getOrderById: (orderId: string) => Promise<OrderRecord | null>;
@@ -306,8 +307,9 @@ export async function handleCallback(
       try {
         await upsertCustomer(order.restaurantId, { phone: customerPhone, source: 'QR' });
         await recordCustomerSpend(order.restaurantId, customerPhone, Number(validCallback.amount || order.amount));
+        await processLoyaltyPayment(order.restaurantId, customerPhone, order.id);
       } catch (customerError) {
-        logger.error('Customer upsert failed (M-Pesa callback)', { error: customerError, restaurantId: order.restaurantId });
+        logger.error('Customer/loyalty processing failed (M-Pesa callback)', { error: customerError, restaurantId: order.restaurantId });
       }
     }
 

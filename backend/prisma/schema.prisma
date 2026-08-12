@@ -210,6 +210,38 @@ enum CustomerSource {
   MANUAL
 }
 
+enum LoyaltyTriggerType {
+  VISIT_COUNT
+  SPEND_THRESHOLD
+  ITEM_COUNT
+  CATEGORY_PURCHASE
+  INACTIVITY
+  BIRTHDAY
+}
+
+enum LoyaltyRewardType {
+  FREE_ITEM
+  DISCOUNT
+  FIXED_AMOUNT
+  PERCENTAGE
+  POINTS
+  BUNDLE
+}
+
+enum LoyaltyTransactionType {
+  EARN
+  REDEEM
+  ADJUST
+  EXPIRE
+}
+
+enum LoyaltyRewardStatus {
+  ISSUED
+  REDEEMED
+  EXPIRED
+  CANCELLED
+}
+
 // ==============================
 // MODELS
 // ==============================
@@ -332,6 +364,11 @@ model Restaurant {
   purchaseOrders         PurchaseOrder[]
   recipes                Recipe[]
   customers              Customer[]
+  loyaltyProgram         LoyaltyProgram?
+  loyaltyRules           LoyaltyRule[]
+  loyaltyAccounts        LoyaltyAccount[]
+  loyaltyTransactions    LoyaltyTransaction[]
+  loyaltyRewards         LoyaltyReward[]
   aiConversations        AiConversation[]
   faqs                   RestaurantFaq[]
   aiGeneratedContents    AiGeneratedContent[]
@@ -1065,16 +1102,121 @@ model Customer {
   averageSpend      Decimal        @default(0) @map("average_spend") @db.Decimal(12, 2)
   notes             String?
   isOptedOut        Boolean        @default(false) @map("is_opted_out")
+  dateOfBirth       DateTime?      @map("date_of_birth")
   createdAt         DateTime       @default(now()) @map("created_at")
   updatedAt         DateTime       @updatedAt @map("updated_at")
 
   restaurant Restaurant @relation(fields: [restaurantId], references: [id], onDelete: Cascade)
+  loyaltyAccount LoyaltyAccount?
 
   @@unique([restaurantId, phone])
   @@index([restaurantId])
   @@index([lastVisit])
   @@index([totalSpend])
   @@map("customers")
+}
+
+model LoyaltyProgram {
+  id             String   @id @default(uuid()) @db.Uuid
+  restaurantId   String   @unique @map("restaurant_id") @db.Uuid
+  name           String   @default("Loyalty Points")
+  pointsPerKes   Decimal  @default(1) @map("points_per_kes") @db.Decimal(6, 2)
+  pointsExpiryDays Int?   @map("points_expiry_days")
+  isActive       Boolean  @default(true) @map("is_active")
+  createdAt      DateTime @default(now()) @map("created_at")
+  updatedAt      DateTime @updatedAt @map("updated_at")
+
+  restaurant Restaurant @relation(fields: [restaurantId], references: [id], onDelete: Cascade)
+
+  @@map("loyalty_programs")
+}
+
+model LoyaltyRule {
+  id             String             @id @default(uuid()) @db.Uuid
+  restaurantId   String             @map("restaurant_id") @db.Uuid
+  name           String
+  triggerType    LoyaltyTriggerType @map("trigger_type")
+  triggerValue   String             @map("trigger_value")
+  rewardType     LoyaltyRewardType  @map("reward_type")
+  rewardValue    String             @map("reward_value")
+  rewardItemId   String?            @map("reward_item_id") @db.Uuid
+  rewardQuantity Int?               @map("reward_quantity")
+  startsAt       DateTime?          @map("starts_at")
+  endsAt         DateTime?          @map("ends_at")
+  usageLimit     Int                @default(1) @map("usage_limit")
+  isActive       Boolean            @default(true) @map("is_active")
+  createdAt      DateTime           @default(now()) @map("created_at")
+  updatedAt      DateTime           @updatedAt @map("updated_at")
+
+  restaurant Restaurant @relation(fields: [restaurantId], references: [id], onDelete: Cascade)
+
+  @@index([restaurantId])
+  @@index([isActive])
+  @@map("loyalty_rules")
+}
+
+model LoyaltyAccount {
+  id            String   @id @default(uuid()) @db.Uuid
+  restaurantId  String   @map("restaurant_id") @db.Uuid
+  customerId    String   @unique @map("customer_id") @db.Uuid
+  pointsBalance Int      @default(0) @map("points_balance")
+  totalEarned   Int      @default(0) @map("total_earned")
+  totalRedeemed Int      @default(0) @map("total_redeemed")
+  createdAt     DateTime @default(now()) @map("created_at")
+  updatedAt     DateTime @updatedAt @map("updated_at")
+
+  restaurant   Restaurant            @relation(fields: [restaurantId], references: [id], onDelete: Cascade)
+  customer     Customer              @relation(fields: [customerId], references: [id], onDelete: Cascade)
+  transactions LoyaltyTransaction[]
+  rewards      LoyaltyReward[]
+
+  @@index([restaurantId])
+  @@map("loyalty_accounts")
+}
+
+model LoyaltyTransaction {
+  id            String                @id @default(uuid()) @db.Uuid
+  restaurantId  String                @map("restaurant_id") @db.Uuid
+  accountId     String                @map("account_id") @db.Uuid
+  type          LoyaltyTransactionType
+  points        Int
+  reason        String
+  referenceType String?               @map("reference_type")
+  referenceId   String?               @map("reference_id")
+  createdAt     DateTime              @default(now()) @map("created_at")
+
+  restaurant Restaurant     @relation(fields: [restaurantId], references: [id], onDelete: Cascade)
+  account    LoyaltyAccount @relation(fields: [accountId], references: [id], onDelete: Cascade)
+
+  @@index([restaurantId])
+  @@index([accountId])
+  @@index([createdAt])
+  @@map("loyalty_transactions")
+}
+
+model LoyaltyReward {
+  id            String              @id @default(uuid()) @db.Uuid
+  restaurantId  String              @map("restaurant_id") @db.Uuid
+  accountId     String              @map("account_id") @db.Uuid
+  ruleId        String?             @map("rule_id") @db.Uuid
+  rewardType    LoyaltyRewardType   @map("reward_type")
+  rewardValue   String              @map("reward_value")
+  itemId        String?             @map("item_id") @db.Uuid
+  quantity      Int                 @default(1)
+  status        LoyaltyRewardStatus @default(ISSUED)
+  issuedAt      DateTime            @default(now()) @map("issued_at")
+  redeemedAt    DateTime?           @map("redeemed_at")
+  expiresAt     DateTime?           @map("expires_at")
+  note          String?
+  createdAt     DateTime            @default(now()) @map("created_at")
+
+  restaurant Restaurant     @relation(fields: [restaurantId], references: [id], onDelete: Cascade)
+  account    LoyaltyAccount @relation(fields: [accountId], references: [id], onDelete: Cascade)
+
+  @@index([restaurantId])
+  @@index([accountId])
+  @@index([status])
+  @@map("loyalty_rewards")
 }
 
 model CashReconciliation {

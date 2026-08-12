@@ -40,6 +40,7 @@ import {
   inventoryRoutes,
   recipeRoutes,
   customerRoutes,
+  loyaltyRoutes,
 } from './routes';
 
 if (config.nodeEnv === 'production' && (!config.jwtAccessSecret || !config.jwtRefreshSecret || !config.encryptionKey)) {
@@ -123,6 +124,7 @@ app.use('/api/v1/notifications', notificationRoutes);
 app.use('/api/v1/inventory', inventoryRoutes);
 app.use('/api/v1/recipes', recipeRoutes);
 app.use('/api/v1/customers', customerRoutes);
+app.use('/api/v1/loyalty', loyaltyRoutes);
 
 app.get('/api/v1/health', async (_req: Request, res: Response) => {
   const checks: Record<string, string> = {};

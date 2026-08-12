@@ -15,3 +15,4 @@ export { default as notificationRoutes } from './notifications/notifications.rou
 export { default as inventoryRoutes } from './inventory/inventory.routes';
 export { default as recipeRoutes } from './recipes/recipes.routes';
 export { default as customerRoutes } from './customers/customers.routes';
+export { default as loyaltyRoutes } from './loyalty/loyalty.routes';

@@ -20,6 +20,7 @@ import analyticsRoutes from '../src/routes/analytics/analytics.routes';
 import inventoryRoutes from '../src/routes/inventory/inventory.routes';
 import recipeRoutes from '../src/routes/recipes/recipes.routes';
 import customerRoutes from '../src/routes/customers/customers.routes';
+import loyaltyRoutes from '../src/routes/loyalty/loyalty.routes';
 
 jest.mock('../src/config/database', () => {
   const mockPrisma = {
@@ -185,6 +186,37 @@ jest.mock('../src/config/database', () => {
       create: jest.fn(),
       update: jest.fn(),
       delete: jest.fn(),
+      count: jest.fn().mockResolvedValue(0),
+    },
+    loyaltyProgram: {
+      findUnique: jest.fn().mockResolvedValue(null),
+      create: jest.fn().mockResolvedValue({}),
+      update: jest.fn().mockResolvedValue({}),
+    },
+    loyaltyRule: {
+      findFirst: jest.fn().mockResolvedValue(null),
+      findMany: jest.fn().mockResolvedValue([]),
+      create: jest.fn(),
+      update: jest.fn(),
+      delete: jest.fn(),
+    },
+    loyaltyAccount: {
+      findUnique: jest.fn().mockResolvedValue(null),
+      findUniqueOrThrow: jest.fn(),
+      findFirst: jest.fn().mockResolvedValue(null),
+      findMany: jest.fn().mockResolvedValue([]),
+      create: jest.fn().mockResolvedValue({}),
+      update: jest.fn().mockResolvedValue({}),
+    },
+    loyaltyTransaction: {
+      findMany: jest.fn().mockResolvedValue([]),
+      create: jest.fn().mockResolvedValue({}),
+    },
+    loyaltyReward: {
+      findFirst: jest.fn().mockResolvedValue(null),
+      findMany: jest.fn().mockResolvedValue([]),
+      create: jest.fn().mockResolvedValue({}),
+      update: jest.fn().mockResolvedValue({}),
       count: jest.fn().mockResolvedValue(0),
     },
     cashReconciliation: {
@@ -357,6 +389,7 @@ export function setupTestApp(): Express {
   app.use('/api/v1/inventory', inventoryRoutes);
   app.use('/api/v1/recipes', recipeRoutes);
   app.use('/api/v1/customers', customerRoutes);
+  app.use('/api/v1/loyalty', loyaltyRoutes);
   app.get('/api/v1/health', (_req: Request, res: Response) => {
     res.json({ status: 'ok', timestamp: new Date().toISOString(), uptime: process.uptime(), version: '1.0.0' });
   });
