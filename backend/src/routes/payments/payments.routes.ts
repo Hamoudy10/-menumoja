@@ -5,6 +5,7 @@ import { prisma } from '@/config/database';
 import { authenticate, enforceRestaurantScope, validate, validateQuery, validateParams, mpesaLimiter, auditLog, asyncHandler } from '@/middleware';
 import { AppError, NotFoundError, ValidationError } from '@/utils/errors';
 import { formatKES, buildPaginationMeta } from '@/utils/helpers';
+import { getIdempotencyKey, findIdempotentPayment, recordPaymentIdempotency, isUniqueViolation } from '@/utils/idempotency';
 import { initiateMpesaSchema, recordCashSchema, receiptListQuerySchema } from '@/utils/validation';
 import { mpesaService } from '@/services';
 import { createReceiptForPayment, getReceiptById } from '@/services/receipt.service';
@@ -94,6 +95,25 @@ router.post('/mpesa/initiate',
   validate(initiateMpesaSchema),
   asyncHandler(async (req, res) => {
     const restaurantId = (req as any).restaurantId;
+    const idempotencyKey = getIdempotencyKey(req);
+
+    if (idempotencyKey) {
+      const existing = await findIdempotentPayment(idempotencyKey, `pay:${restaurantId}`);
+      if (existing && existing.mpesaCheckoutRequestId) {
+        logger.info('Reusing idempotent M-Pesa initiation', { paymentId: existing.id, restaurantId });
+        res.status(201).json({
+          success: true,
+          data: {
+            paymentId: existing.id,
+            checkoutRequestId: existing.mpesaCheckoutRequestId,
+            status: existing.status,
+            idempotentReplay: true,
+          },
+        });
+        return;
+      }
+    }
+
     const { orderId, phone } = req.body;
 
     const order = await prisma.order.findFirst({
@@ -160,8 +180,19 @@ router.post('/mpesa/initiate',
     const result = await mpesaService.initiatePayment(
       order.id,
       createOrderService(),
-      createPaymentService()
+      createPaymentService(idempotencyKey)
     );
+
+    if (idempotencyKey) {
+      try {
+        const payment = await createPaymentService().getPaymentByCheckoutRequestId(result.checkoutRequestId);
+        if (payment) {
+          await recordPaymentIdempotency(idempotencyKey, `pay:${restaurantId}`, payment.id);
+        }
+      } catch (idemError) {
+        logger.error('Failed to record M-Pesa payment idempotency', { error: idemError, restaurantId });
+      }
+    }
 
     res.status(201).json({
       success: true,
@@ -287,6 +318,28 @@ router.post('/cash/record',
   validate(recordCashSchema),
   asyncHandler(async (req, res) => {
     const restaurantId = (req as any).restaurantId;
+    const idempotencyKey = getIdempotencyKey(req);
+
+    if (idempotencyKey) {
+      const existing = await findIdempotentPayment(idempotencyKey, `pay:${restaurantId}`);
+      if (existing) {
+        logger.info('Reusing idempotent cash payment', { paymentId: existing.id, restaurantId });
+        res.status(201).json({
+          success: true,
+          data: {
+            paymentId: existing.id,
+            orderId: existing.orderId,
+            amount: Number(existing.amount),
+            amountTendered: Number(existing.cashReceived || existing.amount),
+            change: Number(existing.changeGiven || 0),
+            processedAt: existing.processedAt,
+            idempotentReplay: true,
+          },
+        });
+        return;
+      }
+    }
+
     const { orderId, amount, amountTendered, discount, notes } = req.body;
 
     const order = await prisma.order.findFirst({
@@ -324,26 +377,55 @@ router.post('/cash/record',
       throw new AppError(400, 'CASHIER_REQUIRED', 'Cashier identification is required', 'Kitambulisho cha mweka hazina kinahitajika');
     }
 
-    const [payment] = await Promise.all([
-      prisma.payment.create({
-        data: {
-          restaurantId,
-          orderId,
-          paymentMethod: 'CASH',
-          amount,
-          status: 'PAID',
-          cashReceived: amountTendered,
-          changeGiven: change,
-          cashierId,
-          processedAt: new Date(),
-          notes: notes || null,
-        },
-      }),
-      prisma.order.update({
-        where: { id: orderId },
-        data: { paymentStatus: 'PAID' },
-      }),
-    ]);
+    let payment: any;
+    try {
+      [payment] = await Promise.all([
+        prisma.payment.create({
+          data: {
+            restaurantId,
+            orderId,
+            paymentMethod: 'CASH',
+            amount,
+            status: 'PAID',
+            cashReceived: amountTendered,
+            changeGiven: change,
+            cashierId,
+            processedAt: new Date(),
+            notes: notes || null,
+            idempotencyKey: idempotencyKey || null,
+          },
+        }),
+        prisma.order.update({
+          where: { id: orderId },
+          data: { paymentStatus: 'PAID' },
+        }),
+      ]);
+    } catch (error) {
+      if (idempotencyKey && isUniqueViolation(error)) {
+        const existing = await findIdempotentPayment(idempotencyKey, `pay:${restaurantId}`);
+        if (existing) {
+          logger.info('Cash payment idempotency race resolved', { paymentId: existing.id, restaurantId });
+          res.status(201).json({
+            success: true,
+            data: {
+              paymentId: existing.id,
+              orderId: existing.orderId,
+              amount: Number(existing.amount),
+              amountTendered: Number(existing.cashReceived || existing.amount),
+              change: Number(existing.changeGiven || 0),
+              processedAt: existing.processedAt,
+              idempotentReplay: true,
+            },
+          });
+          return;
+        }
+      }
+      throw error;
+    }
+
+    if (idempotencyKey) {
+      await recordPaymentIdempotency(idempotencyKey, `pay:${restaurantId}`, payment.id);
+    }
 
     try {
       const openShift = await prisma.cashReconciliation.findFirst({
@@ -886,6 +968,25 @@ router.post('/card/record',
   auditLog,
   asyncHandler(async (req, res) => {
     const restaurantId = (req as any).restaurantId;
+    const idempotencyKey = getIdempotencyKey(req);
+
+    if (idempotencyKey) {
+      const existing = await findIdempotentPayment(idempotencyKey, `pay:${restaurantId}`);
+      if (existing) {
+        logger.info('Reusing idempotent card payment', { paymentId: existing.id, restaurantId });
+        res.status(201).json({
+          success: true,
+          data: {
+            id: existing.id,
+            orderId: existing.orderId,
+            amount: Number(existing.amount),
+            idempotentReplay: true,
+          },
+        });
+        return;
+      }
+    }
+
     const { orderId, amount } = req.body;
 
     const order = await prisma.order.findFirst({
@@ -896,22 +997,48 @@ router.post('/card/record',
     if (!order) throw new NotFoundError('Order not found', 'Agizo halikupatikana');
     if (order.paymentStatus === 'PAID') throw new ValidationError('Order is already paid', 'Agizo tayari limelipwa');
 
-    const [payment] = await Promise.all([
-      prisma.payment.create({
-        data: {
-          restaurantId,
-          orderId,
-          paymentMethod: 'CARD',
-          amount,
-          status: 'PAID',
-          processedAt: new Date(),
-        },
-      }),
-      prisma.order.update({
-        where: { id: orderId },
-        data: { paymentStatus: 'PAID' },
-      }),
-    ]);
+    let payment: any;
+    try {
+      [payment] = await Promise.all([
+        prisma.payment.create({
+          data: {
+            restaurantId,
+            orderId,
+            paymentMethod: 'CARD',
+            amount,
+            status: 'PAID',
+            processedAt: new Date(),
+            idempotencyKey: idempotencyKey || null,
+          },
+        }),
+        prisma.order.update({
+          where: { id: orderId },
+          data: { paymentStatus: 'PAID' },
+        }),
+      ]);
+    } catch (error) {
+      if (idempotencyKey && isUniqueViolation(error)) {
+        const existing = await findIdempotentPayment(idempotencyKey, `pay:${restaurantId}`);
+        if (existing) {
+          logger.info('Card payment idempotency race resolved', { paymentId: existing.id, restaurantId });
+          res.status(201).json({
+            success: true,
+            data: {
+              id: existing.id,
+              orderId: existing.orderId,
+              amount: Number(existing.amount),
+              idempotentReplay: true,
+            },
+          });
+          return;
+        }
+      }
+      throw error;
+    }
+
+    if (idempotencyKey) {
+      await recordPaymentIdempotency(idempotencyKey, `pay:${restaurantId}`, payment.id);
+    }
 
     await freeTableIfLastOrder(restaurantId, orderId, order.tableId);
 
@@ -1181,7 +1308,7 @@ function createOrderService() {
   };
 }
 
-function createPaymentService() {
+function createPaymentService(idempotencyKey?: string | null) {
   return {
     createPayment: async (data: {
       orderId: string;
@@ -1205,6 +1332,7 @@ function createPaymentService() {
           status: data.status as any,
           mpesaCheckoutRequestId: data.checkoutRequestId,
           mpesaPhone: data.phone,
+          idempotencyKey: idempotencyKey || null,
         },
       });
       return {

@@ -38,5 +38,11 @@ export const createPosOrder = (data: any, idempotencyKey?: string) =>
 export const addOrderNote = (id: string, note: string) =>
   api.put(`/orders/${id}/note`, { note }).then(unwrap)
 
+export const holdOrder = (id: string) =>
+  api.put(`/orders/${id}/hold`).then(unwrap)
+
+export const unholdOrder = (id: string) =>
+  api.put(`/orders/${id}/unhold`).then(unwrap)
+
 export const refundOrder = (id: string, reason: string, items?: any[]) =>
   api.post(`/orders/${id}/refund`, { reason, items }).then(unwrap)

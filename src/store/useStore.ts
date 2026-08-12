@@ -74,7 +74,7 @@ interface AppState {
   createTable: (data: any) => Promise<void>
   updateTable: (id: string, data: any) => Promise<void>
   removeTable: (id: string) => Promise<void>
-  setTableStatus: (id: string, status: string) => Promise<void>
+  setTableStatus: (id: string, status: string, version?: number) => Promise<void>
   fetchZones: () => Promise<void>
   createZone: (data: any) => Promise<void>
   updateZone: (id: string, data: any) => Promise<void>
@@ -133,7 +133,7 @@ const defaultOnboarding: OnboardingData = {
   socialMedia: [], aiMarketing: false,
 }
 
-export const useStore = create<AppState>((set) => ({
+export const useStore = create<AppState>()((set, get) => ({
   darkMode: (() => {
     try {
       return localStorage.getItem('app-theme')
@@ -671,6 +671,7 @@ export const useStore = create<AppState>((set) => ({
             sessions: t.sessions ?? [],
             qrCode: t.qrCode ?? null,
             _count: t._count ?? { orders: 0 },
+            version: t.version ?? 0,
           }))
         : []
       set({ tables: normalized as any })
@@ -693,7 +694,12 @@ export const useStore = create<AppState>((set) => ({
       const res = await tablesApi.updateTable(id, data)
       set((s) => ({ tables: s.tables.map((t: any) => (t.id === id ? { ...t, ...data, ...res } : t)) }))
     } catch (err: any) {
-      toast.error(err?.response?.data?.message || 'Failed to update table')
+      if (err?.response?.status === 409) {
+        toast.error('Table was modified elsewhere — refresh and try again')
+        get().fetchTables()
+      } else {
+        toast.error(err?.response?.data?.message || 'Failed to update table')
+      }
       throw err
     }
   },
@@ -707,12 +713,17 @@ export const useStore = create<AppState>((set) => ({
       throw err
     }
   },
-  setTableStatus: async (id, status) => {
+  setTableStatus: async (id, status, version) => {
     try {
-      await tablesApi.setTableStatus(id, status)
-      set((s) => ({ tables: s.tables.map((t: any) => (t.id === id ? { ...t, status } : t)) }))
+      await tablesApi.setTableStatus(id, status, version)
+      set((s) => ({ tables: s.tables.map((t: any) => (t.id === id ? { ...t, status, version: (t.version ?? 0) + 1 } : t)) }))
     } catch (err: any) {
-      toast.error(err?.response?.data?.message || 'Failed to update table status')
+      if (err?.response?.status === 409) {
+        toast.error('Table was modified elsewhere — refresh and try again')
+        get().fetchTables()
+      } else {
+        toast.error(err?.response?.data?.message || 'Failed to update table status')
+      }
       throw err
     }
   },

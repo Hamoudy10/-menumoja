@@ -60,3 +60,29 @@ export function isUniqueViolation(error: unknown): boolean {
     (error as { code?: string }).code === IDEMPOTENCY_RACE_CODE
   );
 }
+
+/**
+ * Looks up a payment previously created under the given idempotency key.
+ * Checks Redis first (fast path), then falls back to the database unique
+ * constraint (covers races and Redis data loss).
+ */
+export async function findIdempotentPayment(key: string, scope: string): Promise<any | null> {
+  const redisKey = `idempotency:payment:${scope}:${key}`;
+  const paymentId = await redis.get(redisKey);
+  if (paymentId) {
+    const payment = await prisma.payment.findUnique({ where: { id: paymentId } });
+    if (payment) return payment;
+  }
+
+  const payment = await prisma.payment.findFirst({
+    where: { idempotencyKey: key },
+  });
+  return payment;
+}
+
+/**
+ * Records a successful payment creation against the idempotency key.
+ */
+export async function recordPaymentIdempotency(key: string, scope: string, paymentId: string): Promise<void> {
+  await redis.set(`idempotency:payment:${scope}:${key}`, paymentId, 'EX', IDEMPOTENCY_TTL_SECONDS);
+}

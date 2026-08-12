@@ -457,15 +457,30 @@ export const createTableSchema = z.object({
   zoneId: z.string().uuid().optional().nullable(),
 }).strict();
 
-export const updateTableSchema = createTableSchema.partial().strict();
+export const updateTableSchema = z.object({
+  tableNumber: z.number().int().min(1).optional(),
+  label: z.string().min(1).max(50).optional(),
+  capacity: z.number().int().min(1).optional(),
+  area: z.string().max(50).optional(),
+  shape: z.enum(['ROUND', 'SQUARE', 'RECTANGLE', 'OVAL', 'BOOTH']).optional(),
+  positionX: z.number().int().optional(),
+  positionY: z.number().int().optional(),
+  width: z.number().int().min(1).max(20).optional(),
+  height: z.number().int().min(1).max(20).optional(),
+  rotation: z.number().int().min(-360).max(360).optional(),
+  zoneId: z.string().uuid().optional().nullable(),
+  version: z.number().int().min(0).optional(),
+}).strict();
 
 export const updateTableStatusSchema = z.object({
   status: z.enum(['FREE', 'OCCUPIED', 'RESERVED', 'UNAVAILABLE']),
+  version: z.number().int().min(0).optional(),
 }).strict();
 
 export const updateTableSessionSchema = z.object({
   action: z.enum(['START', 'END']),
   guestCount: z.number().int().min(1).max(100).optional(),
+  version: z.number().int().min(0).optional(),
 }).strict();
 
 export const createZoneSchema = z.object({

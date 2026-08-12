@@ -28,6 +28,7 @@ const orderListQuerySchema = z.object({
   dateFrom: z.string().datetime().optional(),
   dateTo: z.string().datetime().optional(),
   tableNumber: z.coerce.number().int().min(1).optional(),
+  held: z.enum(['true', 'false']).optional(),
   page: z.coerce.number().int().min(1).default(1),
   perPage: z.coerce.number().int().min(1).max(100).default(20),
 });
@@ -600,13 +601,14 @@ router.get('/',
   validateQuery(orderListQuerySchema),
   asyncHandler(async (req, res) => {
     const restaurantId = (req as any).restaurantId;
-    const { status, paymentStatus, dateFrom, dateTo, tableNumber, page, perPage } = req.query as any;
+    const { status, paymentStatus, dateFrom, dateTo, tableNumber, page, perPage, held } = req.query as any;
 
     const where: any = { restaurantId };
 
     if (status) where.status = status;
     if (paymentStatus) where.paymentStatus = paymentStatus;
     if (tableNumber) where.tableNumber = tableNumber;
+    if (held !== undefined) where.isHeld = held === 'true';
     if (dateFrom || dateTo) {
       where.createdAt = {};
       if (dateFrom) where.createdAt.gte = new Date(dateFrom);
@@ -674,6 +676,7 @@ router.get('/live',
       where: {
         restaurantId,
         status: { in: ['PENDING', 'CONFIRMED', 'PREPARING', 'READY'] },
+        isHeld: false,
       },
       orderBy: [
         { status: 'asc' },
@@ -884,6 +887,7 @@ router.get('/kitchen',
       where: {
         restaurantId,
         status: { in: ['PENDING', 'CONFIRMED', 'PREPARING', 'READY'] },
+        isHeld: false,
       },
       orderBy: { confirmedAt: 'asc' },
       select: {
@@ -1152,6 +1156,74 @@ router.put('/:id/assign-waiter',
       },
     });
 
+    res.json({ success: true, data: updated });
+  })
+);
+
+// PUT /:id/hold - Persist a held order (survives refresh/network loss)
+router.put('/:id/hold',
+  authenticate,
+  enforceRestaurantScope,
+  auditLog,
+  validateParams(idParamSchema),
+  asyncHandler(async (req, res) => {
+    const restaurantId = (req as any).restaurantId;
+    const id = String(req.params.id);
+
+    const order = await prisma.order.findFirst({
+      where: { id, restaurantId },
+      select: { id: true, status: true, paymentStatus: true },
+    });
+
+    if (!order) {
+      throw new NotFoundError('Order not found', 'Agizo halikupatikana');
+    }
+
+    if (order.paymentStatus === 'PAID') {
+      throw new ValidationError('Paid orders cannot be held', 'Agizo lililolipwa haliwezi kushikiliwa');
+    }
+
+    if (!['PENDING', 'CONFIRMED'].includes(order.status)) {
+      throw new ValidationError('Only pending or confirmed orders can be held', 'Agizo linaloweza kushikiliwa ni lile linalosubiri tu');
+    }
+
+    const updated = await prisma.order.update({
+      where: { id },
+      data: { isHeld: true },
+      select: { id: true, orderNumber: true, isHeld: true },
+    });
+
+    logger.info('Order held', { orderId: id, restaurantId, userId: req.user?.userId });
+    res.json({ success: true, data: updated });
+  })
+);
+
+// PUT /:id/unhold - Release a held order back into the live queue
+router.put('/:id/unhold',
+  authenticate,
+  enforceRestaurantScope,
+  auditLog,
+  validateParams(idParamSchema),
+  asyncHandler(async (req, res) => {
+    const restaurantId = (req as any).restaurantId;
+    const id = String(req.params.id);
+
+    const order = await prisma.order.findFirst({
+      where: { id, restaurantId },
+      select: { id: true },
+    });
+
+    if (!order) {
+      throw new NotFoundError('Order not found', 'Agizo halikupatikana');
+    }
+
+    const updated = await prisma.order.update({
+      where: { id },
+      data: { isHeld: false },
+      select: { id: true, orderNumber: true, isHeld: true },
+    });
+
+    logger.info('Order unheld', { orderId: id, restaurantId, userId: req.user?.userId });
     res.json({ success: true, data: updated });
   })
 );

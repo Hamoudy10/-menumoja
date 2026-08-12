@@ -429,6 +429,10 @@ router.put(
       throw new AppError(404, 'TABLE_NOT_FOUND', 'Table not found', 'Meza haikupatikana');
     }
 
+    if (data.version !== undefined && table.version !== data.version) {
+      throw new AppError(409, 'TABLE_CONFLICT', 'Table was modified by another device. Refresh and try again.', 'Meza imebadilishwa na kifaa kingine. Onyesha upya na ujaribu tena.');
+    }
+
     if (data.tableNumber && data.tableNumber !== table.tableNumber) {
       const conflict = await prisma.restaurantTable.findUnique({
         where: { restaurantId_tableNumber: { restaurantId, tableNumber: data.tableNumber } },
@@ -445,9 +449,11 @@ router.put(
       }
     }
 
+    const { version, ...tableData } = data;
+
     const updated = await prisma.restaurantTable.update({
       where: { id: tableId },
-      data,
+      data: { ...tableData, version: { increment: 1 } },
     });
 
     res.json({
@@ -505,16 +511,20 @@ router.put(
   asyncHandler(async (req, res) => {
     const restaurantId = (req as any).restaurantId;
     const tableId = String(req.params.tableId);
-    const { status } = req.body;
+    const { status, version } = req.body;
 
     const table = await prisma.restaurantTable.findFirst({ where: { id: tableId, restaurantId } });
     if (!table) {
       throw new AppError(404, 'TABLE_NOT_FOUND', 'Table not found', 'Meza haikupatikana');
     }
 
+    if (version !== undefined && table.version !== version) {
+      throw new AppError(409, 'TABLE_CONFLICT', 'Table was modified by another device. Refresh and try again.', 'Meza imebadilishwa na kifaa kingine. Onyesha upya na ujaribu tena.');
+    }
+
     const updated = await prisma.restaurantTable.update({
       where: { id: tableId },
-      data: { status },
+      data: { status, version: { increment: 1 } },
     });
 
     if (status === 'FREE') {
@@ -542,11 +552,15 @@ router.put(
   asyncHandler(async (req, res) => {
     const restaurantId = (req as any).restaurantId;
     const tableId = String(req.params.tableId);
-    const { action, guestCount } = req.body;
+    const { action, guestCount, version } = req.body;
 
     const table = await prisma.restaurantTable.findFirst({ where: { id: tableId, restaurantId } });
     if (!table) {
       throw new AppError(404, 'TABLE_NOT_FOUND', 'Table not found', 'Meza haikupatikana');
+    }
+
+    if (version !== undefined && table.version !== version) {
+      throw new AppError(409, 'TABLE_CONFLICT', 'Table was modified by another device. Refresh and try again.', 'Meza imebadilishwa na kifaa kingine. Onyesha upya na ujaribu tena.');
     }
 
     let session;
@@ -564,7 +578,7 @@ router.put(
       }
       const updated = await prisma.restaurantTable.update({
         where: { id: tableId },
-        data: { status: table.status === 'FREE' ? 'OCCUPIED' : table.status },
+        data: { status: table.status === 'FREE' ? 'OCCUPIED' : table.status, version: { increment: 1 } },
       });
       if (updated.status !== table.status) {
         try {

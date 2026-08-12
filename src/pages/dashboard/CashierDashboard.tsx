@@ -95,6 +95,7 @@ export default function CashierDashboard() {
   const soundRef = useRef<HTMLAudioElement | null>(null)
   const posRef = useRef<HTMLDivElement>(null)
   const quickOrderKeyRef = useRef<string | null>(null)
+  const paymentKeyRef = useRef<string | null>(null)
 
   useEffect(() => {
     soundRef.current = new Audio('data:audio/wav;base64,UklGRnoGAABXQVZFZm10IBAAAAABAAEAQB8AAEAfAAABAAgAZGF0YQoGAACAf39/f4B/f3+AgH9/f3+Af39/gIB/f39/gH9/f4CAf39/f4B/f3+AgH9/f3+Af39/gIB/f39/gH9/f4B/f3+AgICAgICA')
@@ -109,9 +110,10 @@ export default function CashierDashboard() {
 
   const fetchOrders = async () => {
     try {
-      const [ordersRes, summaryRes] = await Promise.all([
+      const [ordersRes, summaryRes, heldRes] = await Promise.all([
         ordersApi.fetchOrders({ perPage: 100 }),
         paymentsApi.fetchTodaySummary(),
+        ordersApi.fetchOrders({ perPage: 100, held: 'true' }),
       ])
       const raw = Array.isArray(ordersRes) ? ordersRes : ordersRes?.orders || ordersRes || []
       const normalized = raw.map((o: any) => ({
@@ -137,6 +139,12 @@ export default function CashierDashboard() {
         if (activeTab === 'pending') return o.paymentStatus !== 'PAID'
         return o.paymentStatus === 'PAID'
       }))
+      const heldRaw = Array.isArray(heldRes) ? heldRes : heldRes?.orders || heldRes || []
+      setHeldOrders(heldRaw.map((o: any) => ({
+        ...o,
+        total: Number(o.total ?? o.totalAmount ?? 0),
+        heldAt: o.updatedAt || o.createdAt,
+      })))
       if (summaryRes) setStats({
         todayTotal: summaryRes.totalRevenue || summaryRes.total || 0,
         ordersCount: summaryRes.totalOrders || summaryRes.orderCount || 0,
@@ -183,6 +191,8 @@ export default function CashierDashboard() {
 
   useEffect(() => { fetchOrders() }, [activeTab])
   useEffect(() => { const iv = setInterval(fetchOrders, 30000); return () => clearInterval(iv) }, [activeTab])
+
+  useEffect(() => { paymentKeyRef.current = null }, [selectedOrder?.id])
 
   const refreshAll = async () => {
     setRefreshing(true)
@@ -314,6 +324,7 @@ export default function CashierDashboard() {
   const handlePayment = async () => {
     if (!selectedOrder) return
     setProcessing(true)
+    if (!paymentKeyRef.current) paymentKeyRef.current = crypto.randomUUID()
     try {
       const tip = parseFloat(tipAmount) || 0
       const sc = parseFloat(serviceChargePercent) || 0
@@ -326,18 +337,20 @@ export default function CashierDashboard() {
           orderId: selectedOrder.id, amount: orderTotal,
           amountTendered: parseFloat(cashReceived),
           discount: parseFloat(discount) || 0,
-        })
+        }, paymentKeyRef.current)
         paidReceiptNumber = res?.receiptNumber || null
       } else if (paymentMethod === 'card') {
-        const res = await paymentsApi.recordCardPayment(selectedOrder.id, orderTotal)
+        const res = await paymentsApi.recordCardPayment(selectedOrder.id, orderTotal, paymentKeyRef.current)
         paidReceiptNumber = res?.receiptNumber || null
       } else if (paymentMethod === 'mpesa') {
         if (!mpesaPhone) { showErrorToast('Enter customer phone'); setProcessing(false); return }
-        await paymentsApi.initiateMpesa(selectedOrder.id, mpesaPhone)
+        await paymentsApi.initiateMpesa(selectedOrder.id, mpesaPhone, paymentKeyRef.current)
+        paymentKeyRef.current = null
         showSuccessToast('M-Pesa STK Push sent')
         setMpesaPhone(''); setSelectedOrder(null); setProcessing(false); fetchOrders()
         return
       }
+      paymentKeyRef.current = null
 
       if (tip > 0) await paymentsApi.recordTip(selectedOrder.id, tip, paymentMethod).catch(() => {})
       if (scAmount > 0) await paymentsApi.recordServiceCharge(selectedOrder.id, scAmount).catch(() => {})
@@ -381,17 +394,25 @@ export default function CashierDashboard() {
     finally { setVoiding(false) }
   }
 
-  const handleHoldOrder = () => {
+  const handleHoldOrder = async () => {
     if (!selectedOrder) return
-    setHeldOrders((prev) => [...prev, { ...selectedOrder, heldAt: new Date().toISOString() }])
-    setSelectedOrder(null)
-    showSuccessToast('Order held')
+    try {
+      await ordersApi.holdOrder(selectedOrder.id)
+      setHeldOrders((prev) => [...prev, { ...selectedOrder, heldAt: new Date().toISOString() }])
+      setSelectedOrder(null)
+      showSuccessToast('Order held')
+      fetchOrders()
+    } catch { showErrorToast('Failed to hold order') }
   }
 
-  const handleRecallOrder = (order: any) => {
-    setSelectedOrder(order)
-    setHeldOrders((prev) => prev.filter((o) => o.id !== order.id))
-    showSuccessToast('Order recalled')
+  const handleRecallOrder = async (order: any) => {
+    try {
+      await ordersApi.unholdOrder(order.id)
+      setSelectedOrder(order)
+      setHeldOrders((prev) => prev.filter((o) => o.id !== order.id))
+      showSuccessToast('Order recalled')
+      fetchOrders()
+    } catch { showErrorToast('Failed to recall order') }
   }
 
   const handleCreateQuickOrder = async () => {

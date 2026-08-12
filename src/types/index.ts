@@ -168,6 +168,7 @@ export interface FloorTable {
   sessions?: Array<{ id: string; startedAt: string; endedAt: string | null; guestCount: number | null }>
   qrCode?: { id: string; label?: string; qrImageUrl?: string; scanCount?: number } | null
   _count?: { orders: number }
+  version?: number
 }
 
 export interface Transaction {

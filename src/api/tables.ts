@@ -14,11 +14,11 @@ export const updateTable = (id: string, data: any) =>
 export const deleteTable = (id: string) =>
   api.delete(`/restaurant/me/tables/${id}`).then(unwrap)
 
-export const setTableStatus = (id: string, status: string) =>
-  api.put(`/restaurant/me/tables/${id}/status`, { status }).then(unwrap)
+export const setTableStatus = (id: string, status: string, version?: number) =>
+  api.put(`/restaurant/me/tables/${id}/status`, { status, version }).then(unwrap)
 
-export const updateTableSession = (id: string, action: 'START' | 'END', guestCount?: number) =>
-  api.put(`/restaurant/me/tables/${id}/session`, { action, guestCount }).then(unwrap)
+export const updateTableSession = (id: string, action: 'START' | 'END', guestCount?: number, version?: number) =>
+  api.put(`/restaurant/me/tables/${id}/session`, { action, guestCount, version }).then(unwrap)
 
 export const fetchZones = () =>
   api.get('/restaurant/me/zones').then(unwrap)

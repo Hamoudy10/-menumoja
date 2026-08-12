@@ -110,7 +110,7 @@ export default function TablesPage() {
     setSaving(true)
     try {
       if (editTable) {
-        await updateTable(editTable.id, payload)
+        await updateTable(editTable.id, { ...payload, version: editTable.version })
         showSuccessToast('Table updated')
       } else {
         const highest = tables.reduce((m, t) => Math.max(m, t.positionY * 100 + t.positionX), 0)
@@ -255,8 +255,8 @@ export default function TablesPage() {
               mode="edit"
               selectedId={selectedId}
               onSelect={handleSelect}
-              onMoveTable={async (id, x, y) => { try { await updateTable(id, { positionX: x, positionY: y }) } catch { showErrorToast('Failed to save position') } }}
-              onResizeTable={async (id, w, h) => { try { await updateTable(id, { width: w, height: h }) } catch { showErrorToast('Failed to save size') } }}
+              onMoveTable={async (id, x, y) => { try { const t = tables.find((tb: any) => tb.id === id); await updateTable(id, { positionX: x, positionY: y, version: t?.version }) } catch { showErrorToast('Failed to save position') } }}
+              onResizeTable={async (id, w, h) => { try { const t = tables.find((tb: any) => tb.id === id); await updateTable(id, { width: w, height: h, version: t?.version }) } catch { showErrorToast('Failed to save size') } }}
               onMoveZone={async (id, x, y) => { try { await updateZone(id, { positionX: x, positionY: y }) } catch { showErrorToast('Failed to save zone') } }}
               onResizeZone={async (id, w, h) => { try { await updateZone(id, { width: w, height: h }) } catch { showErrorToast('Failed to save zone') } }}
               onZoneDrawn={handleZoneDrawn}
@@ -331,12 +331,12 @@ export default function TablesPage() {
                     {tableStatus!.label}
                   </span>
                   {selectedTable.status === 'OCCUPIED' && (
-                    <button onClick={() => setTableStatus(selectedTable.id, 'FREE')} className="text-[11px] font-semibold text-success hover:underline">
+                    <button onClick={() => setTableStatus(selectedTable.id, 'FREE', selectedTable.version)} className="text-[11px] font-semibold text-success hover:underline">
                       Mark free
                     </button>
                   )}
                   {selectedTable.status !== 'UNAVAILABLE' && selectedTable.status !== 'RESERVED' && selectedTable.status !== 'OCCUPIED' && (
-                    <button onClick={() => setTableStatus(selectedTable.id, 'UNAVAILABLE')} className="text-[11px] font-semibold text-text-secondary hover:underline">
+                    <button onClick={() => setTableStatus(selectedTable.id, 'UNAVAILABLE', selectedTable.version)} className="text-[11px] font-semibold text-text-secondary hover:underline">
                       Mark unavailable
                     </button>
                   )}

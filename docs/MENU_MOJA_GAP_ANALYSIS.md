@@ -219,7 +219,16 @@ TARGET DOMAIN                    CURRENT STATE                        GAP CLASS
 
 **Remaining follow-ups for Tier 0:** apply migrations to the live Supabase database on the next deployment; monitor that `prisma migrate deploy` succeeds in `start.sh`.
 
-### Tier 1 — RELIABILITY (master plan phases 1–3)
+### Tier 1a — POS/KDS RELIABILITY ✅ EXECUTED (2026-08-12)
+1. ✅ **Payment idempotency** — `Payment.idempotencyKey` + composite unique (migration 4); cash/card record + M-Pesa initiate replay on duplicate `Idempotency-Key` (Redis fast-path + DB fallback + P2002 race resolution); CashierDashboard generates a key per payment flow (reset on order change/success).
+2. ✅ **Persisted held orders** — `Order.isHeld`; `PUT /orders/:id/hold` (rejects paid/preparing) + `/unhold`; live & kitchen queries exclude held; `GET /orders?held=true`; POS loads/releases held orders via API (survives refresh).
+3. ✅ **KDS hardening** — cancel-with-reason (via existing cancel API), reprint ticket (72mm print window), new-order chime with sound toggle (localStorage `kds_sound`), online/offline + last-sync indicator.
+4. ✅ **Table optimistic locking** — `RestaurantTable.version`; status/session/update endpoints reject stale versions with 409 `TABLE_CONFLICT`; store refetches tables on conflict.
+5. ✅ Tests — `tests/reliability.test.ts` (7 tests): cash payment replay (single create), M-Pesa initiate replay, hold/unhold + rejection rules, table version match + stale 409.
+
+**Remaining in Tier 1a:** split/partial payments (allocation model), modifiers/add-ons (DB + POS + QR + KDS), KDS station routing, table merge/split.
+
+### Tier 1b — M-PESA STATE MACHINE (next recommended)
 7. POS hardening: modifiers, split/partial payments, held orders (persisted), KDS station/actions, table merge/split, optimistic locking
 8. M-Pesa: state machine, PaymentAttempt/WebhookEvent, reconciliation dashboard, timeout/reversal handling
 9. Offline-first: local queues + sync + connectivity UI + PWA decision

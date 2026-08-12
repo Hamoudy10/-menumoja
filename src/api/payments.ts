@@ -17,14 +17,14 @@ export const getPayment = (id: string) =>
 export const fetchTodaySummary = () =>
   api.get('/payments/summary/today').then(unwrap)
 
-export const initiateMpesa = (orderId: string, phone: string) =>
-  api.post('/payments/mpesa/initiate', { orderId, phone }).then(unwrap)
+export const initiateMpesa = (orderId: string, phone: string, idempotencyKey?: string) =>
+  api.post('/payments/mpesa/initiate', { orderId, phone }, idempotencyKey ? { headers: { 'Idempotency-Key': idempotencyKey } } : undefined).then(unwrap)
 
 export const getMpesaStatus = (checkoutRequestId: string) =>
   api.get(`/payments/mpesa/${checkoutRequestId}/status`).then(unwrap)
 
-export const recordCashPayment = (data: any) =>
-  api.post('/payments/cash/record', data).then(unwrap)
+export const recordCashPayment = (data: any, idempotencyKey?: string) =>
+  api.post('/payments/cash/record', data, idempotencyKey ? { headers: { 'Idempotency-Key': idempotencyKey } } : undefined).then(unwrap)
 
 export const getRevenueReport = (params?: any) =>
   api.get('/payments/report', { params }).then(unwrap)
@@ -41,8 +41,8 @@ export const closeShift = (shiftId: string, actualCash: number) =>
 export const getShifts = () =>
   api.get('/payments/cash/shifts').then(unwrap)
 
-export const recordCardPayment = (orderId: string, amount: number) =>
-  api.post('/payments/card/record', { orderId, amount }).then(unwrap)
+export const recordCardPayment = (orderId: string, amount: number, idempotencyKey?: string) =>
+  api.post('/payments/card/record', { orderId, amount }, idempotencyKey ? { headers: { 'Idempotency-Key': idempotencyKey } } : undefined).then(unwrap)
 
 export const recordTip = (orderId: string, amount: number, method: string) =>
   api.post('/payments/tip', { orderId, amount, method }).then(unwrap)

@@ -616,7 +616,8 @@ model RestaurantTable {
   rotation         Int          @default(0) @map("rotation")
   zoneId           String?      @map("zone_id") @db.Uuid
   currentSessionId String?      @map("current_session_id")
-  qrCodeId         String?      @map("qr_code_id") @db.Uuid
+  qrCodeId         String?      @map("qr_code_id")
+  version          Int          @default(0)
   createdAt        DateTime     @default(now()) @map("created_at")
   updatedAt        DateTime     @updatedAt @map("updated_at")
 
@@ -696,6 +697,7 @@ model Order {
   customerName         String?            @map("customer_name")
   customerPhone        String?            @map("customer_phone")
   idempotencyKey       String?            @map("idempotency_key")
+  isHeld               Boolean            @default(false) @map("is_held")
   createdAt            DateTime           @default(now()) @map("created_at")
   updatedAt            DateTime           @updatedAt @map("updated_at")
 
@@ -749,6 +751,7 @@ model Payment {
   mpesaPhone             String?       @map("mpesa_phone")
   mpesaCheckoutRequestId String?       @map("mpesa_checkout_request_id")
   mpesaReceiptNumber     String?       @map("mpesa_receipt_number")
+  idempotencyKey         String?       @map("idempotency_key")
   cashReceived           Decimal?      @map("cash_received") @db.Decimal(10, 2)
   changeGiven            Decimal?      @map("change_given") @db.Decimal(10, 2)
   cashierId              String?       @map("cashier_id") @db.Uuid
@@ -765,6 +768,7 @@ model Payment {
   @@index([orderId])
   @@index([cashierId])
   @@index([status])
+  @@unique([restaurantId, idempotencyKey])
   @@map("payments")
 }
 
