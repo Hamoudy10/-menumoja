@@ -24,4 +24,8 @@ p.owner.count().then(c => {
 "
 
 echo "=== Starting application ==="
-node_modules/.bin/tsx src/index.ts
+if [ -f dist/index.js ]; then
+  node dist/index.js
+else
+  node_modules/.bin/tsx src/index.ts
+fi

@@ -409,10 +409,10 @@ router.post(
         label: label || `Table ${tableNumber}`,
         capacity: capacity || 4,
         shape: shape || 'ROUND',
-        positionX: positionX ?? 0,
-        positionY: positionY ?? 0,
-        width: width ?? 2,
-        height: height ?? 2,
+        positionX: positionX != null ? Math.round(positionX) : 0,
+        positionY: positionY != null ? Math.round(positionY) : 0,
+        width: width != null ? Math.max(1, Math.round(width)) : 2,
+        height: height != null ? Math.max(1, Math.round(height)) : 2,
         rotation: rotation ?? 0,
         zoneId: zoneId || null,
       },
@@ -463,6 +463,10 @@ router.put(
     }
 
     const { version, ...tableData } = data;
+    if (tableData.positionX != null) tableData.positionX = Math.round(tableData.positionX);
+    if (tableData.positionY != null) tableData.positionY = Math.round(tableData.positionY);
+    if (tableData.width != null) tableData.width = Math.max(1, Math.round(tableData.width));
+    if (tableData.height != null) tableData.height = Math.max(1, Math.round(tableData.height));
 
     const updated = await prisma.restaurantTable.update({
       where: { id: tableId },
@@ -643,10 +647,10 @@ router.post(
         restaurantId,
         name,
         color: color || '#E2E8F0',
-        positionX: positionX ?? 0,
-        positionY: positionY ?? 0,
-        width: width ?? 12,
-        height: height ?? 8,
+        positionX: positionX != null ? Math.round(positionX) : 0,
+        positionY: positionY != null ? Math.round(positionY) : 0,
+        width: width != null ? Math.max(1, Math.round(width)) : 12,
+        height: height != null ? Math.max(1, Math.round(height)) : 8,
       },
     });
 
@@ -668,9 +672,15 @@ router.put(
       throw new AppError(404, 'ZONE_NOT_FOUND', 'Zone not found', 'Eneo halikupatikana');
     }
 
+    const zoneData: any = { ...req.body };
+    if (zoneData.positionX != null) zoneData.positionX = Math.round(zoneData.positionX);
+    if (zoneData.positionY != null) zoneData.positionY = Math.round(zoneData.positionY);
+    if (zoneData.width != null) zoneData.width = Math.max(1, Math.round(zoneData.width));
+    if (zoneData.height != null) zoneData.height = Math.max(1, Math.round(zoneData.height));
+
     const updated = await prisma.tableZone.update({
       where: { id: zoneId },
-      data: req.body,
+      data: zoneData,
     });
 
     res.json({ success: true, data: updated });

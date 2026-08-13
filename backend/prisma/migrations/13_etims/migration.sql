@@ -36,5 +36,3 @@ ALTER TABLE "etr_submissions" ADD CONSTRAINT "etr_submissions_restaurant_id_fkey
 -- AddForeignKey
 ALTER TABLE "etr_submissions" ADD CONSTRAINT "etr_submissions_receipt_id_fkey" FOREIGN KEY ("receipt_id") REFERENCES "receipts"("id") ON DELETE CASCADE ON UPDATE CASCADE;
 
--- AddForeignKey
-ALTER TABLE "receipts" ADD CONSTRAINT "receipts_payment_id_fkey" FOREIGN KEY ("payment_id") REFERENCES "payments"("id") ON DELETE SET NULL ON UPDATE CASCADE;
