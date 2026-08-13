@@ -91,7 +91,7 @@ app.use(cors({
   origin: config.frontendUrl ? [config.frontendUrl, ...(config.nodeEnv === 'development' ? ['http://localhost:5173'] : [])] : '*',
   credentials: true,
   methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
-  allowedHeaders: ['Content-Type', 'Authorization', 'x-session-id', 'x-qr-code-id', 'x-staff-pin'],
+  allowedHeaders: ['Content-Type', 'Authorization', 'Idempotency-Key', 'x-session-id', 'x-qr-code-id', 'x-staff-pin'],
 }));
 
 if (config.nodeEnv !== 'test') {
