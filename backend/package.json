@@ -9,7 +9,7 @@
   "build": "tsc",
   "start": "sh scripts/start.sh",
   "start:dev": "tsx src/index.ts",
-  "start:prod": "npx prisma generate && node dist/index.js",
+  "start:prod": "sh scripts/start.sh",
     "postinstall": "prisma generate",
     "db:generate": "prisma generate",
     "db:push": "prisma db push",
