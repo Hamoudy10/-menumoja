@@ -1,44 +1,47 @@
-# Menu Moja — Portfolio
+# Menu Moja — Sales Portfolio
 
-Print-ready portfolio (6 pages, A4): `menumoja-portfolio.html` — real screenshots embedded, contact details included.
+Conversion-focused single-page sales portfolio for restaurant owners in Mombasa.
 
-Live hosted copy: **https://menumoja.vercel.app/portfolio.html**
+- **Hosted (live):** https://menumoja.vercel.app/portfolio.html
+- **Source:** `menumoja-portfolio.html` (this folder) — same page, open directly in any browser
+- **Print:** Ctrl/Cmd + P → Save as PDF (A4) for a paper copy
 
-## How to export to PDF (6 pages, A4)
+## Structure (one page, conversion funnel)
 
-1. Open `menumoja-portfolio.html` in Chrome or Edge (or the hosted link).
-2. Press **Ctrl + P** (Print).
-3. Destination: **Save as PDF**.
-4. Set **Paper size: A4** · **Margins: None** · tick **Background graphics**.
-5. Save as `MenuMoja-Portfolio.pdf`.
+Hero (CTA: Book a Demo / Try Menu Moja / WhatsApp) → Trust strip → Problems →
+What is Menu Moja → RUN/UNDERSTAND/GROW → Available now → Real screenshots →
+How it works (flow + before/after) → Keep your POS → Built for Kenya →
+Business benefits → Roadmap → Onboarding steps → Pricing → FAQ →
+Trust & security → Demo CTA → Contact.
 
-The HTML is styled for exactly 6 A4 pages (cover, RUN/UNDERSTAND/GROW,
-screenshots, positioning/Kenya, how-it-works/available-now, outcomes/demo/contact).
+## Key links (edit in the HTML if they change)
 
-## Updating screenshots
+- WhatsApp / Book a demo: `https://wa.me/254742773562` (number +254 742 773 562)
+- Live demo: `https://menumoja.vercel.app/menu/amorino-restaurant`
+  (replace with the demo video link when ready — search `amorino-restaurant`)
+- Email: badikuutechsolutions@gmail.com
 
-Source captures live in `../snapshots/`. The portfolio embeds them as base64 —
-regenerate with `node <path-to>/build-portfolio.js` after replacing captures.
-Current screenshot slots (10):
+## Screenshots
 
-dashboard → Restaurant Dashboard
-customer menu → QR Digital Menu
-cart visual → Customer Ordering
-POS → Point of Sale
-kitchen display → Kitchen Display
-Tables and floor plan → Tables & Floor Plan
-payments → M-Pesa & Payments
-analytics → Analytics
-customers → Customers (CRM)
-AI manager → AI — Restaurant Manager
+Source captures: `../snapshots/`. Optimized WebP copies for the page live in
+`./screenshots/` (also mirrored to `public/screenshots/` for the hosted page).
 
-## Demo
+Slots (10):
+dashboard → Owner Dashboard · POS → Point of Sale · customer menu → QR Menu ·
+cart visual → Customer Ordering · kitchen display → KDS ·
+Tables and floor plan → Tables & Floor Plan · payments → M-Pesa & Payments ·
+analytics → Analytics · customers → Customers (CRM) · AI manager → AI Manager.
 
-The TRY MENU MOJA button points at the live QR menu
-(menumoja.vercel.app/menu/amorino-restaurant). Replace with the demo video
-link when the video is ready (search for `amorino-restaurant` in the HTML).
+Regenerate both HTML + WebP copies: `node <build-portfolio2.js>` (in temp).
 
-## WhatsApp reply script (client has already asked)
+## Honesty rules
+
+- AVAILABLE NOW only lists verified features.
+- Roadmap items are separated and labeled.
+- No fake testimonials/statistics — "real screens" is the social proof.
+- Replace the demo button with the video link when ready.
+
+## WhatsApp reply script
 
 > "Absolutely. I'll send you our Menu Moja portfolio shortly. It gives a brief
 > overview of the platform, the restaurant problems we're solving, and some
@@ -50,5 +53,3 @@ After they've had a look:
 > "Once you've had a look, I'd be happy to visit your restaurant for 15–20
 > minutes. I'd like to understand what system you're currently using and show
 > you specifically where Menu Moja could add value."
-
-That's the transition from portfolio → meeting → demo → pilot.
