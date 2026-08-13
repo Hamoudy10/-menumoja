@@ -6,11 +6,22 @@ import { prisma } from '@/config/database';
 import logger from '@/utils/logger';
 import { emitTableStatusChanged } from '@/hooks/socket';
 import { invalidateMenuCache } from '@/utils/cache';
+import { assertCanCreateTable, getSubscriptionSummary } from '@/services/subscription.service';
 
 const router = Router();
 
 router.use(authenticate);
 router.use(enforceRestaurantScope);
+
+// GET /me/subscription - plan, limits and current usage (single source of truth)
+router.get(
+  '/me/subscription',
+  asyncHandler(async (req, res) => {
+    const restaurantId = (req as any).restaurantId;
+    const summary = await getSubscriptionSummary(restaurantId);
+    res.json({ success: true, data: summary });
+  })
+);
 
 // GET /me - Get authenticated owner's restaurant
 router.get(
@@ -374,6 +385,8 @@ router.post(
   asyncHandler(async (req, res) => {
     const restaurantId = (req as any).restaurantId;
     const { tableNumber, label, capacity, shape, positionX, positionY, width, height, rotation, zoneId } = req.body;
+
+    await assertCanCreateTable(restaurantId);
 
     const existing = await prisma.restaurantTable.findUnique({
       where: { restaurantId_tableNumber: { restaurantId, tableNumber } },

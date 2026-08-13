@@ -390,6 +390,37 @@ router.post(
   })
 );
 
+// POST /admin/login - Platform super-admin login
+router.post(
+  '/admin/login',
+  authLimiter,
+  asyncHandler(async (req, res) => {
+    const { email, password } = req.body;
+    if (!email || !password) {
+      throw new AppError(400, 'MISSING_FIELDS', 'Email and password are required', 'Barua pepe na nenosiri zinahitajika');
+    }
+
+    const admin = await prisma.platformAdmin.findUnique({ where: { email: String(email).toLowerCase().trim() } });
+    if (!admin || !(await comparePassword(String(password), admin.passwordHash))) {
+      throw new AppError(401, 'INVALID_CREDENTIALS', 'Invalid email or password', 'Barua pepe au nenosiri si sahihi');
+    }
+
+    const tokens = generateTokens(admin.id, 'super_admin');
+    await storeRefreshToken(admin.id, tokens.refreshToken);
+    await prisma.platformAdmin.update({ where: { id: admin.id }, data: { lastLogin: new Date() } });
+
+    logger.info('Platform admin logged in', { adminId: admin.id });
+
+    res.json({
+      success: true,
+      data: {
+        user: { id: admin.id, name: admin.name, email: admin.email, role: 'super_admin' },
+        tokens,
+      },
+    });
+  })
+);
+
 // POST /refresh-token - Refresh access token
 router.post(
   '/refresh-token',

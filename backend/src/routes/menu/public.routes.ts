@@ -7,10 +7,16 @@ import { redis } from '@/config/redis';
 import logger from '@/utils/logger';
 import { getUpsellSuggestions } from '@/services/upsell.service';
 import { getPersonalizedMenu } from '@/services/menu-personalization.service';
+import { listPlans } from '@/services/subscription.service';
 
 const router = Router();
 
 router.use(generalLimiter);
+
+// GET /plans - public pricing (frontend never hard-codes prices)
+router.get('/plans', asyncHandler(async (_req, res) => {
+  res.json({ success: true, data: await listPlans() });
+}));
 
 // GET /:restaurantSlug - Full menu for customer
 router.get(

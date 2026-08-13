@@ -1,6 +1,7 @@
 import { Router } from 'express';
 import { asyncHandler, AppError } from '@/utils';
 import { authenticate, enforceRestaurantScope, validate, auditLog } from '@/middleware';
+import { assertCanCreateMenuItem } from '@/services/subscription.service';
 import {
   createCategorySchema,
   updateCategorySchema,
@@ -304,6 +305,8 @@ router.post(
   asyncHandler(async (req, res) => {
     const restaurantId = (req as any).restaurantId;
     const data = req.body;
+
+    await assertCanCreateMenuItem(restaurantId);
 
     const category = await prisma.menuCategory.findFirst({
       where: { id: data.categoryId, restaurantId },

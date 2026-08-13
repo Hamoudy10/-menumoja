@@ -36,6 +36,7 @@ interface AppState {
   refreshToken: string | null
   restaurant: Restaurant | null
   login: (email: string, password: string) => Promise<void>
+  adminLogin: (email: string, password: string) => Promise<void>
   loginWithGoogle: (credential: string) => Promise<void>
   register: (data: any) => Promise<any>
   verifyOtp: (userId: string, otp: string) => Promise<void>
@@ -160,7 +161,7 @@ export const useStore = create<AppState>()((set, get) => ({
       localStorage.setItem('refreshToken', refreshToken)
       set({
         isAuthenticated: true,
-        userRole: data.user?.role || 'owner',
+        userRole: data.user?.role === 'super_admin' ? 'admin' : (data.user?.role || 'owner'),
         accessToken,
         refreshToken,
         restaurant: data.restaurant || null,
@@ -168,6 +169,28 @@ export const useStore = create<AppState>()((set, get) => ({
       toast.success('Welcome back!')
     } catch (err: any) {
       const msg = err?.response?.data?.message || err?.message || 'Login failed'
+      toast.error(msg)
+      throw err
+    }
+  },
+
+  adminLogin: async (email, password) => {
+    try {
+      const data = await authApi.adminLogin(email, password)
+      const accessToken = data.tokens?.accessToken || data.accessToken
+      const refreshToken = data.tokens?.refreshToken || data.refreshToken
+      localStorage.setItem('accessToken', accessToken)
+      localStorage.setItem('refreshToken', refreshToken)
+      set({
+        isAuthenticated: true,
+        userRole: 'admin',
+        accessToken,
+        refreshToken,
+        restaurant: null,
+      })
+      toast.success('Admin signed in')
+    } catch (err: any) {
+      const msg = err?.response?.data?.message || err?.message || 'Admin login failed'
       toast.error(msg)
       throw err
     }
@@ -271,6 +294,18 @@ export const useStore = create<AppState>()((set, get) => ({
     const refreshToken = localStorage.getItem('refreshToken')
     if (!accessToken || !refreshToken) return
     try {
+      // platform admins have no restaurant scope — skip the restaurant fetch
+      let role: string | null = null
+      try {
+        const payload = JSON.parse(atob(accessToken.split('.')[1]))
+        role = payload?.role || null
+      } catch { /* not a JWT — fall through */ }
+
+      if (role === 'super_admin') {
+        set({ accessToken, refreshToken, isAuthenticated: true, userRole: 'admin', restaurant: null })
+        return
+      }
+
       set({ accessToken, refreshToken, isAuthenticated: true, userRole: 'owner' })
       const data = await restaurantApi.fetchRestaurant()
       if (data) {

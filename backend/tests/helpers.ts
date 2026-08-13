@@ -45,6 +45,8 @@ jest.mock('../src/config/database', () => {
     },
     subscriptionPlan: {
       findFirst: jest.fn(),
+      findUnique: jest.fn(),
+      findMany: jest.fn().mockResolvedValue([]),
       create: jest.fn(),
     },
     restaurantSettings: {
@@ -55,6 +57,11 @@ jest.mock('../src/config/database', () => {
       createMany: jest.fn(),
       findMany: jest.fn(),
       upsert: jest.fn(),
+    },
+    restaurantBranch: {
+      findMany: jest.fn().mockResolvedValue([]),
+      create: jest.fn(),
+      count: jest.fn().mockResolvedValue(0),
     },
     menuCategory: {
       findFirst: jest.fn(),

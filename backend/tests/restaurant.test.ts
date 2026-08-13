@@ -115,7 +115,16 @@ describe('POST /api/v1/restaurant/me/tables', () => {
     const owner = await createTestOwner();
     const restaurant = await createTestRestaurant(owner.id);
     const token = generateTestToken(owner.id, 'owner', restaurant.id);
+    const planId = uuidv4();
 
+    (prisma.restaurant.findUnique as jest.Mock).mockResolvedValue({
+      id: restaurant.id, planId, subscriptionStatus: 'ACTIVE', trialEndsAt: null, planExpiresAt: null, isSuspended: false,
+    });
+    (prisma.subscriptionPlan.findUnique as jest.Mock).mockResolvedValue({
+      id: planId, name: 'Business', maxMenuItems: 50, maxTables: 25,
+      hasOrdering: true, hasAnalytics: true, hasSurveillance: false, hasUssd: false, hasMultiBranch: false,
+    });
+    (prisma.restaurantTable.count as jest.Mock).mockResolvedValue(4);
     (prisma.restaurantTable.findUnique as jest.Mock).mockResolvedValue(null);
     (prisma.restaurantTable.create as jest.Mock).mockResolvedValue({
       id: uuidv4(),

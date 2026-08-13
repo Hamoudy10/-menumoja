@@ -35,3 +35,6 @@ export const resetPassword = (identifier: string, otp: string, newPassword: stri
 
 export const staffLogin = (pin: string, restaurantSlug: string) =>
   api.post('/auth/staff/login', { pin, restaurantSlug }).then(unwrap)
+
+export const adminLogin = (email: string, password: string) =>
+  api.post('/auth/admin/login', { email, password }).then(unwrap)

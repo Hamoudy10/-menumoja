@@ -5,6 +5,9 @@ const unwrap = (r: any) => r.data?.data || r.data
 export const fetchRestaurant = () =>
   api.get('/restaurant/me').then(unwrap)
 
+export const fetchSubscription = () =>
+  api.get('/restaurant/me/subscription').then(unwrap)
+
 export const updateRestaurant = (data: any) =>
   api.put('/restaurant/me', data).then(unwrap)
 

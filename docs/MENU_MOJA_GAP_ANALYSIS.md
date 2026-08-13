@@ -361,10 +361,15 @@ TARGET DOMAIN                    CURRENT STATE                        GAP CLASS
 
 **Also fixed:** Render Docker build broke because `postinstall: prisma generate` ran before the schema was copied — the schema is now copied before `npm ci` in both Dockerfiles.
 
-### Tier 7 — ADMIN PLATFORM & BILLING (next recommended)
-7. POS hardening: modifiers, split/partial payments, held orders (persisted), KDS station/actions, table merge/split, optimistic locking
-8. M-Pesa: state machine, PaymentAttempt/WebhookEvent, reconciliation dashboard, timeout/reversal handling
-9. Offline-first: local queues + sync + connectivity UI + PWA decision
+### Tier 7 — ADMIN PLATFORM & BILLING ✅ EXECUTED (2026-08-13)
+- Platform admin auth: `POST /auth/admin/login` (PlatformAdmin, super_admin tokens, rate-limited)
+- Plan enforcement service (`subscription.service.ts`): menu item limit + table limit + feature gates, hooked into `POST /menu/items` and `POST /restaurant/me/tables`
+- `GET /restaurant/me/subscription` summary + public `GET /menu/public/plans`
+- Admin API client (`src/api/admin.ts`) wired into real endpoints: Overview (stats + MRR chart + revenue by plan + renewals), Restaurants (search/filter/sort/pagination/suspend-activate), Subscriptions (MRR, donut, new-vs-cancel, renewals), Support (list/reply/close)
+- Store: `adminLogin`, admin-aware `restoreSession` (super_admin tokens skip restaurant scope), admin role mapping
+- SettingsPage subscription section is now server-driven (plan name + price + renewal date from `GET /restaurant/me/subscription`)
+- Tests: `subscription.test.ts` (6) + admin-login cases in `auth.test.ts` — 14/14 green
+- Remaining (post-launch): billing webhook handlers + trial/upgrade checkout flows + admin audit-log page UI + KRA-verified eTIMS (Tier 6)
 
 ### Tier 2 — FOUNDATIONS FOR INTELLIGENCE (phases 4–6)
 10. Inventory (models, movements, suppliers, POs, adjustments, reorder)

@@ -1,45 +1,18 @@
-import { useState, useMemo } from 'react'
+import { useState, useEffect, useMemo, useCallback } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import {
   Search, SlidersHorizontal, MoreVertical, Eye, Ban, CheckCircle,
-  Store, MapPin, User, ChevronDown, X, ArrowUp, ArrowDown,
+  Store, MapPin, User, ChevronDown, X, ArrowUp, ArrowDown, Loader2,
 } from 'lucide-react'
 import { Badge } from '@/components/ui/Badge'
 import { Modal } from '@/components/ui/Modal'
 import { Toggle } from '@/components/ui/Toggle'
 import { SearchBar } from '@/components/ui/SearchBar'
 import { showSuccessToast, showErrorToast } from '@/components/ui/Toast'
-
-interface RestaurantRow {
-  id: string
-  name: string
-  owner: string
-  location: string
-  city: string
-  plan: 'starter' | 'business' | 'premium'
-  status: 'active' | 'suspended'
-  ordersToday: number
-  revenueMonth: number
-  joinedDate: string
-  email: string
-  phone: string
-  cuisine: string
-}
-
-const allRestaurants: RestaurantRow[] = [
-  { id: '1', name: 'Bahari Restaurant', owner: 'James Ochieng', location: 'Mombasa, Kenya', city: 'Mombasa', plan: 'business', status: 'active', ordersToday: 47, revenueMonth: 485000, joinedDate: '2025-01-15', email: 'james@bahari.co.ke', phone: '+254712345678', cuisine: 'Swahili & Grill' },
-  { id: '2', name: 'Safari Grill', owner: 'John Kamau', location: 'Nairobi, Kenya', city: 'Nairobi', plan: 'starter', status: 'active', ordersToday: 32, revenueMonth: 245000, joinedDate: '2025-03-01', email: 'john@safarigrill.com', phone: '+254723456789', cuisine: 'Grill & BBQ' },
-  { id: '3', name: 'Coastal Delights', owner: 'Amina Hassan', location: 'Mombasa, Kenya', city: 'Mombasa', plan: 'premium', status: 'active', ordersToday: 58, revenueMonth: 720000, joinedDate: '2024-11-20', email: 'amina@coastal.com', phone: '+254734567890', cuisine: 'Coastal & Seafood' },
-  { id: '4', name: 'Mountain View Cafe', owner: 'Peter Njoroge', location: 'Nyeri, Kenya', city: 'Nyeri', plan: 'starter', status: 'active', ordersToday: 18, revenueMonth: 120000, joinedDate: '2025-05-10', email: 'peter@mountainview.com', phone: '+254745678901', cuisine: 'Cafe & Pastries' },
-  { id: '5', name: 'Spice Garden', owner: 'Fatima Ahmed', location: 'Zanzibar, Tanzania', city: 'Zanzibar', plan: 'business', status: 'suspended', ordersToday: 0, revenueMonth: 0, joinedDate: '2024-08-12', email: 'fatima@spicegarden.com', phone: '+255712345678', cuisine: 'Indian & Spice' },
-  { id: '6', name: 'Lake Side Inn', owner: 'David Omondi', location: 'Kisumu, Kenya', city: 'Kisumu', plan: 'starter', status: 'active', ordersToday: 24, revenueMonth: 189000, joinedDate: '2025-02-28', email: 'david@lakeside.com', phone: '+254756789012', cuisine: 'Fish & Grill' },
-  { id: '7', name: 'Savannah Bistro', owner: 'Grace Mwangi', location: 'Nairobi, Kenya', city: 'Nairobi', plan: 'premium', status: 'active', ordersToday: 41, revenueMonth: 560000, joinedDate: '2024-06-15', email: 'grace@savannah.com', phone: '+254767890123', cuisine: 'Continental' },
-  { id: '8', name: 'Quick Bites', owner: 'Hassan Ali', location: 'Dar es Salaam, Tanzania', city: 'Dar es Salaam', plan: 'starter', status: 'suspended', ordersToday: 0, revenueMonth: 0, joinedDate: '2025-04-05', email: 'hassan@quickbites.com', phone: '+255723456789', cuisine: 'Fast Food' },
-  { id: '9', name: 'Riverside Kitchen', owner: 'Sarah Wanjiku', location: 'Nairobi, Kenya', city: 'Nairobi', plan: 'business', status: 'active', ordersToday: 36, revenueMonth: 410000, joinedDate: '2024-09-01', email: 'sarah@riverside.com', phone: '+254778901234', cuisine: 'Fusion & Healthy' },
-  { id: '10', name: 'The Golden Wok', owner: 'Li Wei', location: 'Nairobi, Kenya', city: 'Nairobi', plan: 'business', status: 'active', ordersToday: 52, revenueMonth: 635000, joinedDate: '2024-10-01', email: 'li@goldenwok.com', phone: '+254789012345', cuisine: 'Chinese & Asian' },
-]
+import * as adminApi from '@/api/admin'
 
 const formatKES = (value: number) => {
+  if (!value) return 'KES 0'
   if (value >= 1000000) return `KES ${(value / 1000000).toFixed(1)}M`
   if (value >= 1000) return `KES ${(value / 1000).toFixed(0).replace(/\B(?=(\d{3})+(?!\d))/g, ',')}K`
   return `KES ${value}`
@@ -48,58 +21,88 @@ const formatKES = (value: number) => {
 type SortField = 'name' | 'ordersToday' | 'revenueMonth' | 'joinedDate'
 type SortDir = 'asc' | 'desc'
 
+const planName = (r: any) => (typeof r.plan === 'string' ? r.plan : r.plan?.name || r.planName || 'free')
+
 export default function AdminRestaurants() {
   const [search, setSearch] = useState('')
   const [filterCity, setFilterCity] = useState<string>('all')
   const [filterPlan, setFilterPlan] = useState<string>('all')
   const [filterStatus, setFilterStatus] = useState<string>('all')
-  const [restaurants, setRestaurants] = useState(allRestaurants)
-  const [selectedRestaurant, setSelectedRestaurant] = useState<RestaurantRow | null>(null)
+  const [restaurants, setRestaurants] = useState<any[]>([])
+  const [selectedRestaurant, setSelectedRestaurant] = useState<any | null>(null)
   const [showFilters, setShowFilters] = useState(false)
   const [sortField, setSortField] = useState<SortField>('name')
   const [sortDir, setSortDir] = useState<SortDir>('asc')
   const [menuOpenId, setMenuOpenId] = useState<string | null>(null)
+  const [loading, setLoading] = useState(true)
+  const [page, setPage] = useState(1)
+  const [totalPages, setTotalPages] = useState(1)
+  const [busyId, setBusyId] = useState<string | null>(null)
 
-  const cities = useMemo(() => [...new Set(restaurants.map(r => r.city))], [restaurants])
+  const load = useCallback(async (p: number, q: string) => {
+    setLoading(true)
+    try {
+      const params: any = { page: p, limit: 20, q: q || undefined }
+      if (filterCity !== 'all') params.city = filterCity
+      if (filterPlan !== 'all') params.plan = filterPlan
+      if (filterStatus !== 'all') params.status = filterStatus
+      const res: any = await adminApi.fetchAdminRestaurants(params)
+      const raw = Array.isArray(res) ? res : res?.data
+      const data = Array.isArray(raw) ? raw : Array.isArray(res?.restaurants) ? res.restaurants : []
+      setRestaurants(data)
+      setTotalPages(res?.meta?.totalPages || Math.max(1, Math.ceil((res?.meta?.total || data.length) / 20)))
+    } catch (err: any) {
+      showErrorToast(err?.response?.data?.message || 'Failed to load restaurants')
+    } finally {
+      setLoading(false)
+    }
+  }, [filterCity, filterPlan, filterStatus])
+
+  useEffect(() => {
+    const t = setTimeout(() => { setPage(1); load(1, search) }, 300)
+    return () => clearTimeout(t)
+  }, [search, load])
+
+  useEffect(() => { load(page, search) }, [page]) // eslint-disable-line react-hooks/exhaustive-deps
+
+  const cities = useMemo(() => [...new Set(restaurants.map(r => r.city || 'Unknown'))], [restaurants])
 
   const filtered = useMemo(() => {
-    let data = [...restaurants]
-
-    if (search) {
-      const q = search.toLowerCase()
-      data = data.filter(r => r.name.toLowerCase().includes(q) || r.owner.toLowerCase().includes(q) || r.location.toLowerCase().includes(q))
-    }
-
-    if (filterCity !== 'all') data = data.filter(r => r.city === filterCity)
-    if (filterPlan !== 'all') data = data.filter(r => r.plan === filterPlan)
-    if (filterStatus !== 'all') data = data.filter(r => r.status === filterStatus)
-
+    const data = [...restaurants]
     data.sort((a, b) => {
-      let cmp = 0
-      if (sortField === 'name') cmp = a.name.localeCompare(b.name)
-      if (sortField === 'ordersToday') cmp = a.ordersToday - b.ordersToday
-      if (sortField === 'revenueMonth') cmp = a.revenueMonth - b.revenueMonth
-      if (sortField === 'joinedDate') cmp = a.joinedDate.localeCompare(b.joinedDate)
+      const cmp = (() => {
+        if (sortField === 'name') return (a.name || '').localeCompare(b.name || '')
+        if (sortField === 'ordersToday') return (a.ordersToday || 0) - (b.ordersToday || 0)
+        if (sortField === 'revenueMonth') return (a.revenueMonth || 0) - (b.revenueMonth || 0)
+        return (a.createdAt || '').localeCompare(b.createdAt || '')
+      })()
       return sortDir === 'asc' ? cmp : -cmp
     })
-
     return data
-  }, [restaurants, search, filterCity, filterPlan, filterStatus, sortField, sortDir])
+  }, [restaurants, sortField, sortDir])
 
   const toggleSort = (field: SortField) => {
     if (sortField === field) setSortDir(d => d === 'asc' ? 'desc' : 'asc')
     else { setSortField(field); setSortDir('asc') }
   }
 
-  const toggleSuspend = (id: string) => {
-    setRestaurants(prev => prev.map(r => {
-      if (r.id !== id) return r
-      const newStatus = r.status === 'active' ? 'suspended' : 'active'
-      if (newStatus === 'active') showSuccessToast(`${r.name} has been reactivated`)
-      else showErrorToast(`${r.name} has been suspended`)
-      return { ...r, status: newStatus as 'active' | 'suspended' }
-    }))
-    setMenuOpenId(null)
+  const toggleSuspend = async (r: any) => {
+    setBusyId(r.id)
+    try {
+      if (r.status === 'suspended') {
+        await adminApi.activateAdminRestaurant(r.id)
+        showSuccessToast(`${r.name} has been reactivated`)
+      } else {
+        await adminApi.suspendAdminRestaurant(r.id, 'Suspended by platform admin')
+        showErrorToast(`${r.name} has been suspended`)
+      }
+      setRestaurants(prev => prev.map(x => x.id === r.id ? { ...x, status: x.status === 'active' ? 'suspended' : 'active' } : x))
+    } catch (err: any) {
+      showErrorToast(err?.response?.data?.message || 'Action failed')
+    } finally {
+      setBusyId(null)
+      setMenuOpenId(null)
+    }
   }
 
   const SortIcon = ({ field }: { field: SortField }) => {
@@ -112,7 +115,7 @@ export default function AdminRestaurants() {
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-2xl font-heading font-bold text-white">Restaurants</h1>
-          <p className="text-sm text-white/50">{filtered.length} restaurants on platform</p>
+          <p className="text-sm text-white/50">{loading ? 'Loading...' : `${filtered.length} restaurants on page`}</p>
         </div>
         <button
           onClick={() => setShowFilters(!showFilters)}
@@ -141,7 +144,7 @@ export default function AdminRestaurants() {
             >
               <select
                 value={filterCity}
-                onChange={e => setFilterCity(e.target.value)}
+                onChange={e => { setFilterCity(e.target.value); setPage(1) }}
                 className="px-3 py-2 rounded-xl bg-primary-light border border-white/10 text-white/80 text-sm outline-none focus:border-secondary"
               >
                 <option value="all">All Cities</option>
@@ -149,17 +152,18 @@ export default function AdminRestaurants() {
               </select>
               <select
                 value={filterPlan}
-                onChange={e => setFilterPlan(e.target.value)}
+                onChange={e => { setFilterPlan(e.target.value); setPage(1) }}
                 className="px-3 py-2 rounded-xl bg-primary-light border border-white/10 text-white/80 text-sm outline-none focus:border-secondary"
               >
                 <option value="all">All Plans</option>
+                <option value="free">Free</option>
                 <option value="starter">Starter</option>
                 <option value="business">Business</option>
                 <option value="premium">Premium</option>
               </select>
               <select
                 value={filterStatus}
-                onChange={e => setFilterStatus(e.target.value)}
+                onChange={e => { setFilterStatus(e.target.value); setPage(1) }}
                 className="px-3 py-2 rounded-xl bg-primary-light border border-white/10 text-white/80 text-sm outline-none focus:border-secondary"
               >
                 <option value="all">All Status</option>
@@ -207,7 +211,7 @@ export default function AdminRestaurants() {
                   <td className="px-4 py-3">
                     <div className="flex items-center gap-3">
                       <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-secondary to-accent flex items-center justify-center text-white text-xs font-bold">
-                        {r.name.charAt(0)}
+                        {(r.name || 'R').charAt(0)}
                       </div>
                       <span className="text-sm font-medium text-white">{r.name}</span>
                     </div>
@@ -215,33 +219,33 @@ export default function AdminRestaurants() {
                   <td className="px-4 py-3">
                     <div className="flex items-center gap-1.5">
                       <User className="w-3.5 h-3.5 text-white/40" />
-                      <span className="text-sm text-white/70">{r.owner}</span>
+                      <span className="text-sm text-white/70">{r.ownerName || r.owner || '—'}</span>
                     </div>
                   </td>
                   <td className="px-4 py-3">
                     <div className="flex items-center gap-1.5">
                       <MapPin className="w-3.5 h-3.5 text-white/40" />
-                      <span className="text-sm text-white/70">{r.location}</span>
+                      <span className="text-sm text-white/70">{r.city || r.location || '—'}</span>
                     </div>
                   </td>
                   <td className="px-4 py-3">
-                    <Badge variant={r.plan === 'premium' ? 'info' : r.plan === 'business' ? 'warning' : 'default'} size="sm">
-                      {(typeof r.plan === 'string' ? r.plan : (r.plan as any)?.name || '').charAt(0).toUpperCase() + (typeof r.plan === 'string' ? r.plan : (r.plan as any)?.name || '').slice(1)}
+                    <Badge variant={planName(r) === 'premium' ? 'info' : planName(r) === 'business' ? 'warning' : 'default'} size="sm">
+                      {planName(r).charAt(0).toUpperCase() + planName(r).slice(1)}
                     </Badge>
                   </td>
                   <td className="px-4 py-3">
                     <Badge variant={r.status === 'active' ? 'success' : 'danger'} size="sm" dot>
-                      {r.status.charAt(0).toUpperCase() + r.status.slice(1)}
+                      {(r.status || 'active').charAt(0).toUpperCase() + (r.status || 'active').slice(1)}
                     </Badge>
                   </td>
                   <td className="px-4 py-3 text-right">
-                    <span className="text-sm font-medium text-white">{r.ordersToday}</span>
+                    <span className="text-sm font-medium text-white">{r.ordersToday ?? 0}</span>
                   </td>
                   <td className="px-4 py-3 text-right">
-                    <span className="text-sm font-medium text-white">{formatKES(r.revenueMonth)}</span>
+                    <span className="text-sm font-medium text-white">{formatKES(r.revenueMonth ?? 0)}</span>
                   </td>
                   <td className="px-4 py-3 text-right">
-                    <span className="text-xs text-white/50">{r.joinedDate}</span>
+                    <span className="text-xs text-white/50">{r.createdAt ? new Date(r.createdAt).toLocaleDateString('en-KE') : '—'}</span>
                   </td>
                   <td className="px-4 py-3 relative">
                     <button
@@ -262,15 +266,16 @@ export default function AdminRestaurants() {
                             onClick={() => { setSelectedRestaurant(r); setMenuOpenId(null) }}
                             className="flex items-center gap-2 w-full px-3 py-2 text-sm text-white/80 hover:bg-white/5 transition-all"
                           >
-                            <Eye className="w-4 h-4" /> View Dashboard
+                            <Eye className="w-4 h-4" /> View Details
                           </button>
                           <button
-                            onClick={() => toggleSuspend(r.id)}
+                            onClick={() => toggleSuspend(r)}
+                            disabled={busyId === r.id}
                             className={`flex items-center gap-2 w-full px-3 py-2 text-sm transition-all ${
                               r.status === 'active' ? 'text-red-400 hover:bg-red-500/10' : 'text-success hover:bg-success/10'
-                            }`}
+                            } disabled:opacity-50`}
                           >
-                            {r.status === 'active' ? <Ban className="w-4 h-4" /> : <CheckCircle className="w-4 h-4" />}
+                            {busyId === r.id ? <Loader2 className="w-4 h-4 animate-spin" /> : r.status === 'active' ? <Ban className="w-4 h-4" /> : <CheckCircle className="w-4 h-4" />}
                             {r.status === 'active' ? 'Suspend' : 'Unsuspend'}
                           </button>
                         </motion.div>
@@ -283,10 +288,36 @@ export default function AdminRestaurants() {
           </table>
         </div>
 
-        {filtered.length === 0 && (
+        {loading && (
+          <div className="text-center py-12">
+            <Loader2 className="w-8 h-8 text-white/30 animate-spin mx-auto" />
+          </div>
+        )}
+
+        {!loading && filtered.length === 0 && (
           <div className="text-center py-12">
             <Store className="w-12 h-12 text-white/20 mx-auto mb-3" />
             <p className="text-white/50 text-sm">No restaurants match your filters</p>
+          </div>
+        )}
+
+        {totalPages > 1 && (
+          <div className="flex items-center justify-center gap-2 py-3 border-t border-white/5">
+            <button
+              onClick={() => setPage(p => Math.max(1, p - 1))}
+              disabled={page <= 1}
+              className="px-3 py-1 rounded-lg bg-white/5 text-white/70 text-sm hover:bg-white/10 disabled:opacity-30"
+            >
+              Prev
+            </button>
+            <span className="text-sm text-white/50">Page {page} / {totalPages}</span>
+            <button
+              onClick={() => setPage(p => Math.min(totalPages, p + 1))}
+              disabled={page >= totalPages}
+              className="px-3 py-1 rounded-lg bg-white/5 text-white/70 text-sm hover:bg-white/10 disabled:opacity-30"
+            >
+              Next
+            </button>
           </div>
         )}
       </div>
@@ -297,46 +328,46 @@ export default function AdminRestaurants() {
             <div className="grid grid-cols-2 gap-4">
               <div className="bg-primary-light rounded-xl p-4">
                 <p className="text-xs text-white/40 mb-1">Owner</p>
-                <p className="text-sm text-white font-medium">{selectedRestaurant.owner}</p>
+                <p className="text-sm text-white font-medium">{selectedRestaurant.ownerName || selectedRestaurant.owner || '—'}</p>
               </div>
               <div className="bg-primary-light rounded-xl p-4">
                 <p className="text-xs text-white/40 mb-1">Email</p>
-                <p className="text-sm text-white font-medium">{selectedRestaurant.email}</p>
+                <p className="text-sm text-white font-medium">{selectedRestaurant.email || '—'}</p>
               </div>
               <div className="bg-primary-light rounded-xl p-4">
                 <p className="text-xs text-white/40 mb-1">Phone</p>
-                <p className="text-sm text-white font-medium">{selectedRestaurant.phone}</p>
+                <p className="text-sm text-white font-medium">{selectedRestaurant.phone || '—'}</p>
               </div>
               <div className="bg-primary-light rounded-xl p-4">
                 <p className="text-xs text-white/40 mb-1">Location</p>
-                <p className="text-sm text-white font-medium">{selectedRestaurant.location}</p>
+                <p className="text-sm text-white font-medium">{selectedRestaurant.city || selectedRestaurant.location || '—'}</p>
               </div>
               <div className="bg-primary-light rounded-xl p-4">
                 <p className="text-xs text-white/40 mb-1">Cuisine</p>
-                <p className="text-sm text-white font-medium">{selectedRestaurant.cuisine}</p>
+                <p className="text-sm text-white font-medium">{selectedRestaurant.cuisine || '—'}</p>
               </div>
               <div className="bg-primary-light rounded-xl p-4">
                 <p className="text-xs text-white/40 mb-1">Plan</p>
-                <p className="text-sm text-white font-medium">{(typeof selectedRestaurant.plan === 'string' ? selectedRestaurant.plan : (selectedRestaurant.plan as any)?.name || '').charAt(0).toUpperCase() + (typeof selectedRestaurant.plan === 'string' ? selectedRestaurant.plan : (selectedRestaurant.plan as any)?.name || '').slice(1)}</p>
+                <p className="text-sm text-white font-medium">{planName(selectedRestaurant).charAt(0).toUpperCase() + planName(selectedRestaurant).slice(1)}</p>
               </div>
             </div>
 
             <div className="grid grid-cols-2 gap-4">
               <div className="bg-primary-light rounded-xl p-4 text-center">
-                <p className="text-2xl font-heading font-bold text-white">{selectedRestaurant.ordersToday}</p>
+                <p className="text-2xl font-heading font-bold text-white">{selectedRestaurant.ordersToday ?? 0}</p>
                 <p className="text-xs text-white/40 mt-1">Orders Today</p>
               </div>
               <div className="bg-primary-light rounded-xl p-4 text-center">
-                <p className="text-2xl font-heading font-bold text-white">{formatKES(selectedRestaurant.revenueMonth)}</p>
+                <p className="text-2xl font-heading font-bold text-white">{formatKES(selectedRestaurant.revenueMonth ?? 0)}</p>
                 <p className="text-xs text-white/40 mt-1">Revenue This Month</p>
               </div>
             </div>
 
             <div className="flex gap-3">
               <Toggle
-                checked={selectedRestaurant.status === 'active'}
-                onChange={() => toggleSuspend(selectedRestaurant.id)}
-                label={selectedRestaurant.status === 'active' ? 'Active' : 'Suspended'}
+                checked={selectedRestaurant.status !== 'suspended'}
+                onChange={() => toggleSuspend(selectedRestaurant)}
+                label={selectedRestaurant.status === 'suspended' ? 'Suspended' : 'Active'}
               />
             </div>
           </div>
