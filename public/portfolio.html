@@ -9,7 +9,7 @@
 <meta property="og:description" content="Run restaurant operations, understand your business and grow repeat customers — from one platform. Built in Mombasa for Kenyan restaurants." />
 <meta property="og:type" content="website" />
 <meta property="og:url" content="https://menumoja.vercel.app/portfolio.html" />
-<meta property="og:image" content="https://menumoja.vercel.app/favicon.png" />
+<meta property="og:image" content="https://menumoja.vercel.app/logo.png" />
 <link rel="canonical" href="https://menumoja.vercel.app/portfolio.html" />
 <link rel="icon" type="image/png" href="/favicon.png" />
 <link rel="preconnect" href="https://fonts.googleapis.com" />
@@ -46,7 +46,7 @@
   .nav { position:sticky; top:0; z-index:50; background:rgba(255,255,255,.92); backdrop-filter:blur(8px); border-bottom:1px solid var(--line); }
   .nav-inner { display:flex; align-items:center; gap:16px; height:64px; }
   .brand { display:flex; align-items:center; gap:10px; text-decoration:none; }
-  .brand-badge { width:36px; height:36px; border-radius:10px; background:linear-gradient(135deg,var(--secondary),var(--accent)); display:flex; align-items:center; justify-content:center; color:#fff; font-family:'Playfair Display',serif; font-weight:800; font-size:16px; }
+  .brand-badge { width:36px; height:36px; border-radius:9px; object-fit:cover; }
   .brand-name { font-family:'Playfair Display',serif; font-weight:800; font-size:17px; color:var(--primary); letter-spacing:.02em; }
   .nav-links { display:flex; align-items:center; gap:22px; margin-left:auto; }
   .nav-links a { text-decoration:none; color:var(--ink); font-size:14px; font-weight:500; }
@@ -71,6 +71,7 @@
   .rug-word { font-family:'Space Grotesk',sans-serif; font-weight:800; font-size:clamp(22px,3vw,30px); color:var(--primary); }
   .rug-word span { display:block; font-size:10px; font-weight:600; letter-spacing:.3em; color:var(--secondary); }
   .hero-sub { color:var(--muted); font-size:clamp(15px,2vw,17px); max-width:520px; }
+  .hero-logo { width:64px; height:64px; border-radius:16px; object-fit:cover; margin-bottom:14px; box-shadow:0 8px 20px rgba(10,22,40,.15); }
   .hero-ctas { display:flex; gap:12px; margin-top:28px; flex-wrap:wrap; }
   .hero-note { margin-top:14px; font-size:12.5px; color:var(--muted); }
   .hero-visual { border-radius:20px; overflow:hidden; border:1px solid var(--line); box-shadow:0 24px 60px rgba(10,22,40,.18); background:var(--soft); }
@@ -244,7 +245,7 @@
 <header class="nav">
   <div class="container nav-inner">
     <a class="brand" href="#top" aria-label="Menu Moja home">
-      <span class="brand-badge" aria-hidden="true">M</span>
+      <img class="brand-badge" src="logo-128.png" alt="Menu Moja logo" width="36" height="36" />
       <span class="brand-name">MENU&nbsp;MOJA</span>
     </a>
     <nav class="nav-links" id="navLinks" aria-label="Main navigation">
@@ -268,6 +269,7 @@
 <section class="hero">
   <div class="container hero-grid">
     <div>
+      <img class="hero-logo" src="logo-128.png" alt="Menu Moja logo" width="64" height="64" />
       <p class="kicker">Smart Restaurant Management &amp; Customer Growth Platform</p>
       <h1>Run your restaurant. <span class="hl">Understand</span> it. Grow it.</h1>
       <div class="rug-line" role="presentation">
@@ -763,7 +765,7 @@
     <h2>Let's discuss your restaurant</h2>
     <div class="rule"></div>
     <div class="contact-grid">
-      <div class="contact-card"><div class="k">Company</div><div class="v">Menu Moja</div></div>
+      <div class="contact-card"><div class="k">Company</div><div class="v">Menu Moja · BadikuTech Solutions</div></div>
       <div class="contact-card"><div class="k">Founder</div><div class="v">Mahmoud Mohamed</div></div>
       <div class="contact-card"><div class="k">Phone / WhatsApp</div><div class="v"><a href="tel:+254742773562">+254 742 773 562</a></div></div>
       <div class="contact-card"><div class="k">Email</div><div class="v"><a href="mailto:badikuutechsolutions@gmail.com">badikuutechsolutions@gmail.com</a></div></div>
@@ -781,7 +783,7 @@
 
 <footer>
   <div class="container">
-    <span>© <span id="year"></span> Menu Moja · Mombasa, Kenya</span>
+    <span>© <span id="year"></span> BadikuTech Solutions. All rights reserved. Menu Moja is a product of BadikuTech Solutions.</span>
     <span><a href="https://menumoja.vercel.app" target="_blank" rel="noopener">menumoja.vercel.app</a></span>
   </div>
 </footer>

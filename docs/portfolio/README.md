@@ -21,6 +21,13 @@ Trust & security → Demo CTA → Contact.
   (replace with the demo video link when ready — search `amorino-restaurant`)
 - Email: badikuutechsolutions@gmail.com
 
+## Branding
+
+- Logo: `logo-128.png` next to the page (hosted copy: `public/logo.png` 512px
+  used for Open Graph, `public/logo-128.png` for the page).
+- Company credit: **© BadikuTech Solutions. All rights reserved.** — Menu Moja
+  is a product of BadikuTech Solutions (company being established).
+
 ## Screenshots
 
 Source captures: `../snapshots/`. Optimized WebP copies for the page live in
