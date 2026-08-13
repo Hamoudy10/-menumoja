@@ -744,10 +744,14 @@ export default function SettingsPage() {
                             a.style.display = 'none'
                             document.body.appendChild(a)
                             a.click()
-                            a.remove()
-                            setTimeout(() => URL.revokeObjectURL(url), 5000)
+                            setTimeout(() => {
+                              a.remove()
+                              URL.revokeObjectURL(url)
+                            }, 1000)
                           } catch {
-                            showErrorToast(t('qr.pdfDownloadFailed'))
+                            const base = import.meta.env.VITE_API_URL || '/api/v1'
+                            const token = localStorage.getItem('accessToken') || ''
+                            window.open(`${base}/qr/${qr.id}/pdf?token=${encodeURIComponent(token)}`, '_blank')
                           }
                         }}
                         className="flex h-8 w-8 items-center justify-center rounded-lg bg-black/5 dark:bg-white/10 hover:bg-black/10 dark:hover:bg-white/20 transition-colors"

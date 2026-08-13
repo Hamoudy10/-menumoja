@@ -94,6 +94,13 @@ publicQrRoutes.post(
   })
 );
 
+router.use((req, _res, next) => {
+  if (!req.headers.authorization && typeof req.query.token === 'string' && req.query.token) {
+    req.headers.authorization = `Bearer ${req.query.token}`;
+  }
+  next();
+});
+
 router.use(authenticate);
 router.use(enforceRestaurantScope);
 
