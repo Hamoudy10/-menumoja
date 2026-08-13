@@ -2,7 +2,7 @@ export { default as authRoutes } from './auth/auth.routes';
 export { default as restaurantRoutes } from './restaurant/restaurant.routes';
 export { default as menuRoutes } from './menu/menu.routes';
 export { default as publicRoutes } from './menu/public.routes';
-export { default as qrRoutes } from './qrcodes/qrcodes.routes';
+export { default as qrRoutes, publicQrRoutes } from './qrcodes/qrcodes.routes';
 export { default as orderRoutes } from './orders/orders.routes';
 export { default as paymentRoutes } from './payments/payments.routes';
 export { default as aiRoutes } from './ai/ai.routes';

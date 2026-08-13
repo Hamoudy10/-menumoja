@@ -734,14 +734,9 @@ export default function SettingsPage() {
                       <button
                         onClick={async () => {
                           try {
-                            const { default: api } = await import('@/api/client')
-                            const token = localStorage.getItem('accessToken')
-                            const apiUrl = import.meta.env.VITE_API_URL || '/api/v1'
-                            const res = await fetch(`${apiUrl}/qr/${qr.id}/pdf`, {
-                              headers: { 'Authorization': `Bearer ${token}` }
-                            })
-                            if (!res.ok) throw new Error('Download failed')
-                            const blob = await res.blob()
+                            const { downloadQrPdf } = await import('@/api/qrcodes')
+                            const res = await downloadQrPdf(qr.id)
+                            const blob = res.data instanceof Blob ? res.data : new Blob([res.data])
                             const url = URL.createObjectURL(blob)
                             const a = document.createElement('a')
                             a.href = url
@@ -749,8 +744,7 @@ export default function SettingsPage() {
                             a.click()
                             URL.revokeObjectURL(url)
                           } catch {
-                            const viewUrl = qr.qrImageUrl || qr.targetUrl || qr.imageUrl
-                            if (viewUrl) window.open(viewUrl, '_blank', 'noopener,noreferrer')
+                            showErrorToast(t('qr.pdfDownloadFailed') || 'Failed to download PDF')
                           }
                         }}
                         className="flex h-8 w-8 items-center justify-center rounded-lg bg-black/5 dark:bg-white/10 hover:bg-black/10 dark:hover:bg-white/20 transition-colors"

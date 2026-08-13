@@ -28,6 +28,7 @@ import {
   menuRoutes,
   publicRoutes,
   qrRoutes,
+  publicQrRoutes,
   orderRoutes,
   paymentRoutes,
   aiRoutes,
@@ -114,6 +115,7 @@ app.use('/api/v1/auth', authRoutes);
 app.use('/api/v1/restaurant', restaurantRoutes);
 app.use('/api/v1/menu/public', publicRoutes);
 app.use('/api/v1/menu', menuRoutes);
+app.use('/api/v1/qr', publicQrRoutes);
 app.use('/api/v1/qr', qrRoutes);
 app.use('/api/v1/orders', orderRoutes);
 app.use('/api/v1/payments', paymentRoutes);
