@@ -137,6 +137,7 @@
     "table": "Table",
     "viewQR": "View QR",
     "downloadPDF": "Download PDF",
+    "pdfDownloadFailed": "Failed to download PDF. Please try again.",
     "design": "Design",
     "qrColor": "QR Color",
     "bgColor": "Background Color",

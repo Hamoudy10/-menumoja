@@ -741,10 +741,13 @@ export default function SettingsPage() {
                             const a = document.createElement('a')
                             a.href = url
                             a.download = `${qr.label || 'qr-code'}.pdf`
+                            a.style.display = 'none'
+                            document.body.appendChild(a)
                             a.click()
-                            URL.revokeObjectURL(url)
+                            a.remove()
+                            setTimeout(() => URL.revokeObjectURL(url), 5000)
                           } catch {
-                            showErrorToast(t('qr.pdfDownloadFailed') || 'Failed to download PDF')
+                            showErrorToast(t('qr.pdfDownloadFailed'))
                           }
                         }}
                         className="flex h-8 w-8 items-center justify-center rounded-lg bg-black/5 dark:bg-white/10 hover:bg-black/10 dark:hover:bg-white/20 transition-colors"

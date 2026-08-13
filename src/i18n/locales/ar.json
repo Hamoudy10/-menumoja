@@ -137,6 +137,7 @@
     "table": "طاولة",
     "viewQR": "عرض QR",
     "downloadPDF": "تنزيل PDF",
+    "pdfDownloadFailed": "فشل تنزيل PDF. حاول مرة أخرى.",
     "design": "تصميم",
     "qrColor": "لون QR",
     "bgColor": "لون الخلفية",

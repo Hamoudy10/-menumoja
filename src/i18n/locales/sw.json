@@ -137,6 +137,7 @@
     "table": "Jedwali",
     "viewQR": "Tazama QR",
     "downloadPDF": "Pakua PDF",
+    "pdfDownloadFailed": "Imeshindwa kupakua PDF. Jaribu tena.",
     "design": "Ubunifu",
     "qrColor": "Rangi ya QR",
     "bgColor": "Rangi ya Mandhari",
