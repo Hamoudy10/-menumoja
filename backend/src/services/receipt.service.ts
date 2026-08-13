@@ -2,6 +2,7 @@ import { prisma } from '@/config/database';
 import { NotFoundError } from '@/utils/errors';
 import { generateReceiptNumber } from '@/utils/helpers';
 import logger from '@/utils/logger';
+import { ensureSubmission } from './etims.service';
 
 /**
  * Central receipt service.
@@ -70,7 +71,7 @@ export async function createReceiptForPayment(paymentId: string, options: { isRe
       ? 0
       : Number(order.taxAmount) || (Number(payment.amount) * 16) / 116;
 
-    return prisma.receipt.create({
+    const created = await prisma.receipt.create({
       data: {
         restaurantId: payment.restaurantId,
         orderId: order.id,
@@ -104,6 +105,15 @@ export async function createReceiptForPayment(paymentId: string, options: { isRe
         refundedAt: options.isRefund ? new Date() : null,
       },
     });
+
+    // eTIMS submission tracking (best-effort, never breaks payment)
+    try {
+      await ensureSubmission(payment.restaurantId, created.id);
+    } catch (etimsError) {
+      logger.warn('eTIMS submission row failed to create', { error: (etimsError as Error).message, receiptId: created.id });
+    }
+
+    return created;
   } catch (error: any) {
     logger.error('Receipt generation failed', { error: error.message, paymentId });
     return null;

@@ -582,6 +582,9 @@ router.get('/',
         amount: Number(p.amount),
         cashReceived: p.cashReceived ? Number(p.cashReceived) : null,
         changeGiven: p.changeGiven ? Number(p.changeGiven) : null,
+        etimsStatus: (p as any).receipt?.etrSubmission?.status || null,
+        kraInvoiceNumber: (p as any).receipt?.etrSubmission?.kraInvoiceNumber || null,
+        receiptNumber: (p as any).receipt?.receiptNumber || null,
       })),
       meta: buildPaginationMeta(total, page, perPage),
     });
@@ -660,6 +663,14 @@ router.get(
           cashier: {
             select: { id: true, fullName: true },
           },
+          receipts: {
+            take: 1,
+            select: {
+              id: true,
+              receiptNumber: true,
+              etrSubmission: { select: { status: true, kraInvoiceNumber: true, attempts: true } },
+            },
+          },
         },
       }),
     ]);
@@ -671,6 +682,9 @@ router.get(
         amount: Number(p.amount),
         cashReceived: p.cashReceived ? Number(p.cashReceived) : null,
         changeGiven: p.changeGiven ? Number(p.changeGiven) : null,
+        etimsStatus: (p as any).receipts?.[0]?.etrSubmission?.status || null,
+        kraInvoiceNumber: (p as any).receipts?.[0]?.etrSubmission?.kraInvoiceNumber || null,
+        receiptNumber: (p as any).receipts?.[0]?.receiptNumber || null,
         order: p.order
           ? {
               ...p.order,

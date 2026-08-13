@@ -61,3 +61,9 @@ export const runReconciliation = (date?: string, notes?: string) =>
 
 export const getReconciliationHistory = (params?: any) =>
   api.get('/payments/reconciliation/history', { params }).then(unwrap)
+
+export const getEtimsStatus = () =>
+  api.get('/etims/status').then(unwrap)
+
+export const processEtimsSubmissions = () =>
+  api.post('/etims/process').then(unwrap)

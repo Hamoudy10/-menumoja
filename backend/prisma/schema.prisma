@@ -270,6 +270,13 @@ enum WaitlistStatus {
   NO_SHOW
 }
 
+enum EtrSubmissionStatus {
+  PENDING
+  SUBMITTED
+  FAILED
+  REJECTED
+}
+
 model AiUsageLog {
   id               String   @id @default(uuid()) @db.Uuid
   restaurantId     String   @map("restaurant_id") @db.Uuid
@@ -410,6 +417,7 @@ model Restaurant {
   reconciliationRecords  ReconciliationRecord[]
   cashReconciliations    CashReconciliation[]
   receipts               Receipt[]
+  etrSubmissions         EtrSubmission[]
   inventoryItems         InventoryItem[]
   stockMovements         StockMovement[]
   suppliers              Supplier[]
@@ -927,6 +935,7 @@ model Payment {
   order      Order      @relation(fields: [orderId], references: [id])
   cashier    Staff?     @relation("CashierPayments", fields: [cashierId], references: [id])
   attempts   PaymentAttempt[]
+  receipts   Receipt[]
 
   @@index([restaurantId])
   @@index([orderId])
@@ -1225,6 +1234,30 @@ model WaitlistEntry {
   @@map("waitlist_entries")
 }
 
+model EtrSubmission {
+  id                String               @id @default(uuid()) @db.Uuid
+  restaurantId      String               @map("restaurant_id") @db.Uuid
+  receiptId         String               @unique @map("receipt_id") @db.Uuid
+  provider          String               @default("KRA_ETIMS")
+  status            EtrSubmissionStatus  @default(PENDING)
+  attempts          Int                  @default(0)
+  lastError         String?              @map("last_error")
+  submittedAt       DateTime?            @map("submitted_at")
+  responseCode      String?              @map("response_code")
+  responseMessage   String?              @map("response_message")
+  kraInvoiceNumber  String?              @map("kra_invoice_number")
+  payload           Json?
+  createdAt         DateTime             @default(now()) @map("created_at")
+  updatedAt         DateTime             @updatedAt @map("updated_at")
+
+  restaurant Restaurant @relation(fields: [restaurantId], references: [id], onDelete: Cascade)
+  receipt    Receipt    @relation(fields: [receiptId], references: [id], onDelete: Cascade)
+
+  @@index([restaurantId])
+  @@index([status])
+  @@map("etr_submissions")
+}
+
 model WhatsAppSettings {
   id            String   @id @default(uuid()) @db.Uuid
   restaurantId  String   @unique @map("restaurant_id") @db.Uuid
@@ -1461,7 +1494,9 @@ model Receipt {
 
   restaurant Restaurant @relation(fields: [restaurantId], references: [id], onDelete: Cascade)
   order      Order      @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  payment    Payment?   @relation(fields: [paymentId], references: [id], onDelete: SetNull)
   cashier    Staff?     @relation(fields: [cashierId], references: [id])
+  etrSubmission EtrSubmission?
 
   @@index([restaurantId])
   @@index([orderId])

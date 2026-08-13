@@ -12,7 +12,8 @@ import { RefreshButton } from '@/components/ui/RefreshButton'
 import { Button } from '@/components/ui/Button'
 import { Input } from '@/components/ui/Input'
 import { showSuccessToast, showErrorToast } from '@/components/ui/Toast'
-import { getReconciliationSummary, runReconciliation, getReconciliationHistory } from '@/api/payments'
+import { getReconciliationSummary, runReconciliation, getReconciliationHistory, getEtimsStatus, processEtimsSubmissions } from '@/api/payments'
+import { FileCheck2, FileClock, FileX2, Send } from 'lucide-react'
 
 function CustomTooltip({ active, payload, label }: any) {
   if (!active || !payload) return null
@@ -42,6 +43,27 @@ export default function PaymentsPage() {
   const [reconLoading, setReconLoading] = useState(false)
   const [reconRunning, setReconRunning] = useState(false)
   const [reconHistory, setReconHistory] = useState<any[]>([])
+  const [etims, setEtims] = useState<any>(null)
+  const [etimsProcessing, setEtimsProcessing] = useState(false)
+
+  const fetchEtims = useCallback(async () => {
+    try {
+      const data = await getEtimsStatus()
+      setEtims(data)
+    } catch { /* eTIMS panel is best-effort */ }
+  }, [])
+
+  useEffect(() => { fetchEtims() }, [fetchEtims])
+
+  const handleProcessEtims = async () => {
+    setEtimsProcessing(true)
+    try {
+      const res = await processEtimsSubmissions()
+      showSuccessToast(`eTIMS: ${res.submitted} submitted, ${res.failed} failed`)
+      fetchEtims()
+    } catch { showErrorToast('eTIMS processing failed') }
+    finally { setEtimsProcessing(false) }
+  }
 
   const fetchRecon = useCallback(async (date: string) => {
     setReconLoading(true)
@@ -333,6 +355,49 @@ export default function PaymentsPage() {
           </div>
         )}
       </div>
+
+      {/* KRA eTIMS status */}
+      {etims && (
+        <div className="rounded-2xl bg-white dark:bg-primary-light border border-white/10 p-4">
+          <div className="flex flex-wrap items-center justify-between gap-3 mb-3">
+            <div>
+              <h3 className="font-heading text-lg font-bold text-text-primary dark:text-white">KRA eTIMS</h3>
+              <p className="font-body text-xs text-text-secondary dark:text-white/50">
+                {etims.configured ? 'Credentials configured — submissions are sent to KRA.' : 'Not configured — receipts wait as PENDING. Nothing is claimed as compliant until KRA returns an invoice number.'}
+              </p>
+            </div>
+            <Button size="sm" loading={etimsProcessing} onClick={handleProcessEtims} disabled={!etims.configured}>
+              <Send className="h-3.5 w-3.5" /> Process Submissions
+            </Button>
+          </div>
+          <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+            {[
+              { label: 'Pending', value: etims.counts?.PENDING ?? 0, icon: <FileClock className="h-4 w-4" />, cls: 'text-amber-500' },
+              { label: 'Submitted', value: etims.counts?.SUBMITTED ?? 0, icon: <FileCheck2 className="h-4 w-4" />, cls: 'text-success' },
+              { label: 'Failed', value: etims.counts?.FAILED ?? 0, icon: <FileX2 className="h-4 w-4" />, cls: 'text-red-500' },
+              { label: 'Rejected', value: etims.counts?.REJECTED ?? 0, icon: <FileX2 className="h-4 w-4" />, cls: 'text-red-500' },
+            ].map((s) => (
+              <div key={s.label} className="rounded-xl bg-black/5 dark:bg-white/5 p-3">
+                <div className={`flex items-center gap-1.5 ${s.cls}`}>{s.icon}<span className="font-accent text-xs uppercase tracking-wider">{s.label}</span></div>
+                <p className="font-heading text-xl font-bold text-text-primary dark:text-white mt-1">{s.value}</p>
+              </div>
+            ))}
+          </div>
+          {(etims.unsubmitted ?? []).length > 0 && (
+            <div className="mt-3 space-y-1 max-h-40 overflow-y-auto">
+              <p className="font-accent text-xs text-text-secondary uppercase tracking-wider mb-1">Needs attention</p>
+              {etims.unsubmitted.map((s: any) => (
+                <div key={s.id} className="flex items-center justify-between text-xs py-1 border-b border-black/5 dark:border-white/5 last:border-0">
+                  <span className="text-text-primary dark:text-white truncate">{s.receiptNumber}</span>
+                  <span className={`font-bold ${s.status === 'PENDING' ? 'text-amber-500' : 'text-red-500'}`}>{s.status}</span>
+                  <span className="text-text-secondary truncate">{s.lastError || `attempts ${s.attempts}`}</span>
+                </div>
+              ))}
+            </div>
+          )}
+          <p className="text-[10px] text-text-secondary mt-2">{etims.note}</p>
+        </div>
+      )}
     </div>
   )
 }

@@ -24,6 +24,7 @@ import loyaltyRoutes from '../src/routes/loyalty/loyalty.routes';
 import whatsappRoutes from '../src/routes/whatsapp/whatsapp.routes';
 import aiRoutes from '../src/routes/ai/ai.routes';
 import reservationRoutes from '../src/routes/reservations/reservations.routes';
+import etimsRoutes from '../src/routes/etims/etims.routes';
 
 jest.mock('../src/config/database', () => {
   const mockPrisma = {
@@ -267,6 +268,14 @@ jest.mock('../src/config/database', () => {
       create: jest.fn().mockResolvedValue({}),
       update: jest.fn().mockResolvedValue({}),
     },
+    etrSubmission: {
+      findUnique: jest.fn().mockResolvedValue(null),
+      findFirst: jest.fn().mockResolvedValue(null),
+      findMany: jest.fn().mockResolvedValue([]),
+      create: jest.fn().mockResolvedValue({}),
+      update: jest.fn().mockResolvedValue({}),
+      groupBy: jest.fn().mockResolvedValue([]),
+    },
     cashReconciliation: {
       findFirst: jest.fn(),
       findMany: jest.fn(),
@@ -441,6 +450,7 @@ export function setupTestApp(): Express {
   app.use('/api/v1/whatsapp', whatsappRoutes);
   app.use('/api/v1/ai', aiRoutes);
   app.use('/api/v1/reservations', reservationRoutes);
+  app.use('/api/v1/etims', etimsRoutes);
   app.get('/api/v1/health', (_req: Request, res: Response) => {
     res.json({ status: 'ok', timestamp: new Date().toISOString(), uptime: process.uptime(), version: '1.0.0' });
   });

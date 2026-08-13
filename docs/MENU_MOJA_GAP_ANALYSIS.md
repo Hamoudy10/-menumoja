@@ -350,7 +350,18 @@ TARGET DOMAIN                    CURRENT STATE                        GAP CLASS
 6. ✅ **UI** — `/dashboard/reservations`: day view with reservations + waitlist side by side, create modals, one-tap check-in/cancel/no-show, auto-seat to the first free table. Sidebar + route wired.
 7. ✅ Tests — `tests/reservation.test.ts` (8): create + table suggestion/RESERVED, past-time rejection, check-in → OCCUPIED, cancel → FREE, invalid transition rejection, waitlist position/wait math, seat → OCCUPIED, unavailable-table rejection.
 
-### Tier 6 — eTIMS / KENYA COMPLIANCE (next recommended — requires KRA API verification)
+### Tier 6 — eTIMS / KENYA COMPLIANCE ✅ ARCHITECTURE BUILT (2026-08-13)
+1. ✅ **Honest-compliance layer (migration 13)** — `EtrSubmission` ledger per receipt: PENDING/SUBMITTED/FAILED/REJECTED, attempts, last error, KRA response code/message, KRA invoice number (evidence), and the exact submitted payload (audit trail). A receipt is **never** labelled compliant — only "SUBMITTED" with the KRA-returned invoice number.
+2. ✅ **KRA adapter** (`integrations/etims.ts`) — sandbox/production separation, cached token auth, A1-style payload builder, normalized submit results. Every contract detail (endpoints, field names, result codes) is flagged `// VERIFY` — **no production submission without KRA sandbox certification** (KRA's portal was not reachable for live verification from this environment; see `docs/ETIMS.md` §2 for the exact checklist).
+3. ✅ **Submission service** — receipts auto-create PENDING rows; unconfigured → stays PENDING (safe no-op, surfaced to owner); success → SUBMITTED + invoice number; business rejection → REJECTED (no auto-retry); network → FAILED (retryable, max 5 attempts); manual process trigger + status view.
+4. ✅ **API** — `GET /etims/status` (counts + needs-attention list), `POST /etims/process` (audited).
+5. ✅ **UI** — KRA eTIMS panel in PaymentsPage (counts, configure-state notice, process button, needs-attention list, honesty note). Receipts list now carries `etimsStatus`/`kraInvoiceNumber`.
+6. ✅ **Docs** — `docs/ETIMS.md`: current status, verification checklist, env vars, lifecycle, honesty definitions, pilot rollout checklist.
+7. ✅ Tests — `tests/etims.test.ts` (6): PENDING creation, unconfigured no-op, status API + scoping, process endpoint, A1 payload (TIN + VAT math 580→80).
+
+**Also fixed:** Render Docker build broke because `postinstall: prisma generate` ran before the schema was copied — the schema is now copied before `npm ci` in both Dockerfiles.
+
+### Tier 7 — ADMIN PLATFORM & BILLING (next recommended)
 7. POS hardening: modifiers, split/partial payments, held orders (persisted), KDS station/actions, table merge/split, optimistic locking
 8. M-Pesa: state machine, PaymentAttempt/WebhookEvent, reconciliation dashboard, timeout/reversal handling
 9. Offline-first: local queues + sync + connectivity UI + PWA decision

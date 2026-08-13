@@ -5,11 +5,13 @@ WORKDIR /app
 RUN apk add --no-cache curl
 
 COPY backend/package*.json ./
+# Copy the Prisma schema BEFORE npm ci — the postinstall hook runs
+# `prisma generate` and needs prisma/schema.prisma present.
+COPY backend/prisma/ ./prisma/
 RUN npm ci
 
 COPY backend/tsconfig.json ./
 COPY backend/src/ ./src/
-COPY backend/prisma/ ./prisma/
 
 RUN npx prisma generate
 
