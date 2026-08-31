@@ -48,6 +48,72 @@ export async function generateManagerAnswer(
     usage: { promptTokens: 0, completionTokens: 0 },
   });
 }
+
+/**
+ * Tool spec handed to the LLM for a manager "action" (a write operation).
+ * jsonSchema is the strict JSON Schema the model must comply with.
+ */
+export interface ManagerActionTool {
+  key: string;
+  label: string;
+  description: string;
+  jsonSchema: Record<string, unknown>;
+}
+
+export interface ManagerActionResult {
+  action: string | null;
+  args: Record<string, unknown>;
+  reply: string;
+}
+
+/**
+ * Uses DeepSeek tool-calling to map the operator's free-text instruction onto
+ * the registered action tools, returning the chosen tool + its arguments.
+ * Returns action=null when the model declined to call a tool (or failed),
+ * so the caller can fall back to the safe, deterministic path.
+ */
+export async function generateManagerAction(
+  question: string,
+  tools: ManagerActionTool[]
+): Promise<ManagerActionResult> {
+  return withRetry(async () => {
+    const client = getClient();
+    const toolSpecs = tools.map((t) => ({
+      type: 'function' as const,
+      function: { name: t.key, description: t.description, parameters: t.jsonSchema },
+    }));
+
+    const response = await client.chat.completions.create({
+      model: AI_MODEL,
+      messages: [
+        {
+          role: 'system',
+          content:
+            "You are Menu Moja AI Manager, carrying out a restaurant operator's instruction. Choose exactly ONE of the available tools that best matches the request and return its arguments. Fill every required argument. Use the item/inventory names exactly as the operator refers to them. Never invent names or IDs. Never propose a change that is not clearly requested. If no tool matches, do not call a tool and briefly explain what you need clarified.",
+        },
+        { role: 'user', content: question },
+      ],
+      tools: toolSpecs,
+      tool_choice: 'auto',
+      max_tokens: 500,
+      temperature: 0.1,
+    });
+
+    const choice = response.choices[0]?.message;
+    const toolCall = choice?.tool_calls?.[0];
+    if (!toolCall) return { action: null, args: {}, reply: choice?.content || '' };
+
+    let args: Record<string, unknown> = {};
+    try {
+      args = JSON.parse(toolCall.function.arguments || '{}');
+    } catch {
+      args = {};
+    }
+
+    return { action: toolCall.function.name, args, reply: choice?.content || '' };
+  }, { action: null, args: {}, reply: '' });
+}
+
 const AI_BASE_URL = config.aiProvider === 'deepseek' ? 'https://api.deepseek.com/v1' : undefined;
 
 function getClient(): OpenAI {

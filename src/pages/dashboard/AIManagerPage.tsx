@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback, useRef } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
-import { Bot, Send, RefreshCw, TrendingUp, Trophy, Percent, AlertTriangle, Info, Loader2 } from 'lucide-react'
+import { Bot, Send, RefreshCw, TrendingUp, Trophy, Percent, AlertTriangle, Info, Loader2, Check, X } from 'lucide-react'
 import { Button } from '@/components/ui/Button'
 import { Input } from '@/components/ui/Input'
 import { Skeleton } from '@/components/ui/Skeleton'
@@ -10,15 +10,23 @@ import * as aiApi from '@/api/ai'
 interface ChatMessage {
   role: 'user' | 'assistant'
   content: string
-  source?: 'llm' | 'tool'
+  source?: 'llm' | 'tool' | 'action'
+}
+
+interface ProposedAction {
+  id: string
+  tool: string
+  label: string
+  args: Record<string, unknown>
+  summary: string
 }
 
 const SUGGESTED_QUESTIONS = [
   'How did we perform this month?',
+  'Mark chicken biryani unavailable',
   'What is our most profitable dish?',
   'Which stock is running low?',
-  'How many customers came back?',
-  'Who served the most orders?',
+  'Restock chicken with 20 kg',
   'Forecast next week sales',
 ]
 
@@ -37,6 +45,8 @@ export default function AIManagerPage() {
   const [asking, setAsking] = useState(false)
   const [briefing, setBriefing] = useState<any>(null)
   const [briefingLoading, setBriefingLoading] = useState(true)
+  const [pendingAction, setPendingAction] = useState<ProposedAction | null>(null)
+  const [updatingAction, setUpdatingAction] = useState(false)
   const endRef = useRef<HTMLDivElement>(null)
 
   const loadBriefing = useCallback(async () => {
@@ -48,7 +58,18 @@ export default function AIManagerPage() {
     finally { setBriefingLoading(false) }
   }, [])
 
+  const loadPendingAction = useCallback(async () => {
+    try {
+      const actions = await aiApi.listAiActions('PENDING')
+      if (Array.isArray(actions) && actions.length > 0) {
+        const a = actions[0]
+        setPendingAction({ id: a.id, tool: a.tool, label: a.label, args: a.args, summary: a.summary })
+      }
+    } catch { /* non-blocking */ }
+  }, [])
+
   useEffect(() => { loadBriefing() }, [loadBriefing])
+  useEffect(() => { loadPendingAction() }, [loadPendingAction])
 
   useEffect(() => {
     endRef.current?.scrollIntoView({ behavior: 'smooth' })
@@ -63,8 +84,31 @@ export default function AIManagerPage() {
     try {
       const res = await aiApi.askManager(question)
       setMessages((prev) => [...prev, { role: 'assistant', content: res.reply, source: res.source }])
+      if (res.proposedAction) setPendingAction(res.proposedAction)
     } catch { showErrorToast('Failed to get an answer') }
     finally { setAsking(false) }
+  }
+
+  const confirmPendingAction = async () => {
+    if (!pendingAction) return
+    setUpdatingAction(true)
+    try {
+      const res = await aiApi.confirmAiAction(pendingAction.id)
+      setMessages((prev) => [...prev, { role: 'assistant', content: res.message }])
+      setPendingAction(null)
+    } catch { showErrorToast('Failed to apply the action') }
+    finally { setUpdatingAction(false) }
+  }
+
+  const rejectPendingAction = async () => {
+    if (!pendingAction) return
+    setUpdatingAction(true)
+    try {
+      await aiApi.rejectAiAction(pendingAction.id)
+      setMessages((prev) => [...prev, { role: 'assistant', content: 'Action rejected — nothing was changed.' }])
+      setPendingAction(null)
+    } catch { showErrorToast('Failed to reject the action') }
+    finally { setUpdatingAction(false) }
   }
 
   return (
@@ -144,16 +188,32 @@ export default function AIManagerPage() {
           <div ref={endRef} />
         </div>
 
+        {pendingAction && (
+          <div className="rounded-xl border border-secondary/40 bg-secondary/5 p-3.5 mb-3">
+            <div className="flex items-center gap-2 mb-1.5">
+              <Bot className="h-3.5 w-3.5 text-secondary" />
+              <span className="text-[10px] font-bold text-secondary uppercase tracking-wider">Proposed action</span>
+            </div>
+            <p className="font-accent text-sm font-medium text-text-primary dark:text-white">{pendingAction.summary}</p>
+            <p className="text-[11px] text-text-secondary mt-0.5">Tool: {pendingAction.label}</p>
+            <div className="flex gap-2 mt-2.5">
+              <Button size="sm" onClick={confirmPendingAction} loading={updatingAction} icon={<Check className="h-4 w-4" />}>Confirm</Button>
+              <Button size="sm" variant="ghost" onClick={rejectPendingAction} disabled={updatingAction} icon={<X className="h-4 w-4" />}>Cancel</Button>
+            </div>
+            <p className="text-[10px] text-text-secondary/80 mt-2">Nothing changes until you confirm — AI actions are never applied automatically.</p>
+          </div>
+        )}
+
         <div className="flex gap-2">
           <Input
             value={input}
             onChange={(e) => setInput(e.target.value)}
             onKeyDown={(e) => e.key === 'Enter' && ask()}
-            placeholder="e.g. What should I promote tonight?"
+            placeholder="e.g. Mark chicken biryani unavailable"
           />
           <Button onClick={() => ask()} loading={asking}><Send className="h-4 w-4" /></Button>
         </div>
-        <p className="text-[10px] text-text-secondary mt-2">The manager only answers from your real data — it never invents numbers. When the AI is unavailable or over budget, it returns the structured data directly.</p>
+        <p className="text-[10px] text-text-secondary mt-2">The manager only answers from your real data — it never invents numbers. When the AI is unavailable or over budget, it returns the structured data directly. Requests to change your restaurant are shown first for your confirmation.</p>
       </div>
     </div>
   )

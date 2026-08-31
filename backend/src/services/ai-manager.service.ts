@@ -2,6 +2,7 @@ import { prisma } from '@/config/database';
 import * as openai from '@/integrations/openai';
 import { detectIntent, runTool, formatToolData } from './manager.service';
 import { recordAiUsage, isWithinDailyBudget, providerName, providerForModel } from './ai-usage.service';
+import { detectActionIntent, proposeAction, ProposedAction } from './ai-action.service';
 import logger from '@/utils/logger';
 
 /**
@@ -33,10 +34,23 @@ async function answerFromLlm(restaurantId: string, question: string, dataText: s
   return result.reply;
 }
 
-export async function answerQuestion(restaurantId: string, question: string): Promise<{ reply: string; toolUsed: string | null; source: 'llm' | 'tool' }> {
+export async function answerQuestion(restaurantId: string, question: string): Promise<{ reply: string; toolUsed: string | null; source: 'llm' | 'tool' | 'action'; proposedAction?: ProposedAction }> {
   const message = (question || '').trim();
   if (!message) {
     return { reply: 'Ask me about your sales, profitability, stock, customers, staff, campaigns or forecasts.', toolUsed: null, source: 'tool' };
+  }
+
+  // Write-operations are proposed, never executed implicitly (Level 3).
+  if (detectActionIntent(message)) {
+    try {
+      const proposal = await proposeAction(restaurantId, message);
+      if (proposal) {
+        return { reply: proposal.reply, toolUsed: proposal.proposedAction.tool, source: 'action', proposedAction: proposal.proposedAction };
+      }
+    } catch (error) {
+      // Could not resolve/parse the proposed action — fall back to read tools.
+      logger.warn('Action proposal failed — falling back to read tools', { error: (error as Error).message, restaurantId });
+    }
   }
 
   const toolKey = detectIntent(message);
