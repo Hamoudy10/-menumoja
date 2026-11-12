@@ -16,6 +16,7 @@
     "db:migrate": "prisma migrate dev",
     "db:migrate:prod": "prisma migrate deploy",
     "db:seed": "tsx prisma/seed.ts",
+    "db:encrypt-secrets": "tsx scripts/encrypt-secrets.ts",
     "db:studio": "prisma studio",
     "test": "jest --passWithNoTests --forceExit",
     "test:watch": "jest --watch --passWithNoTests",
