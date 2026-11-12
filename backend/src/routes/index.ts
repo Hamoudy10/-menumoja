@@ -19,3 +19,5 @@ export { default as loyaltyRoutes } from './loyalty/loyalty.routes';
 export { default as whatsappRoutes } from './whatsapp/whatsapp.routes';
 export { default as reservationRoutes } from './reservations/reservations.routes';
 export { default as etimsRoutes } from './etims/etims.routes';
+export { default as syncRoutes } from './sync/sync.routes';
+export { default as billingRoutes } from './billing/billing.routes';

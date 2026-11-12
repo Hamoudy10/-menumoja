@@ -1,5 +1,6 @@
 import { Router } from 'express';
-import { asyncHandler, AppError, generateSlug, hashPassword, generatePin } from '@/utils';
+import { asyncHandler, AppError, generateSlug, hashPassword, generatePin, encryptSecret, isEncryptedSecret } from '@/utils';
+import { toOwnerSettings } from '@/utils/settings';
 import { authenticate, enforceRestaurantScope, validate, auditLog } from '@/middleware';
 import { updateRestaurantSchema, updateSettingsSchema, openingHoursSchema, createBranchSchema, createTableSchema, updateTableSchema, updateTableStatusSchema, updateTableSessionSchema, createZoneSchema, updateZoneSchema, createPromotionSchema, updatePromotionSchema, createStaffSchema, updateStaffSchema, uploadImageSchema } from '@/utils/validation';
 import { prisma } from '@/config/database';
@@ -59,7 +60,10 @@ router.get(
 
     res.json({
       success: true,
-      data: restaurant,
+      data: {
+        ...restaurant,
+        settings: toOwnerSettings(restaurant.settings as Record<string, unknown> | null),
+      },
     });
   })
 );
@@ -224,17 +228,31 @@ router.put(
       if (paymentSettings.businessName) settingsData.mpesaBusinessName = String(paymentSettings.businessName).trim();
     }
 
+    // Encrypt secret credentials at rest. Already-encrypted values are passed
+    // through unchanged so a client that echoes the stored value cannot
+    // double-encrypt it. An empty passkey means "leave unchanged".
+    if (typeof settingsData.mpesaPasskey === 'string') {
+      if (!settingsData.mpesaPasskey) {
+        delete settingsData.mpesaPasskey;
+      } else if (!isEncryptedSecret(settingsData.mpesaPasskey)) {
+        settingsData.mpesaPasskey = encryptSecret(settingsData.mpesaPasskey);
+      }
+    }
+
     const settings = await prisma.restaurantSettings.upsert({
       where: { restaurantId },
       create: { restaurantId, ...settingsData },
       update: settingsData,
     });
 
+    // Settings drive the public menu (branding, payments), so drop the cache.
+    await invalidateMenuCache(restaurantId);
+
     logger.info('Restaurant settings updated', { restaurantId });
 
     res.json({
       success: true,
-      data: settings,
+      data: toOwnerSettings(settings as Record<string, unknown>),
     });
   })
 );

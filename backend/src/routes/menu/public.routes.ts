@@ -8,6 +8,7 @@ import logger from '@/utils/logger';
 import { getUpsellSuggestions } from '@/services/upsell.service';
 import { getPersonalizedMenu } from '@/services/menu-personalization.service';
 import { listPlans } from '@/services/subscription.service';
+import { toPublicSettings } from '@/utils/settings';
 
 const router = Router();
 
@@ -171,7 +172,8 @@ router.get(
         isHalalCertified: restaurant.isHalalCertified,
         dietaryOptions: restaurant.dietaryOptions,
       },
-      settings: restaurant.settings,
+      // Whitelisted: never expose payment credentials on a public endpoint.
+      settings: toPublicSettings(restaurant.settings as Record<string, unknown> | null),
       openingHours: restaurant.openingHours,
       promotions: promotions.map((p) => ({
         id: p.id,

@@ -292,6 +292,8 @@ export const recordCashSchema = z
     amountTendered: z.number().min(0, 'Amount tendered must be at least 0'),
     discount: z.number().min(0).optional(),
     notes: z.string().max(500).optional(),
+    deviceId: z.string().max(128).optional(),
+    clientTransactionId: z.string().max(128).optional(),
   })
   .strict()
   .refine((data) => data.amountTendered >= data.amount, {

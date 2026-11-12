@@ -6,6 +6,7 @@ import { authenticate, optionalAuth, enforceRestaurantScope, validate, validateQ
 import { AppError, NotFoundError, ValidationError } from '@/utils/errors';
 import { generateOrderNumber, calculateTotals, buildPaginationMeta } from '@/utils/helpers';
 import { getIdempotencyKey, findIdempotentOrder, recordIdempotency, isUniqueViolation } from '@/utils/idempotency';
+import { findOrderByClientTxn, recordMutation, markApplied } from '@/services/sync.service';
 import { upsertCustomer } from '@/services/customer.service';
 import { sendTransactional } from '@/services/whatsapp.service';
 import { updateOrderStatusSchema } from '@/utils/validation';
@@ -13,6 +14,29 @@ import { mpesaService } from '@/services';
 import { onTableSeated, freeTableIfLastOrder } from '@/services/table.service';
 import { io } from '@/hooks/socket';
 import logger from '@/utils/logger';
+
+/**
+ * Reads optional device identity from a request body. When both fields are
+ * present, returns any order already created by that device+transaction so an
+ * offline replay is a safe no-op (Phase 2 sync engine).
+ */
+async function dedupeOrderByClientTxn(restaurantId: string, body: any): Promise<{ deviceId: string | null; clientTransactionId: string | null; existing: any }> {
+  const deviceId = body?.deviceId?.trim() || null;
+  const clientTransactionId = body?.clientTransactionId?.trim() || null;
+  if (!deviceId || !clientTransactionId) return { deviceId: null, clientTransactionId: null, existing: null };
+  const existing = await findOrderByClientTxn(restaurantId, deviceId, clientTransactionId);
+  return { deviceId, clientTransactionId, existing };
+}
+
+/** Records + marks a created order into the durable sync-changes outbox. */
+async function recordOrderSynced(restaurantId: string, order: any, deviceId: string | null, clientTransactionId: string | null): Promise<void> {
+  if (!deviceId || !clientTransactionId) return;
+  const { change } = await recordMutation({
+    restaurantId, deviceId, clientTransactionId, entityType: 'ORDER', mutationType: 'pos_order',
+    entityId: order.id, payload: { orderId: order.id, orderNumber: order.orderNumber, totalAmount: Number(order.totalAmount) },
+  });
+  if (change?.id && order.id) await markApplied(change.id, order.id);
+}
 
 const router = Router();
 
@@ -398,6 +422,8 @@ const posOrderSchema = z.object({
   })).min(1, 'At least one item is required').max(100, 'Maximum 100 items'),
   notes: z.string().max(1000).optional(),
   paymentMethod: z.enum(['cash', 'mpesa', 'card']).default('cash'),
+  deviceId: z.string().max(128).optional(),
+  clientTransactionId: z.string().max(128).optional(),
 }).strict();
 
 router.post('/',
@@ -428,6 +454,22 @@ router.post('/',
     }
 
     const { tableNumber, customerName, customerPhone, items, notes, paymentMethod } = req.body;
+
+    const { deviceId, clientTransactionId, existing } = await dedupeOrderByClientTxn(restaurantId, req.body);
+    if (existing) {
+      logger.info('Reusing device+transaction POS order', { orderId: existing.id, deviceId, clientTransactionId, restaurantId });
+      res.status(201).json({
+        success: true,
+        data: {
+          orderId: existing.id,
+          orderNumber: existing.orderNumber,
+          estimatedPrepMinutes: existing.estimatedPrepMinutes,
+          totalAmount: Number(existing.totalAmount),
+          idempotentReplay: true,
+        },
+      });
+      return;
+    }
 
     const resolvedItems: Array<{ menuItemId: string | null; name: string; price: number; quantity: number; specialInstructions: string | null }> = [];
     const lookupIds = items
@@ -502,6 +544,8 @@ router.post('/',
           customerName: customerName || null,
           customerPhone: customerPhone || null,
           idempotencyKey: idempotencyKey || null,
+          deviceId,
+          clientTransactionId,
           items: {
             create: resolvedItems.map((i) => ({
               menuItemId: i.menuItemId,
@@ -539,6 +583,8 @@ router.post('/',
     if (idempotencyKey) {
       await recordIdempotency(idempotencyKey, `pos:${restaurantId}`, order.id);
     }
+
+    await recordOrderSynced(restaurantId, order, deviceId, clientTransactionId);
 
     logger.info('POS order created', { orderId: order.id, orderNumber: order.orderNumber, restaurantId });
 

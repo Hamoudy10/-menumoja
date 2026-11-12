@@ -111,6 +111,8 @@ export default function SettingsPage() {
     businessName: '',
     stkPushEnabled: true,
   })
+  // The server never returns the raw passkey — only whether one is stored.
+  const [mpesaPasskeySet, setMpesaPasskeySet] = useState(false)
 
   const [qrDesign, setQrDesign] = useState({
     qrColor: '#FF6B35',
@@ -158,11 +160,14 @@ export default function SettingsPage() {
       })
       setFontStyle(restaurant.fontStyle || 'modern')
       const s = restaurant.settings as any
-      if (s?.mpesaShortcode || s?.mpesaPasskey || s?.mpesaBusinessName) {
+      // The passkey is write-only from the client's perspective: the API
+      // returns `mpesaPasskeySet` instead of the secret itself.
+      setMpesaPasskeySet(Boolean(s?.mpesaPasskeySet))
+      if (s?.mpesaShortcode || s?.mpesaBusinessName || s?.mpesaPasskeySet) {
         setPaymentSettings((prev) => ({
           ...prev,
           mpesaShortcode: s.mpesaShortcode || prev.mpesaShortcode,
-          mpesaPasskey: s.mpesaPasskey || prev.mpesaPasskey,
+          mpesaPasskey: '',
           businessName: s.mpesaBusinessName || prev.businessName,
           mpesaEnabled: s.allowMpesaPayment ?? prev.mpesaEnabled,
           cashEnabled: s.allowCashPayment ?? prev.cashEnabled,
@@ -270,6 +275,10 @@ export default function SettingsPage() {
     setSaving(true)
     try {
       await restaurantApi.updateSettings({ paymentSettings })
+      if (paymentSettings.mpesaPasskey) {
+        setMpesaPasskeySet(true)
+        setPaymentSettings((prev) => ({ ...prev, mpesaPasskey: '' }))
+      }
       showSuccessToast('Payment settings updated')
     } catch { showErrorToast('Failed to save payment settings') } finally { setSaving(false) }
   }
@@ -1013,7 +1022,12 @@ export default function SettingsPage() {
                 onChange={(e) => setPaymentSettings({ ...paymentSettings, mpesaShortcode: e.target.value })} placeholder="e.g., 247247 (paybill) or 5273012 (till)" />
               <Input label="M-Pesa Passkey (from Daraja portal)" type="password" value={paymentSettings.mpesaPasskey}
                 onChange={(e) => setPaymentSettings({ ...paymentSettings, mpesaPasskey: e.target.value })}
-                placeholder="Available in developer.safaricom.co.ke → your number → Lipa Na M-Pesa Online" />
+                placeholder={mpesaPasskeySet ? '•••••••• (saved — leave blank to keep)' : 'Available in developer.safaricom.co.ke → your number → Lipa Na M-Pesa Online'} />
+              {mpesaPasskeySet && (
+                <p className="font-accent text-xs text-success flex items-center gap-1">
+                  <CheckCircle2 className="h-3.5 w-3.5" /> A passkey is saved securely. Enter a new one only to replace it.
+                </p>
+              )}
               <Input label="Business Name (shown on payment prompt)" value={paymentSettings.businessName || restaurant?.name || ''}
                 onChange={(e) => setPaymentSettings({ ...paymentSettings, businessName: e.target.value })} placeholder="Business name registered with M-Pesa" />
             </div>

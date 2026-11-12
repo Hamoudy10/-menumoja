@@ -1,5 +1,6 @@
 import logger from '../utils/logger';
 import { AppError } from '../utils/errors';
+import { decryptSecret } from '../utils/encryption';
 import * as mpesa from '../integrations/mpesa';
 import { sendSMS } from '../integrations/africasTalking';
 import { prisma } from '../config/database';
@@ -132,7 +133,8 @@ export async function initiatePayment(
       select: { mpesaShortcode: true, mpesaPasskey: true, mpesaBusinessName: true },
     });
     restaurantShortcode = settings?.mpesaShortcode || undefined;
-    passkey = settings?.mpesaPasskey || undefined;
+    // Decrypts values stored with the enc:v1: prefix; legacy plaintext passes through.
+    passkey = settings?.mpesaPasskey ? decryptSecret(settings.mpesaPasskey) : undefined;
     businessName = settings?.mpesaBusinessName || undefined;
   } catch (settingsError) {
     logger.warn('Failed to load restaurant M-Pesa credentials', { error: settingsError, restaurantId: order.restaurantId });

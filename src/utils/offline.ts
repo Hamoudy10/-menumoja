@@ -41,8 +41,31 @@ export interface FlushResult {
 
 const QUEUE_KEY = 'menumoja_offline_queue'
 const STATUS_KEY = 'menumoja_offline_status'
+const DEVICE_ID_KEY = 'menumoja_device_id'
 
 const MAX_ATTEMPTS = 5
+
+/**
+ * Returns a stable device id for this browser, so offline POS mutations carry
+ * a consistent device identity across reconnects/replays (Phase 2 sync engine).
+ */
+export function getDeviceId(): string {
+  try {
+    if (typeof window !== 'undefined' && window.localStorage) {
+      let id = window.localStorage.getItem(DEVICE_ID_KEY)
+      if (!id) {
+        id = typeof crypto !== 'undefined' && crypto.randomUUID
+          ? crypto.randomUUID()
+          : `${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 10)}`
+        window.localStorage.setItem(DEVICE_ID_KEY, id)
+      }
+      return id
+    }
+  } catch {
+    // ignore
+  }
+  return 'web-anon'
+}
 
 export function isNetworkError(error: unknown): boolean {
   const anyError = error as { code?: string; response?: unknown; message?: string }

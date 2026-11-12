@@ -41,8 +41,8 @@ export const closeShift = (shiftId: string, actualCash: number) =>
 export const getShifts = () =>
   api.get('/payments/cash/shifts').then(unwrap)
 
-export const recordCardPayment = (orderId: string, amount: number, idempotencyKey?: string) =>
-  api.post('/payments/card/record', { orderId, amount }, idempotencyKey ? { headers: { 'Idempotency-Key': idempotencyKey } } : undefined).then(unwrap)
+export const recordCardPayment = (orderId: string, amount: number, idempotencyKey?: string, meta?: { deviceId?: string; clientTransactionId?: string }) =>
+  api.post('/payments/card/record', { orderId, amount, deviceId: meta?.deviceId, clientTransactionId: meta?.clientTransactionId }, idempotencyKey ? { headers: { 'Idempotency-Key': idempotencyKey } } : undefined).then(unwrap)
 
 export const recordTip = (orderId: string, amount: number, method: string) =>
   api.post('/payments/tip', { orderId, amount, method }).then(unwrap)

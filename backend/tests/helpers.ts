@@ -6,6 +6,7 @@ import { errorHandler } from '../src/middleware/errorHandler';
 
 process.env.JWT_ACCESS_SECRET = 'test-access-secret-for-jest';
 process.env.JWT_REFRESH_SECRET = 'test-refresh-secret-for-jest';
+process.env.ENCRYPTION_KEY = 'test-encryption-key-for-jest';
 process.env.NODE_ENV = 'test';
 process.env.FRONTEND_URL = 'http://localhost:5173';
 process.env.DATABASE_URL = 'postgresql://test:test@localhost:5432/menumoja_test';
@@ -25,6 +26,8 @@ import whatsappRoutes from '../src/routes/whatsapp/whatsapp.routes';
 import aiRoutes from '../src/routes/ai/ai.routes';
 import reservationRoutes from '../src/routes/reservations/reservations.routes';
 import etimsRoutes from '../src/routes/etims/etims.routes';
+import billingRoutes from '../src/routes/billing/billing.routes';
+import adminRoutes from '../src/routes/admin/admin.routes';
 
 jest.mock('../src/config/database', () => {
   const mockPrisma = {
@@ -48,6 +51,17 @@ jest.mock('../src/config/database', () => {
       findUnique: jest.fn(),
       findMany: jest.fn().mockResolvedValue([]),
       create: jest.fn(),
+    },
+    subscriptionInvoice: {
+      findUnique: jest.fn().mockResolvedValue(null),
+      findFirst: jest.fn().mockResolvedValue(null),
+      findMany: jest.fn().mockResolvedValue([]),
+      create: jest.fn(),
+      update: jest.fn(),
+      updateMany: jest.fn().mockResolvedValue({ count: 0 }),
+      count: jest.fn().mockResolvedValue(0),
+      aggregate: jest.fn().mockResolvedValue({ _sum: { amountKes: 0 }, _count: { id: 0 } }),
+      groupBy: jest.fn().mockResolvedValue([]),
     },
     restaurantSettings: {
       upsert: jest.fn(),
@@ -263,6 +277,12 @@ jest.mock('../src/config/database', () => {
       aggregate: jest.fn().mockResolvedValue({ _sum: { totalTokens: 0, estimatedCostKes: 0 }, _count: { id: 0 } }),
       groupBy: jest.fn().mockResolvedValue([]),
     },
+    syncChange: {
+      create: jest.fn().mockResolvedValue({ id: uuidv4(), status: 'PENDING' }),
+      findUnique: jest.fn().mockResolvedValue(null),
+      findMany: jest.fn().mockResolvedValue([]),
+      update: jest.fn().mockResolvedValue({}),
+    },
     reservation: {
       findFirst: jest.fn().mockResolvedValue(null),
       findMany: jest.fn().mockResolvedValue([]),
@@ -322,6 +342,7 @@ jest.mock('../src/config/database', () => {
     notification: {
       findMany: jest.fn(),
       findUnique: jest.fn(),
+      create: jest.fn().mockResolvedValue({ id: uuidv4() }),
       update: jest.fn(),
       updateMany: jest.fn(),
       delete: jest.fn(),
@@ -458,6 +479,8 @@ export function setupTestApp(): Express {
   app.use('/api/v1/ai', aiRoutes);
   app.use('/api/v1/reservations', reservationRoutes);
   app.use('/api/v1/etims', etimsRoutes);
+  app.use('/api/v1/billing', billingRoutes);
+  app.use('/api/v1/admin', adminRoutes);
   app.get('/api/v1/health', (_req: Request, res: Response) => {
     res.json({ status: 'ok', timestamp: new Date().toISOString(), uptime: process.uptime(), version: '1.0.0' });
   });

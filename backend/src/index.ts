@@ -19,6 +19,7 @@ import { errorHandler } from './middleware/errorHandler';
 import { generalLimiter } from './middleware/rateLimiter';
 import { initSocket } from './hooks/socket';
 import { initializeScheduler } from './jobs/scheduler';
+import { startBillingScheduler } from './jobs/billingScheduler';
 import { prisma } from './config/database';
 import { redis } from './config/redis';
 
@@ -45,6 +46,8 @@ import {
   whatsappRoutes,
   reservationRoutes,
   etimsRoutes,
+  syncRoutes,
+  billingRoutes,
 } from './routes';
 
 if (config.nodeEnv === 'production' && (!config.jwtAccessSecret || !config.jwtRefreshSecret || !config.encryptionKey)) {
@@ -133,6 +136,8 @@ app.use('/api/v1/loyalty', loyaltyRoutes);
 app.use('/api/v1/whatsapp', whatsappRoutes);
 app.use('/api/v1/reservations', reservationRoutes);
 app.use('/api/v1/etims', etimsRoutes);
+app.use('/api/v1/sync', syncRoutes);
+app.use('/api/v1/billing', billingRoutes);
 
 app.get('/api/v1/health', async (_req: Request, res: Response) => {
   const checks: Record<string, string> = {};
@@ -208,6 +213,8 @@ function startServer(): void {
     } catch (err) {
       logger.warn('Failed to initialize job scheduler', { error: err });
     }
+
+    startBillingScheduler();
   }
 }
 

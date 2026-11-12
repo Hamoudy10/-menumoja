@@ -151,7 +151,8 @@ router.post(
 
     const restaurant = await prisma.restaurant.findUnique({
       where: { id: restaurantId },
-      select: { slug: true, name: true, settings: true },
+      // Do not load settings here — it contains payment credentials and is unused.
+      select: { slug: true, name: true },
     });
     if (!restaurant) {
       throw new AppError(404, 'RESTAURANT_NOT_FOUND', 'Restaurant not found', 'Mgahawa haukupatikana');

@@ -14,9 +14,29 @@ import { upsertCustomer, recordCustomerSpend } from '@/services/customer.service
 import { processPayment as processLoyaltyPayment } from '@/services/loyalty.service';
 import { sendTransactional, recordCampaignConversion } from '@/services/whatsapp.service';
 import { freeTableIfLastOrder } from '@/services/table.service';
+import { findPaymentByClientTxn, recordMutation, markApplied } from '@/services/sync.service';
 import * as mpesa from '@/integrations/mpesa';
 import { io } from '@/hooks/socket';
 import logger from '@/utils/logger';
+
+/** Reads optional device identity from a body and dedupes a replayed payment. */
+async function dedupePaymentByClientTxn(restaurantId: string, body: any): Promise<{ deviceId: string | null; clientTransactionId: string | null; existing: any }> {
+  const deviceId = body?.deviceId?.trim() || null;
+  const clientTransactionId = body?.clientTransactionId?.trim() || null;
+  if (!deviceId || !clientTransactionId) return { deviceId: null, clientTransactionId: null, existing: null };
+  const existing = await findPaymentByClientTxn(restaurantId, deviceId, clientTransactionId);
+  return { deviceId, clientTransactionId, existing };
+}
+
+/** Records + marks a created payment into the durable sync-changes outbox. */
+async function recordPaymentSynced(restaurantId: string, payment: any, deviceId: string | null, clientTransactionId: string | null, mutationType: string): Promise<void> {
+  if (!deviceId || !clientTransactionId) return;
+  const { change } = await recordMutation({
+    restaurantId, deviceId, clientTransactionId, entityType: 'PAYMENT', mutationType,
+    entityId: payment.id, payload: { paymentId: payment.id, orderId: payment.orderId, amount: Number(payment.amount) },
+  });
+  if (change?.id && payment.id) await markApplied(change.id, payment.id);
+}
 
 const SAFARICOM_IPS = [
   '196.201.214.200', '196.201.214.206', '196.201.213.200', '196.201.213.206',
@@ -360,7 +380,25 @@ router.post('/cash/record',
       }
     }
 
-    const { orderId, amount, amountTendered, discount, notes } = req.body;
+    const { orderId, amount, amountTendered, discount, notes, deviceId, clientTransactionId } = req.body;
+
+    const deduped = await dedupePaymentByClientTxn(restaurantId, req.body);
+    if (deduped.existing) {
+      logger.info('Reusing device+transaction cash payment', { paymentId: deduped.existing.id, deviceId, clientTransactionId, restaurantId });
+      res.status(201).json({
+        success: true,
+        data: {
+          paymentId: deduped.existing.id,
+          orderId: deduped.existing.orderId,
+          amount: Number(deduped.existing.amount),
+          amountTendered: Number(deduped.existing.cashReceived || deduped.existing.amount),
+          change: Number(deduped.existing.changeGiven || 0),
+          processedAt: deduped.existing.processedAt,
+          idempotentReplay: true,
+        },
+      });
+      return;
+    }
 
     const order = await prisma.order.findFirst({
       where: { id: orderId, restaurantId },
@@ -415,6 +453,8 @@ router.post('/cash/record',
             processedAt: new Date(),
             notes: notes || null,
             idempotencyKey: idempotencyKey || null,
+            deviceId: deduped.deviceId,
+            clientTransactionId: deduped.clientTransactionId,
           },
         }),
         prisma.order.update({
@@ -448,6 +488,8 @@ router.post('/cash/record',
     if (idempotencyKey) {
       await recordPaymentIdempotency(idempotencyKey, `pay:${restaurantId}`, payment.id);
     }
+
+    await recordPaymentSynced(restaurantId, payment, deduped.deviceId, deduped.clientTransactionId, 'cash_payment');
 
     try {
       const openShift = await prisma.cashReconciliation.findFirst({
@@ -1095,6 +1137,21 @@ router.post('/card/record',
 
     const { orderId, amount } = req.body;
 
+    const deduped = await dedupePaymentByClientTxn(restaurantId, req.body);
+    if (deduped.existing) {
+      logger.info('Reusing device+transaction card payment', { paymentId: deduped.existing.id, restaurantId });
+      res.status(201).json({
+        success: true,
+        data: {
+          id: deduped.existing.id,
+          orderId: deduped.existing.orderId,
+          amount: Number(deduped.existing.amount),
+          idempotentReplay: true,
+        },
+      });
+      return;
+    }
+
     const order = await prisma.order.findFirst({
       where: { id: orderId, restaurantId },
       select: { id: true, orderNumber: true, totalAmount: true, paymentStatus: true, tableId: true, customerName: true, customerPhone: true },
@@ -1115,6 +1172,8 @@ router.post('/card/record',
             status: 'PAID',
             processedAt: new Date(),
             idempotencyKey: idempotencyKey || null,
+            deviceId: deduped.deviceId,
+            clientTransactionId: deduped.clientTransactionId,
           },
         }),
         prisma.order.update({
@@ -1145,6 +1204,8 @@ router.post('/card/record',
     if (idempotencyKey) {
       await recordPaymentIdempotency(idempotencyKey, `pay:${restaurantId}`, payment.id);
     }
+
+    await recordPaymentSynced(restaurantId, payment, deduped.deviceId, deduped.clientTransactionId, 'card_payment');
 
     await freeTableIfLastOrder(restaurantId, orderId, order.tableId);
 

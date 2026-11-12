@@ -4,6 +4,8 @@ import { prisma } from '../../config/database';
 import { authenticate, requireRole, validate, auditLog } from '../../middleware';
 import { AppError, NotFoundError } from '../../utils/errors';
 import { parsePagination, buildPaginationMeta, asyncHandler } from '../../utils/helpers';
+import { toOwnerSettings } from '../../utils/settings';
+import { createInvoice, markInvoicePaid, voidInvoice, getBillingStats, runExpirySweep } from '../../services/billing.service';
 import logger from '../../utils/logger';
 import * as africasTalking from '../../integrations/africasTalking';
 import { AuthenticatedRequest } from '../../types';
@@ -134,6 +136,7 @@ router.get('/restaurants/:id', asyncHandler(async (req: AuthenticatedRequest, re
     success: true,
     data: {
       ...restaurant,
+      settings: toOwnerSettings(restaurant.settings as Record<string, unknown> | null),
       recentOrders,
     },
   });
@@ -640,6 +643,82 @@ router.post('/broadcast', validate(broadcastSchema), auditLog, asyncHandler(asyn
       emailSent,
     },
   });
+}));
+
+// ==================== BILLING ====================
+
+const createInvoiceSchema = z.object({
+  restaurantId: z.string().uuid(),
+  planId: z.string().uuid().optional(),
+  amountKes: z.number().positive().optional(),
+  periodStart: z.coerce.date().optional(),
+  periodEnd: z.coerce.date().optional(),
+  notes: z.string().max(1000).optional(),
+}).strict();
+
+const markPaidSchema = z.object({
+  method: z.enum(['MPESA', 'CASH', 'BANK', 'CARD', 'MANUAL']),
+  reference: z.string().max(120).optional(),
+  notes: z.string().max(1000).optional(),
+}).strict();
+
+const voidInvoiceSchema = z.object({
+  reason: z.string().max(500).optional(),
+}).strict();
+
+router.get('/billing/stats', asyncHandler(async (_req: AuthenticatedRequest, res: Response) => {
+  const stats = await getBillingStats();
+  res.json({ success: true, data: stats });
+}));
+
+router.get('/billing/invoices', asyncHandler(async (req: AuthenticatedRequest, res: Response) => {
+  const { page, perPage } = parsePagination(req.query as any);
+  const skip = (page - 1) * perPage;
+  const status = req.query.status as string | undefined;
+  const restaurantId = req.query.restaurantId as string | undefined;
+
+  const where: any = {};
+  if (status && ['PENDING', 'PAID', 'OVERDUE', 'VOID'].includes(status)) where.status = status;
+  if (restaurantId) where.restaurantId = restaurantId;
+
+  const [invoices, total] = await Promise.all([
+    prisma.subscriptionInvoice.findMany({
+      where,
+      orderBy: { createdAt: 'desc' },
+      skip,
+      take: perPage,
+      include: {
+        restaurant: { select: { id: true, name: true, slug: true } },
+        plan: { select: { id: true, name: true } },
+      },
+    }),
+    prisma.subscriptionInvoice.count({ where }),
+  ]);
+
+  res.json({ success: true, data: invoices, meta: buildPaginationMeta(total, page, perPage) });
+}));
+
+router.post('/billing/invoices', validate(createInvoiceSchema), asyncHandler(async (req: AuthenticatedRequest, res: Response) => {
+  const invoice = await createInvoice(req.body as any);
+  res.status(201).json({ success: true, data: invoice });
+}));
+
+router.post('/billing/invoices/:id/mark-paid', validate(markPaidSchema), asyncHandler(async (req: AuthenticatedRequest, res: Response) => {
+  const result = await markInvoicePaid(String(req.params.id), {
+    ...(req.body as any),
+    actorId: req.user?.userId,
+  });
+  res.json({ success: true, data: result });
+}));
+
+router.post('/billing/invoices/:id/void', validate(voidInvoiceSchema), asyncHandler(async (req: AuthenticatedRequest, res: Response) => {
+  const invoice = await voidInvoice(String(req.params.id), (req.body as any)?.reason);
+  res.json({ success: true, data: invoice });
+}));
+
+router.post('/billing/run-expiry', asyncHandler(async (_req: AuthenticatedRequest, res: Response) => {
+  const result = await runExpirySweep();
+  res.json({ success: true, data: result });
 }));
 
 export default router;
