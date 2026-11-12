@@ -7,6 +7,7 @@ import * as openai from '@/integrations/openai';
 import { detectIntent, formatToolData } from '@/services/manager.service';
 import { assertRestaurantUsable } from '@/services/subscription.service';
 import { recordAiUsage, providerName, providerForModel, isWithinDailyBudget } from '@/services/ai-usage.service';
+import { isCommandRoleAllowed } from './access';
 
 /**
  * AI Command ("Jarvis") orchestration — Phase A.
@@ -72,6 +73,20 @@ function assertRestaurantContext(ctx: ToolContext): void {
       'RESTAURANT_CONTEXT_REQUIRED',
       'A restaurant context is required for AI commands',
       'Muktadha wa mgahawa unahitajika kwa amri za AI'
+    );
+  }
+}
+
+/**
+ * Advanced AI capabilities are admin-only for now. Staff keep the manual UI.
+ */
+function assertCommandAccess(ctx: ToolContext): void {
+  if (!isCommandRoleAllowed(ctx.role)) {
+    throw new AppError(
+      403,
+      'AI_COMMAND_FORBIDDEN',
+      'AI commands are currently limited to restaurant admins. Please use the dashboard.',
+      'Amri za AI zinaruhusiwa kwa wasimamizi wa mgahawa pekee kwa sasa. Tafadhali tumia dashibodi.'
     );
   }
 }
@@ -165,6 +180,7 @@ function serializeForStorage(value: unknown): any {
 
 export async function handleCommand(ctx: ToolContext, input: CommandInput): Promise<CommandResponse> {
   assertRestaurantContext(ctx);
+  assertCommandAccess(ctx);
   const text = String(input.text || '').trim();
   if (!text) throw AppError.validation('Command text is required', 'Amri inahitajika');
 
@@ -335,6 +351,7 @@ function assertActionPending(action: any): void {
 
 export async function confirmCommand(ctx: ToolContext, actionId: string): Promise<any> {
   assertRestaurantContext(ctx);
+  assertCommandAccess(ctx);
   const action = await loadActionForUpdate(ctx, actionId);
   assertActionPending(action);
 
@@ -420,6 +437,7 @@ export async function confirmCommand(ctx: ToolContext, actionId: string): Promis
 
 export async function rejectCommand(ctx: ToolContext, actionId: string): Promise<void> {
   assertRestaurantContext(ctx);
+  assertCommandAccess(ctx);
   const action = await loadActionForUpdate(ctx, actionId);
   assertActionPending(action);
   await prisma.aiAction.update({
@@ -433,6 +451,7 @@ export async function rejectCommand(ctx: ToolContext, actionId: string): Promise
 
 export async function undoCommand(ctx: ToolContext, actionId: string): Promise<any> {
   assertRestaurantContext(ctx);
+  assertCommandAccess(ctx);
   const action = await loadActionForUpdate(ctx, actionId);
 
   if (action.status !== 'EXECUTED') {
@@ -475,6 +494,7 @@ export async function undoCommand(ctx: ToolContext, actionId: string): Promise<a
 
 export async function getConversation(ctx: ToolContext, conversationId: string): Promise<any> {
   assertRestaurantContext(ctx);
+  assertCommandAccess(ctx);
   const conversation = await prisma.aiConversation.findFirst({
     where: { id: conversationId, restaurantId: ctx.restaurantId },
     select: { id: true, sessionId: true, conversationType: true, messages: true, createdAt: true, updatedAt: true },

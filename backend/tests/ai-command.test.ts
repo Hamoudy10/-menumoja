@@ -147,15 +147,24 @@ describe('handleCommand — writes are proposed, never executed', () => {
   });
 
   it('refuses a tool the role is not allowed to use (defense in depth)', async () => {
-    (openai.selectCommandTool as jest.Mock).mockResolvedValue({
-      action: 'set_item_price',
-      args: { item: 'Anything', price: 100 },
-      reply: '',
-    });
+    // Allow the kitchen role through the command-access gate to prove the
+    // inner per-tool authorization still blocks a privileged tool.
+    const previous = process.env.AI_COMMAND_ALLOWED_ROLES;
+    process.env.AI_COMMAND_ALLOWED_ROLES = 'owner,kitchen';
+    try {
+      (openai.selectCommandTool as jest.Mock).mockResolvedValue({
+        action: 'set_item_price',
+        args: { item: 'Anything', price: 100 },
+        reply: '',
+      });
 
-    const result = await handleCommand({ ...ctx, role: 'kitchen' }, { text: 'change the price' });
-    expect(result.kind).toBe('refused');
-    expect(prisma.aiAction.create).not.toHaveBeenCalled();
+      const result = await handleCommand({ ...ctx, role: 'kitchen' }, { text: 'change the price' });
+      expect(result.kind).toBe('refused');
+      expect(prisma.aiAction.create).not.toHaveBeenCalled();
+    } finally {
+      if (previous === undefined) delete process.env.AI_COMMAND_ALLOWED_ROLES;
+      else process.env.AI_COMMAND_ALLOWED_ROLES = previous;
+    }
   });
 });
 
@@ -263,6 +272,25 @@ describe('command routes — security', () => {
       .send({ text: 'show sales', role: 'super_admin', restaurantId: '99999999-9999-9999-9999-999999999999' });
 
     expect(res.status).toBe(422);
+    expect(openai.selectCommandTool).not.toHaveBeenCalled();
+  });
+
+  it('blocks staff roles from AI commands (403) — manual UI only', async () => {
+    for (const role of ['manager', 'cashier', 'waiter', 'kitchen']) {
+      const token = generateTestToken(`staff-${role}`, role, RESTAURANT_ID);
+      const res = await request(app)
+        .post('/api/v1/ai/command')
+        .set(getAuthHeader(token))
+        .send({ text: 'show sales' });
+      expect(res.status).toBe(403);
+    }
+    expect(openai.selectCommandTool).not.toHaveBeenCalled();
+  });
+
+  it('blocks a service call from a staff role (defense in depth)', async () => {
+    await expect(
+      handleCommand({ ...ctx, role: 'cashier' }, { text: 'show sales' })
+    ).rejects.toThrow();
     expect(openai.selectCommandTool).not.toHaveBeenCalled();
   });
 

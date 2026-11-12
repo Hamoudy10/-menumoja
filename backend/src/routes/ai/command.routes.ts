@@ -6,6 +6,7 @@ import { AppError } from '@/utils/errors';
 import { prisma } from '@/config/database';
 import { handleCommand, confirmCommand, rejectCommand, undoCommand, getConversation } from '@/ai/command.service';
 import { isTranscriptionConfigured, transcribeAudio } from '@/integrations/groq';
+import { isCommandRoleAllowed } from '@/ai/access';
 import type { ToolContext } from '@/ai/tools/types';
 
 /**
@@ -58,10 +59,25 @@ function contextFrom(req: any): ToolContext {
   };
 }
 
+// AI commands are admin-only for now. Staff keep the manual UI. The policy is
+// configurable server-side via AI_COMMAND_ALLOWED_ROLES (default owner+super_admin).
+function requireCommandAccess(req: any, _res: Response, next: NextFunction): void {
+  if (!req.user?.role || !isCommandRoleAllowed(req.user.role)) {
+    throw new AppError(
+      403,
+      'AI_COMMAND_FORBIDDEN',
+      'AI commands are currently limited to restaurant admins. Please use the dashboard.',
+      'Amri za AI zinaruhusiwa kwa wasimamizi wa mgahawa pekee kwa sasa. Tafadhali tumia dashibodi.'
+    );
+  }
+  next();
+}
+
+router.use(authenticate, requireCommandAccess);
+
 // POST /ai/command — text in, answer/clarification/proposal out.
 router.post(
   '/command',
-  authenticate,
   enforceRestaurantScope,
   aiChatLimiter,
   validate(commandSchema),
@@ -78,7 +94,6 @@ router.post(
 // POST /ai/command/:id/confirm — explicitly execute a proposal.
 router.post(
   '/command/:id/confirm',
-  authenticate,
   enforceRestaurantScope,
   validateParams(actionIdParamSchema),
   asyncHandler(async (req: any, res: any) => {
@@ -90,7 +105,6 @@ router.post(
 // POST /ai/command/:id/reject — decline a proposal.
 router.post(
   '/command/:id/reject',
-  authenticate,
   enforceRestaurantScope,
   validateParams(actionIdParamSchema),
   asyncHandler(async (req: any, res: any) => {
@@ -102,7 +116,6 @@ router.post(
 // POST /ai/command/:id/undo — compensating undo inside the window.
 router.post(
   '/command/:id/undo',
-  authenticate,
   enforceRestaurantScope,
   validateParams(actionIdParamSchema),
   asyncHandler(async (req: any, res: any) => {
@@ -114,7 +127,6 @@ router.post(
 // GET /ai/command/conversations/:id — follow-up history (tenant-scoped).
 router.get(
   '/command/conversations/:id',
-  authenticate,
   enforceRestaurantScope,
   validateParams(conversationIdParamSchema),
   asyncHandler(async (req: any, res: any) => {
@@ -166,7 +178,6 @@ async function buildTranscriptionPrompt(restaurantId: string): Promise<string> {
 // POST /ai/command/transcribe — audio → text. Audio is processed in memory and never stored.
 router.post(
   '/command/transcribe',
-  authenticate,
   enforceRestaurantScope,
   aiChatLimiter,
   uploadAudio,

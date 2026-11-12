@@ -7,6 +7,7 @@ import { useTranslation } from 'react-i18next'
 import toast from 'react-hot-toast'
 import DashboardSidebar from './DashboardSidebar'
 import NotificationBell from '@/components/notifications/NotificationBell'
+import JarvisCommandBar from '@/components/ai/JarvisCommandBar'
 import * as notificationsApi from '@/api/notifications'
 
 export default function DashboardLayout() {
@@ -148,6 +149,9 @@ export default function DashboardLayout() {
             <Outlet />
           </main>
         </div>
+
+        {/* Admin-only AI command bar (Phase B). Staff dashboards do not render it. */}
+        <JarvisCommandBar />
       </div>
   )
 }

@@ -1,6 +1,6 @@
 # Menu Moja — AI Command Layer ("Jarvis") — Phase A
 
-> **Status:** Phase A implemented (backend only, no UI change yet).
+> **Status:** Phase A (backend) and Phase B (admin command bar) implemented.
 > **Last updated:** 2026-11-12.
 > **Related:** `docs/SYSTEM_OVERVIEW.md`, `backend/src/ai/`, `backend/tests/ai-command.test.ts`, `backend/tests/ai-evals.test.ts`.
 
@@ -44,6 +44,29 @@ that both the current UI and the future command bar will share.
    model is instructed to answer only from that data.
 
 ---
+
+## 2.1 Access policy (admin-only for now)
+
+The advanced AI capabilities are **restricted to restaurant admins**; staff
+roles continue to use the manual POS/KDS/waiter UI.
+
+- Server default allow-list: `owner` + `super_admin`
+  (`backend/src/ai/access.ts`).
+- Every command route is gated by `requireCommandAccess` → `403
+  AI_COMMAND_FORBIDDEN` for any other role.
+- The service also re-checks (`assertCommandAccess`) so the guarantee holds
+  outside the HTTP surface.
+- Configurable without code changes:
+  ```
+  AI_COMMAND_ALLOWED_ROLES=owner,super_admin   # default
+  # widen later, e.g.:  AI_COMMAND_ALLOWED_ROLES=owner,manager
+  ```
+- Widening the allow-list still does **not** grant tool access: each tool has
+  its own role allow-list, re-checked server-side.
+- `super_admin` still needs an explicit restaurant context (fails closed with
+  `400` rather than querying across tenants).
+- UI: the command bar is rendered only in the owner dashboard layout
+  (`DashboardLayout`), so staff never see it.
 
 ## 3. Architecture
 
@@ -220,6 +243,29 @@ The AI text command is **never** queued in the offline sync engine.
 Until `GROQ_API_KEY` is configured, the endpoint returns a clear 503 and the
 client falls back to text.
 
+### 8.1 Command bar UX (Phase B)
+
+Files: `src/api/command.ts`, `src/components/ai/JarvisCommandBar.tsx`,
+mounted in `src/components/layout/DashboardLayout.tsx` (owner dashboard only).
+
+- **Entry points:** floating "Jarvis" pill (bottom-right) and `Ctrl/Cmd+K`.
+- **Text + voice:** type and send, or hold the mic button and release to send
+  (MediaRecorder → `/ai/command/transcribe`). Audio is never stored. If voice
+  is not configured (503), the UI shows a one-time note and keeps text input.
+- **Answers:** rendered inline; structured `data` is available under a
+  collapsible "View data".
+- **Proposals:** rendered as a confirmation card with the human summary and a
+  risk hint. Nothing executes until **Confirm**. `Cancel` rejects the proposal.
+- **Undo:** after a confirmed reversible action, an `Undo (Ns)` button appears
+  until the server-side window expires.
+- **Clarifications:** options render as chips. Selecting one sends
+  `"<original intent> (<chosen option>)"` with the same `conversationId`.
+  *Known limitation:* this relies on the LLM + conversation history to keep the
+  intent; a future increment should issue server-side clarification tokens that
+  resolve directly to the chosen entity.
+- **Security:** the component only exists in the owner layout, and the API
+  independently rejects non-admin roles with 403.
+
 ---
 
 ## 9. Proactive nudges (Phase C — deterministic)
@@ -311,8 +357,8 @@ refuses writes (never guesses).
 | Phase | Scope | Status |
 |---|---|---|
 | **A** | Tool registry, `/ai/command`, confirm/reject/undo, audit, evals, docs. | ✅ Done |
-| **B** | Command bar + hold-to-talk, Groq Whisper, confirmation cards, undo UI. | Next |
-| **C** | Deterministic proactive nudges + daily briefing push. | Later |
+| **B** | Admin-only access policy, command bar, hold-to-talk, confirmation cards, undo UI, Groq wiring (key pending). | ✅ Done (voice key pending) |
+| **C** | Deterministic proactive nudges + daily briefing push. | Next |
 | **D** | Multi-step workflows, autopilot rules (reversible-only), deeper language support. | Later |
 
 ---
