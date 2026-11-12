@@ -950,10 +950,11 @@ export const useStore = create<AppState>()((set, get) => ({
   fetchNotifications: async () => {
     try {
       const data = await notificationsApi.fetchNotifications()
-      set({
-        notifications: data.notifications || data,
-        unreadCount: data.unreadCount ?? 0,
-      })
+      const list = Array.isArray(data) ? data : (data.notifications || [])
+      const unread = Array.isArray(data)
+        ? list.filter((n: any) => !(n.isRead ?? n.read)).length
+        : (data.unreadCount ?? list.filter((n: any) => !(n.isRead ?? n.read)).length)
+      set({ notifications: list, unreadCount: unread })
     } catch (err: any) {
       toast.error(err?.response?.data?.message || 'Failed to load notifications')
     }

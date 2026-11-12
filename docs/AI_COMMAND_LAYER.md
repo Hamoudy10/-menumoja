@@ -270,6 +270,9 @@ mounted in `src/components/layout/DashboardLayout.tsx` (owner dashboard only).
 
 ## 9. Proactive nudges (Phase C — deterministic)
 
+**Implemented.** See **`docs/PROACTIVE_ALERTS.md`** for the detectors, dedupe
+windows, scheduler, admin trigger, actionable notification UI and env vars.
+
 Do **not** run an LLM in the background to scan for problems. Detectors are
 plain SQL/event listeners that create structured `Notification` rows and Socket
 events, each with a pre-wired action:
@@ -358,7 +361,7 @@ refuses writes (never guesses).
 |---|---|---|
 | **A** | Tool registry, `/ai/command`, confirm/reject/undo, audit, evals, docs. | ✅ Done |
 | **B** | Admin-only access policy, command bar, hold-to-talk, confirmation cards, undo UI, Groq wiring (key pending). | ✅ Done (voice key pending) |
-| **C** | Deterministic proactive nudges + daily briefing push. | Next |
+| **C** | Deterministic proactive nudges + daily briefing push + actionable notifications. | ✅ Done (`docs/PROACTIVE_ALERTS.md`) |
 | **D** | Multi-step workflows, autopilot rules (reversible-only), deeper language support. | Later |
 
 ---

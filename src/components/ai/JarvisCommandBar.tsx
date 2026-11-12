@@ -160,6 +160,19 @@ export default function JarvisCommandBar() {
     [conversationId, location.pathname, push, sending]
   )
 
+  // Proactive notifications can launch a command (e.g. "Review with Jarvis").
+  useEffect(() => {
+    const handler = (event: Event) => {
+      const detail = (event as CustomEvent).detail
+      const text = typeof detail?.text === 'string' ? detail.text : ''
+      if (!text.trim()) return
+      setOpen(true)
+      void send(text)
+    }
+    window.addEventListener('jarvis:command', handler as EventListener)
+    return () => window.removeEventListener('jarvis:command', handler as EventListener)
+  }, [send])
+
   const handleOption = (option: { label: string }) => {
     const intent = lastIntentRef.current
     const text = intent ? `${intent} (${option.label})` : option.label

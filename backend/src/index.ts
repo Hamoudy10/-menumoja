@@ -20,6 +20,7 @@ import { generalLimiter } from './middleware/rateLimiter';
 import { initSocket } from './hooks/socket';
 import { initializeScheduler } from './jobs/scheduler';
 import { startBillingScheduler } from './jobs/billingScheduler';
+import { startProactiveScheduler } from './jobs/proactiveScheduler';
 import { prisma } from './config/database';
 import { redis } from './config/redis';
 
@@ -215,6 +216,7 @@ function startServer(): void {
     }
 
     startBillingScheduler();
+    startProactiveScheduler();
   }
 }
 

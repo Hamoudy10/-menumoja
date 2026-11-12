@@ -172,6 +172,8 @@ enum NotificationType {
   SOCIAL_POST_PUBLISHED
   REVIEW_RECEIVED
   SUBSCRIPTION_EXPIRING
+  ORDER_WAITING
+  DAILY_BRIEFING
 }
 
 enum PaymentAttemptStatus {

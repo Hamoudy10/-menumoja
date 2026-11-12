@@ -1,21 +1,56 @@
-import { useState, useEffect, useRef } from 'react'
+import { useState, useEffect, useRef, type ReactNode } from 'react'
+import { useNavigate } from 'react-router-dom'
 import { motion, AnimatePresence } from 'framer-motion'
-import { Bell, X, CheckCheck, Trash2, Clock, ShoppingCart, CreditCard, ChefHat, Star, AlertTriangle } from 'lucide-react'
+import { Bell, X, CheckCheck, Clock, ShoppingCart, CreditCard, ChefHat, Star, AlertTriangle, Sparkles } from 'lucide-react'
 import { useStore } from '@/store/useStore'
 import { useTranslation } from 'react-i18next'
 import { format } from 'date-fns'
+import * as notificationsApi from '@/api/notifications'
 
-const iconMap: Record<string, React.ReactNode> = {
-  new_order: <ShoppingCart className="h-4 w-4" />,
-  payment: <CreditCard className="h-4 w-4" />,
-  order_ready: <ChefHat className="h-4 w-4" />,
-  review: <Star className="h-4 w-4" />,
-  alert: <AlertTriangle className="h-4 w-4" />,
+function iconFor(type: string): ReactNode {
+  const key = String(type || '').toLowerCase()
+  switch (key) {
+    case 'new_order':
+      return <ShoppingCart className="h-4 w-4" />
+    case 'payment':
+    case 'payment_received':
+    case 'payment_failed':
+    case 'subscription_expiring':
+      return <CreditCard className="h-4 w-4" />
+    case 'order_ready':
+      return <ChefHat className="h-4 w-4" />
+    case 'order_waiting':
+      return <Clock className="h-4 w-4" />
+    case 'daily_briefing':
+      return <Sparkles className="h-4 w-4" />
+    case 'review':
+      return <Star className="h-4 w-4" />
+    case 'low_stock':
+    case 'camera_alert':
+    case 'alert':
+      return <AlertTriangle className="h-4 w-4" />
+    default:
+      return <Bell className="h-4 w-4" />
+  }
 }
+
+function colorFor(type: string): string {
+  const key = String(type || '').toLowerCase()
+  if (key === 'new_order') return 'bg-blue-100 dark:bg-blue-900/30 text-blue-500'
+  if (key === 'daily_briefing') return 'bg-indigo-100 dark:bg-indigo-900/30 text-indigo-500'
+  if (key.startsWith('payment') || key === 'subscription_expiring') return 'bg-green-100 dark:bg-green-900/30 text-green-500'
+  if (key === 'order_ready') return 'bg-amber-100 dark:bg-amber-900/30 text-amber-500'
+  if (key === 'order_waiting') return 'bg-amber-100 dark:bg-amber-900/30 text-amber-500'
+  if (key === 'low_stock' || key === 'camera_alert' || key === 'alert') return 'bg-red-100 dark:bg-red-900/30 text-red-500'
+  return 'bg-black/5 dark:bg-white/10 text-text-secondary'
+}
+
+const isReadNotification = (n: any): boolean => Boolean(n?.isRead ?? n?.read)
 
 export default function NotificationBell() {
   const { notifications, unreadCount, fetchNotifications } = useStore()
   const { t } = useTranslation()
+  const navigate = useNavigate()
   const [open, setOpen] = useState(false)
   const ref = useRef<HTMLDivElement>(null)
 
@@ -32,6 +67,25 @@ export default function NotificationBell() {
     document.addEventListener('mousedown', handleClick)
     return () => document.removeEventListener('mousedown', handleClick)
   }, [])
+
+  const handleAction = async (notification: any, action: any) => {
+    try {
+      await notificationsApi.markAsRead(notification.id)
+    } catch {
+      /* read receipt is best-effort */
+    }
+    fetchNotifications()
+
+    if (action?.kind === 'navigate' && action.to) {
+      setOpen(false)
+      navigate(action.to)
+      return
+    }
+    if (action?.kind === 'command' && action.text) {
+      setOpen(false)
+      window.dispatchEvent(new CustomEvent('jarvis:command', { detail: { text: action.text } }))
+    }
+  }
 
   return (
     <div ref={ref} className="relative">
@@ -78,16 +132,10 @@ export default function NotificationBell() {
                 notifications.slice(0, 20).map((n: any) => (
                   <div
                     key={n.id}
-                    className={`flex items-start gap-3 border-b border-white/5 p-3 transition-colors hover:bg-black/5 dark:hover:bg-white/5 ${!n.read ? 'bg-secondary/5' : ''}`}
+                    className={`flex items-start gap-3 border-b border-white/5 p-3 transition-colors hover:bg-black/5 dark:hover:bg-white/5 ${!isReadNotification(n) ? 'bg-secondary/5' : ''}`}
                   >
-                    <div className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-lg ${
-                      n.type === 'new_order' ? 'bg-blue-100 dark:bg-blue-900/30 text-blue-500' :
-                      n.type === 'payment' ? 'bg-green-100 dark:bg-green-900/30 text-green-500' :
-                      n.type === 'order_ready' ? 'bg-amber-100 dark:bg-amber-900/30 text-amber-500' :
-                      n.type === 'alert' ? 'bg-red-100 dark:bg-red-900/30 text-red-500' :
-                      'bg-black/5 dark:bg-white/10 text-text-secondary'
-                    }`}>
-                      {iconMap[n.type] || <Bell className="h-4 w-4" />}
+                    <div className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-lg ${colorFor(n.type)}`}>
+                      {iconFor(n.type)}
                     </div>
                     <div className="flex-1 min-w-0">
                       <p className="font-body text-xs font-medium text-text-primary dark:text-white/90 truncate">
@@ -102,8 +150,25 @@ export default function NotificationBell() {
                         <Clock className="h-2.5 w-2.5" />
                         {n.createdAt ? format(new Date(n.createdAt), 'MMM d, HH:mm') : ''}
                       </p>
+
+                      {Array.isArray(n.data?.actions) && n.data.actions.length > 0 && (
+                        <div className="mt-2 flex flex-wrap gap-1.5">
+                          {n.data.actions.map((action: any, index: number) => (
+                            <button
+                              key={`${n.id}-${index}`}
+                              onClick={(event) => {
+                                event.stopPropagation()
+                                void handleAction(n, action)
+                              }}
+                              className="rounded-full border border-secondary/40 bg-secondary/10 px-2.5 py-1 text-[10px] font-accent font-medium text-secondary hover:bg-secondary/20"
+                            >
+                              {action.label}
+                            </button>
+                          ))}
+                        </div>
+                      )}
                     </div>
-                    {!n.read && (
+                    {!isReadNotification(n) && (
                       <span className="mt-1.5 h-2 w-2 shrink-0 rounded-full bg-secondary" />
                     )}
                   </div>

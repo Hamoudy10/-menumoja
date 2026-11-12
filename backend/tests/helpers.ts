@@ -353,6 +353,7 @@ jest.mock('../src/config/database', () => {
     notification: {
       findMany: jest.fn(),
       findUnique: jest.fn(),
+      findFirst: jest.fn().mockResolvedValue(null),
       create: jest.fn().mockResolvedValue({ id: uuidv4() }),
       update: jest.fn(),
       updateMany: jest.fn(),

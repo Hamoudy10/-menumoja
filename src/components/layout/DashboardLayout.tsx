@@ -32,8 +32,10 @@ export default function DashboardLayout() {
     const poll = setInterval(async () => {
       try {
         const data = await notificationsApi.fetchNotifications()
-        const newNotifications = (data.notifications || data || [])
-        const currentCount = data.unreadCount ?? 0
+        const newNotifications = Array.isArray(data) ? data : (data.notifications || [])
+        const currentCount = Array.isArray(data)
+          ? newNotifications.filter((n: any) => !(n.isRead ?? n.read)).length
+          : (data.unreadCount ?? 0)
 
         const prevCount = parseInt(localStorage.getItem('last_notif_count') || '0')
 
@@ -45,6 +47,14 @@ export default function DashboardLayout() {
             order_ready: '👨‍🍳',
             review: '⭐',
             alert: '⚠️',
+            NEW_ORDER: '🆕',
+            PAYMENT_RECEIVED: '💰',
+            PAYMENT_FAILED: '⚠️',
+            LOW_STOCK: '⚠️',
+            ORDER_WAITING: '⏳',
+            SUBSCRIPTION_EXPIRING: '💳',
+            DAILY_BRIEFING: '📊',
+            CAMERA_ALERT: '📷',
           }
           toast(
             (t) => (

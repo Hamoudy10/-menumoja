@@ -6,6 +6,7 @@ import { AppError, NotFoundError } from '../../utils/errors';
 import { parsePagination, buildPaginationMeta, asyncHandler } from '../../utils/helpers';
 import { toOwnerSettings } from '../../utils/settings';
 import { createInvoice, markInvoicePaid, voidInvoice, getBillingStats, runExpirySweep } from '../../services/billing.service';
+import { runProactiveChecks } from '../../services/proactive.service';
 import logger from '../../utils/logger';
 import * as africasTalking from '../../integrations/africasTalking';
 import { AuthenticatedRequest } from '../../types';
@@ -718,6 +719,15 @@ router.post('/billing/invoices/:id/void', validate(voidInvoiceSchema), asyncHand
 
 router.post('/billing/run-expiry', asyncHandler(async (_req: AuthenticatedRequest, res: Response) => {
   const result = await runExpirySweep();
+  res.json({ success: true, data: result });
+}));
+
+// ==================== PROACTIVE ALERTS ====================
+
+// POST /admin/proactive/run — manually run the deterministic proactive checks
+// (low stock, waiting orders, expiring subscriptions, daily briefings).
+router.post('/proactive/run', asyncHandler(async (_req: AuthenticatedRequest, res: Response) => {
+  const result = await runProactiveChecks();
   res.json({ success: true, data: result });
 }));
 
