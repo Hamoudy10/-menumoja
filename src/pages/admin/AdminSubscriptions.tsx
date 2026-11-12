@@ -1,13 +1,17 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useCallback } from 'react'
 import { motion } from 'framer-motion'
-import { ArrowUp, ArrowDown, DollarSign, TrendingUp, Calendar, Loader2 } from 'lucide-react'
+import {
+  ArrowUp, ArrowDown, DollarSign, TrendingUp, Calendar, Loader2,
+  Plus, RefreshCw, Receipt, CheckCircle2, XCircle, PlayCircle,
+} from 'lucide-react'
 import {
   PieChart, Pie, Cell, LineChart, Line,
   XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer,
 } from 'recharts'
 import { Badge } from '@/components/ui/Badge'
 import { Skeleton } from '@/components/ui/Skeleton'
-import { showErrorToast } from '@/components/ui/Toast'
+import { Modal } from '@/components/ui/Modal'
+import { showErrorToast, showSuccessToast } from '@/components/ui/Toast'
 import * as adminApi from '@/api/admin'
 
 const formatKES = (value: number) => {
@@ -37,16 +41,134 @@ export default function AdminSubscriptions() {
   const [data, setData] = useState<any>(null)
   const [loading, setLoading] = useState(true)
 
+  // Billing / invoicing
+  const [billingStats, setBillingStats] = useState<any>(null)
+  const [invoices, setInvoices] = useState<any[]>([])
+  const [invoicesLoading, setInvoicesLoading] = useState(false)
+  const [statusFilter, setStatusFilter] = useState('all')
+  const [restaurants, setRestaurants] = useState<any[]>([])
+  const [busy, setBusy] = useState(false)
+
+  const [showCreate, setShowCreate] = useState(false)
+  const [createForm, setCreateForm] = useState({ restaurantId: '', amountKes: '', periodEnd: '', notes: '' })
+  const [payingInvoice, setPayingInvoice] = useState<any | null>(null)
+  const [payForm, setPayForm] = useState<{ method: string; reference: string; notes: string }>({
+    method: 'MPESA',
+    reference: '',
+    notes: '',
+  })
+
+  const errMsg = (err: any, fallback: string) =>
+    err?.response?.data?.error?.message || err?.response?.data?.message || fallback
+
   useEffect(() => {
     let cancelled = false
     adminApi.fetchAdminRevenue()
       .then((r) => { if (!cancelled) setData(r) })
       .catch((err: any) => {
-        if (!cancelled) showErrorToast(err?.response?.data?.message || 'Failed to load subscription data')
+        if (!cancelled) showErrorToast(errMsg(err, 'Failed to load subscription data'))
       })
       .finally(() => { if (!cancelled) setLoading(false) })
     return () => { cancelled = true }
   }, [])
+
+  useEffect(() => {
+    adminApi.fetchAdminRestaurants({ limit: 100 })
+      .then((r: any) => setRestaurants(Array.isArray(r) ? r : r?.data || []))
+      .catch(() => { /* non-fatal */ })
+  }, [])
+
+  const loadBilling = useCallback(async () => {
+    setInvoicesLoading(true)
+    try {
+      const [stats, list] = await Promise.all([
+        adminApi.fetchBillingStats().catch(() => null),
+        adminApi.fetchAdminInvoices(statusFilter !== 'all' ? { status: statusFilter } : {}).catch(() => ({ data: [] })),
+      ])
+      setBillingStats(stats)
+      setInvoices(Array.isArray(list) ? list : (list as any)?.data || [])
+    } finally {
+      setInvoicesLoading(false)
+    }
+  }, [statusFilter])
+
+  useEffect(() => { void loadBilling() }, [loadBilling])
+
+  const handleCreateInvoice = async () => {
+    if (!createForm.restaurantId) {
+      showErrorToast('Select a restaurant')
+      return
+    }
+    setBusy(true)
+    try {
+      await adminApi.createAdminInvoice({
+        restaurantId: createForm.restaurantId,
+        amountKes: createForm.amountKes ? Number(createForm.amountKes) : undefined,
+        periodEnd: createForm.periodEnd ? new Date(createForm.periodEnd).toISOString() : undefined,
+        notes: createForm.notes || undefined,
+      })
+      showSuccessToast('Invoice created')
+      setShowCreate(false)
+      setCreateForm({ restaurantId: '', amountKes: '', periodEnd: '', notes: '' })
+      await loadBilling()
+    } catch (err: any) {
+      showErrorToast(errMsg(err, 'Failed to create invoice'))
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  const handleMarkPaid = async () => {
+    if (!payingInvoice) return
+    setBusy(true)
+    try {
+      await adminApi.markAdminInvoicePaid(payingInvoice.id, {
+        method: (payForm.method || 'MANUAL') as any,
+        reference: payForm.reference || undefined,
+        notes: payForm.notes || undefined,
+      })
+      showSuccessToast('Invoice marked as paid — subscription extended')
+      setPayingInvoice(null)
+      setPayForm({ method: 'MPESA', reference: '', notes: '' })
+      await loadBilling()
+    } catch (err: any) {
+      showErrorToast(errMsg(err, 'Failed to mark invoice paid'))
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  const handleVoid = async (invoice: any) => {
+    if (!window.confirm(`Void invoice ${invoice.invoiceNumber}?`)) return
+    setBusy(true)
+    try {
+      await adminApi.voidAdminInvoice(invoice.id, 'Voided by platform admin')
+      showSuccessToast('Invoice voided')
+      await loadBilling()
+    } catch (err: any) {
+      showErrorToast(errMsg(err, 'Failed to void invoice'))
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  const handleRunExpiry = async () => {
+    setBusy(true)
+    try {
+      const result: any = await adminApi.runBillingExpiry()
+      showSuccessToast(
+        `Sweep done: ${result?.expiredTrials || 0} trials, ${result?.expiredPlans || 0} plans expired, ${result?.markedOverdue || 0} invoices overdue`
+      )
+      await loadBilling()
+    } catch (err: any) {
+      showErrorToast(errMsg(err, 'Expiry sweep failed'))
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  const invoiceBadge = (status: string) =>
+    status === 'PAID' ? 'success' : status === 'PENDING' ? 'warning' : status === 'OVERDUE' ? 'danger' : 'default'
 
   if (loading) {
     return (
@@ -259,6 +381,251 @@ export default function AdminSubscriptions() {
           </div>
         )}
       </motion.div>
+
+      {/* ── Billing KPIs ── */}
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+        {[
+          { label: 'Total billed', value: billingStats?.totalBilledKes, icon: Receipt, color: 'from-secondary to-accent' },
+          { label: 'Collected', value: billingStats?.collectedKes, icon: CheckCircle2, color: 'from-success to-emerald-400' },
+          { label: 'Outstanding', value: billingStats?.outstandingKes, icon: XCircle, color: 'from-red-500 to-rose-400' },
+        ].map((kpi) => (
+          <div key={kpi.label} className="bg-primary-light border border-white/5 rounded-2xl p-5">
+            <div className="flex items-center justify-between mb-2">
+              <p className="text-xs text-white/40">{kpi.label}</p>
+              <div className={`w-9 h-9 rounded-xl bg-gradient-to-br ${kpi.color} flex items-center justify-center`}>
+                <kpi.icon className="w-4 h-4 text-white" />
+              </div>
+            </div>
+            <p className="text-2xl font-heading font-bold text-white">{formatKES(Number(kpi.value || 0))}</p>
+          </div>
+        ))}
+        <div className="bg-primary-light border border-white/5 rounded-2xl p-5">
+          <div className="flex items-center justify-between mb-2">
+            <p className="text-xs text-white/40">Invoices</p>
+            <div className="w-9 h-9 rounded-xl grad-brand flex items-center justify-center">
+              <Receipt className="w-4 h-4 text-white" />
+            </div>
+          </div>
+          <p className="text-2xl font-heading font-bold text-white">{billingStats?.invoiceCount ?? invoices.length}</p>
+          <p className="text-xs text-white/40 mt-2">{billingStats?.outstandingCount ?? 0} outstanding</p>
+        </div>
+      </div>
+
+      {/* ── Invoices ── */}
+      <motion.div
+        initial={{ opacity: 0, y: 20 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ delay: 0.3 }}
+        className="bg-primary-light border border-white/5 rounded-2xl p-5"
+      >
+        <div className="flex flex-wrap items-center justify-between gap-3 mb-4">
+          <div>
+            <h3 className="text-sm font-semibold text-white">Subscription Invoices</h3>
+            <p className="text-xs text-white/40 mt-1">Issue invoices, reconcile payments, and run the expiry sweep</p>
+          </div>
+          <div className="flex flex-wrap items-center gap-2">
+            <select
+              value={statusFilter}
+              onChange={(e) => setStatusFilter(e.target.value)}
+              className="rounded-xl border border-white/10 bg-primary-dark px-3 py-2 text-xs text-white outline-none focus:border-secondary"
+            >
+              <option value="all">All statuses</option>
+              <option value="PENDING">Pending</option>
+              <option value="PAID">Paid</option>
+              <option value="OVERDUE">Overdue</option>
+              <option value="VOID">Void</option>
+            </select>
+            <button
+              onClick={() => void loadBilling()}
+              className="flex items-center gap-1.5 rounded-xl border border-white/10 px-3 py-2 text-xs text-white/70 hover:bg-white/5 hover:text-white"
+              disabled={invoicesLoading}
+            >
+              <RefreshCw className={`w-3.5 h-3.5 ${invoicesLoading ? 'animate-spin' : ''}`} /> Refresh
+            </button>
+            <button
+              onClick={() => void handleRunExpiry()}
+              disabled={busy}
+              className="flex items-center gap-1.5 rounded-xl border border-white/10 px-3 py-2 text-xs text-white/70 hover:bg-white/5 hover:text-white disabled:opacity-50"
+            >
+              <PlayCircle className="w-3.5 h-3.5" /> Run expiry sweep
+            </button>
+            <button
+              onClick={() => setShowCreate(true)}
+              className="flex items-center gap-1.5 rounded-xl bg-secondary px-3 py-2 text-xs font-accent font-semibold text-white hover:bg-secondary-dark"
+            >
+              <Plus className="w-3.5 h-3.5" /> New invoice
+            </button>
+          </div>
+        </div>
+
+        {invoicesLoading && invoices.length === 0 ? (
+          <p className="text-sm text-white/40 text-center py-10">Loading invoices…</p>
+        ) : invoices.length === 0 ? (
+          <p className="text-sm text-white/40 text-center py-10">No invoices yet</p>
+        ) : (
+          <div className="overflow-x-auto">
+            <table className="w-full">
+              <thead>
+                <tr className="border-b border-white/5">
+                  {['Invoice', 'Restaurant', 'Amount', 'Period end', 'Status', ''].map((h) => (
+                    <th key={h} className={`px-3 py-2.5 text-xs font-accent font-semibold text-white/40 uppercase tracking-wider ${['Amount', 'Period end', 'Status', ''].includes(h) ? 'text-right' : 'text-left'}`}>
+                      {h}
+                    </th>
+                  ))}
+                </tr>
+              </thead>
+              <tbody>
+                {invoices.map((inv: any) => (
+                  <tr key={inv.id} className="border-b border-white/5 last:border-0 hover:bg-white/5 transition-colors">
+                    <td className="px-3 py-3">
+                      <span className="text-sm text-white font-medium">{inv.invoiceNumber}</span>
+                      {inv.reference && <p className="text-xs text-white/40 max-w-[180px] truncate">Ref: {inv.reference}</p>}
+                    </td>
+                    <td className="px-3 py-3">
+                      <span className="text-sm text-white/80">{inv.restaurant?.name || '—'}</span>
+                      {inv.plan?.name && <p className="text-xs text-white/40">{inv.plan.name}</p>}
+                    </td>
+                    <td className="px-3 py-3 text-right text-sm font-medium text-white">KES {Number(inv.amountKes || 0).toLocaleString()}</td>
+                    <td className="px-3 py-3 text-right text-sm text-white/70">
+                      {inv.periodEnd ? new Date(inv.periodEnd).toLocaleDateString('en-KE') : '—'}
+                    </td>
+                    <td className="px-3 py-3 text-right">
+                      <Badge variant={invoiceBadge(inv.status) as any} size="sm" dot>{inv.status}</Badge>
+                    </td>
+                    <td className="px-3 py-3 text-right">
+                      {(inv.status === 'PENDING' || inv.status === 'OVERDUE') ? (
+                        <div className="flex items-center justify-end gap-2">
+                          <button
+                            onClick={() => { setPayingInvoice(inv); setPayForm({ method: 'MPESA', reference: inv.reference || '', notes: '' }) }}
+                            className="rounded-lg bg-success/15 px-2.5 py-1.5 text-xs font-medium text-success hover:bg-success/25"
+                          >
+                            Mark paid
+                          </button>
+                          <button
+                            onClick={() => void handleVoid(inv)}
+                            disabled={busy}
+                            className="rounded-lg bg-white/5 px-2.5 py-1.5 text-xs font-medium text-white/60 hover:bg-white/10 disabled:opacity-50"
+                          >
+                            Void
+                          </button>
+                        </div>
+                      ) : (
+                        <span className="text-xs text-white/30">—</span>
+                      )}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
+      </motion.div>
+
+      {/* ── Create invoice modal ── */}
+      <Modal open={showCreate} onClose={() => setShowCreate(false)} title="New subscription invoice" size="sm">
+        <div className="space-y-3">
+          <div>
+            <label className="mb-1 block text-xs font-accent font-medium text-white/60">Restaurant</label>
+            <select
+              value={createForm.restaurantId}
+              onChange={(e) => setCreateForm((p) => ({ ...p, restaurantId: e.target.value }))}
+              className="w-full rounded-xl border border-white/10 bg-primary-dark px-3 py-2.5 text-sm text-white outline-none focus:border-secondary"
+            >
+              <option value="">Select a restaurant</option>
+              {restaurants.map((r: any) => (
+                <option key={r.id} value={r.id}>{r.name}</option>
+              ))}
+            </select>
+          </div>
+          <div>
+            <label className="mb-1 block text-xs font-accent font-medium text-white/60">Amount (KES) — optional, defaults to plan price</label>
+            <input
+              type="number"
+              value={createForm.amountKes}
+              onChange={(e) => setCreateForm((p) => ({ ...p, amountKes: e.target.value }))}
+              placeholder="1500"
+              className="w-full rounded-xl border border-white/10 bg-primary-dark px-3 py-2.5 text-sm text-white outline-none focus:border-secondary"
+            />
+          </div>
+          <div>
+            <label className="mb-1 block text-xs font-accent font-medium text-white/60">Due date — optional (defaults to 1 month)</label>
+            <input
+              type="date"
+              value={createForm.periodEnd}
+              onChange={(e) => setCreateForm((p) => ({ ...p, periodEnd: e.target.value }))}
+              className="w-full rounded-xl border border-white/10 bg-primary-dark px-3 py-2.5 text-sm text-white outline-none focus:border-secondary"
+            />
+          </div>
+          <div>
+            <label className="mb-1 block text-xs font-accent font-medium text-white/60">Notes</label>
+            <input
+              type="text"
+              value={createForm.notes}
+              onChange={(e) => setCreateForm((p) => ({ ...p, notes: e.target.value }))}
+              placeholder="e.g. November subscription"
+              className="w-full rounded-xl border border-white/10 bg-primary-dark px-3 py-2.5 text-sm text-white outline-none focus:border-secondary"
+            />
+          </div>
+          <div className="flex gap-2 pt-1">
+            <button onClick={() => setShowCreate(false)} className="flex-1 rounded-xl border border-white/10 py-2.5 text-sm text-white/70 hover:bg-white/5">Cancel</button>
+            <button onClick={() => void handleCreateInvoice()} disabled={busy} className="flex flex-1 items-center justify-center gap-2 rounded-xl bg-secondary py-2.5 text-sm font-accent font-semibold text-white hover:bg-secondary-dark disabled:opacity-50">
+              {busy && <Loader2 className="w-4 h-4 animate-spin" />} Create invoice
+            </button>
+          </div>
+        </div>
+      </Modal>
+
+      {/* ── Mark paid modal ── */}
+      <Modal open={!!payingInvoice} onClose={() => setPayingInvoice(null)} title={`Mark ${payingInvoice?.invoiceNumber || 'invoice'} paid`} size="sm">
+        <div className="space-y-3">
+          <div className="rounded-xl bg-white/5 p-3">
+            <p className="text-xs text-white/40">Amount</p>
+            <p className="text-xl font-heading font-bold text-white">KES {Number(payingInvoice?.amountKes || 0).toLocaleString()}</p>
+            <p className="text-xs text-white/40 mt-1">{payingInvoice?.restaurant?.name}</p>
+          </div>
+          <div>
+            <label className="mb-1 block text-xs font-accent font-medium text-white/60">Payment method</label>
+            <select
+              value={payForm.method}
+              onChange={(e) => setPayForm((p) => ({ ...p, method: e.target.value }))}
+              className="w-full rounded-xl border border-white/10 bg-primary-dark px-3 py-2.5 text-sm text-white outline-none focus:border-secondary"
+            >
+              <option value="MPESA">M-Pesa</option>
+              <option value="BANK">Bank transfer</option>
+              <option value="CASH">Cash</option>
+              <option value="CARD">Card</option>
+              <option value="MANUAL">Manual</option>
+            </select>
+          </div>
+          <div>
+            <label className="mb-1 block text-xs font-accent font-medium text-white/60">Transaction reference</label>
+            <input
+              type="text"
+              value={payForm.reference}
+              onChange={(e) => setPayForm((p) => ({ ...p, reference: e.target.value }))}
+              placeholder="e.g. QWE1ABC2DE"
+              className="w-full rounded-xl border border-white/10 bg-primary-dark px-3 py-2.5 text-sm text-white outline-none focus:border-secondary"
+            />
+          </div>
+          <div>
+            <label className="mb-1 block text-xs font-accent font-medium text-white/60">Notes</label>
+            <input
+              type="text"
+              value={payForm.notes}
+              onChange={(e) => setPayForm((p) => ({ ...p, notes: e.target.value }))}
+              placeholder="Optional"
+              className="w-full rounded-xl border border-white/10 bg-primary-dark px-3 py-2.5 text-sm text-white outline-none focus:border-secondary"
+            />
+          </div>
+          <p className="text-xs text-white/40">Marking paid extends the restaurant's plan to the invoice period end and reactivates it.</p>
+          <div className="flex gap-2 pt-1">
+            <button onClick={() => setPayingInvoice(null)} className="flex-1 rounded-xl border border-white/10 py-2.5 text-sm text-white/70 hover:bg-white/5">Cancel</button>
+            <button onClick={() => void handleMarkPaid()} disabled={busy} className="flex flex-1 items-center justify-center gap-2 rounded-xl bg-success py-2.5 text-sm font-accent font-semibold text-white hover:bg-emerald-600 disabled:opacity-50">
+              {busy && <Loader2 className="w-4 h-4 animate-spin" />} Confirm payment
+            </button>
+          </div>
+        </div>
+      </Modal>
     </div>
   )
 }

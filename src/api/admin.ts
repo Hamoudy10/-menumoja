@@ -40,3 +40,33 @@ export const fetchAuditLogs = (params?: any) =>
     data: r.data?.data || r.data,
     meta: r.data?.meta,
   }))
+
+// ==================== BILLING ====================
+
+export const fetchBillingStats = () =>
+  api.get('/admin/billing/stats').then(unwrap)
+
+export const fetchAdminInvoices = (params?: any) =>
+  api.get('/admin/billing/invoices', { params }).then((r: any) => ({
+    data: r.data?.data || r.data,
+    meta: r.data?.meta,
+  }))
+
+export const createAdminInvoice = (data: {
+  restaurantId: string
+  amountKes?: number
+  periodStart?: string
+  periodEnd?: string
+  notes?: string
+}) => api.post('/admin/billing/invoices', data).then(unwrap)
+
+export const markAdminInvoicePaid = (
+  id: string,
+  data: { method: 'MPESA' | 'CASH' | 'BANK' | 'CARD' | 'MANUAL'; reference?: string; notes?: string }
+) => api.post(`/admin/billing/invoices/${id}/mark-paid`, data).then(unwrap)
+
+export const voidAdminInvoice = (id: string, reason?: string) =>
+  api.post(`/admin/billing/invoices/${id}/void`, { reason }).then(unwrap)
+
+export const runBillingExpiry = () =>
+  api.post('/admin/billing/run-expiry').then(unwrap)

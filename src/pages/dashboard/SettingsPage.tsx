@@ -19,6 +19,8 @@ import { useTheme, googleFonts } from '@/components/theme/ThemeProvider'
 import { compressImage } from '@/utils/image'
 import * as restaurantApi from '@/api/restaurant'
 import * as qrcodesApi from '@/api/qrcodes'
+import * as billingApi from '@/api/billing'
+import { Modal } from '@/components/ui/Modal'
 
 const settingsSections = [
   { id: 'profile', labelKey: 'settings.profile', icon: User },
@@ -95,12 +97,57 @@ export default function SettingsPage() {
   const [staffSaving, setStaffSaving] = useState(false)
   const [loaded, setLoaded] = useState(false)
   const [subscription, setSubscription] = useState<any>(null)
+  const [billing, setBilling] = useState<billingApi.BillingOverview | null>(null)
+  const [billingLoading, setBillingLoading] = useState(false)
+  const [payInvoice, setPayInvoice] = useState<billingApi.BillingInvoice | null>(null)
+  const [claimForm, setClaimForm] = useState<{ method: 'MPESA' | 'CASH' | 'BANK' | 'CARD'; reference: string; notes: string }>({
+    method: 'MPESA',
+    reference: '',
+    notes: '',
+  })
+  const [claiming, setClaiming] = useState(false)
+
+  const loadBilling = useCallback(async () => {
+    setBillingLoading(true)
+    try {
+      setBilling(await billingApi.fetchBillingOverview())
+    } catch {
+      /* non-fatal — billing may be unavailable */
+    } finally {
+      setBillingLoading(false)
+    }
+  }, [])
 
   useEffect(() => {
     restaurantApi.fetchSubscription()
       .then(setSubscription)
       .catch(() => { /* non-fatal */ })
-  }, [])
+    void loadBilling()
+  }, [loadBilling])
+
+  const handleClaimPayment = async () => {
+    if (!payInvoice) return
+    if (!claimForm.reference.trim()) {
+      showErrorToast('Enter the M-Pesa / bank transaction reference')
+      return
+    }
+    setClaiming(true)
+    try {
+      await billingApi.claimInvoicePayment(payInvoice.id, {
+        method: claimForm.method,
+        reference: claimForm.reference.trim(),
+        notes: claimForm.notes.trim() || undefined,
+      })
+      showSuccessToast('Payment reference submitted for verification')
+      setPayInvoice(null)
+      setClaimForm({ method: 'MPESA', reference: '', notes: '' })
+      await loadBilling()
+    } catch {
+      showErrorToast('Failed to submit payment reference')
+    } finally {
+      setClaiming(false)
+    }
+  }
 
   const [paymentSettings, setPaymentSettings] = useState({
     mpesaEnabled: true,
@@ -1063,17 +1110,31 @@ export default function SettingsPage() {
 
       case 'subscription': {
         const planName = (typeof restaurant?.plan === 'string' ? restaurant.plan : (restaurant?.plan as any)?.name || 'business').toLowerCase()
-        const sub = subscription || (restaurant as any)?.subscription
+        const sub = billing?.subscription || subscription || (restaurant as any)?.subscription
         const planKey = sub?.plan?.name ? String(sub.plan.name).toLowerCase() : planName
-        const price = Number(sub?.plan?.priceMonthly ?? (planKey === 'premium' ? 7500 : planKey === 'starter' ? 1500 : 3500))
+        const price = Number(sub?.plan?.priceMonthlyKes ?? sub?.plan?.priceMonthly ?? (planKey === 'premium' ? 7500 : planKey === 'starter' ? 1500 : 3500))
+        const status = String(sub?.status || 'TRIAL').toUpperCase()
+        const statusVariant = status === 'ACTIVE' ? 'success' : status === 'TRIAL' ? 'info' : 'danger'
+        const invoices = billing?.invoices || []
+        const outstanding = billing?.outstanding
+        const invoiceVariant = (s: string) =>
+          s === 'PAID' ? 'success' : s === 'PENDING' ? 'warning' : s === 'OVERDUE' ? 'danger' : 'default'
         return (
           <div className="space-y-4">
             <div className="rounded-2xl bg-gradient-to-br from-primary to-primary-light p-6 text-white">
-              <Crown className="h-8 w-8 text-accent mb-3" />
-              <h3 className="font-heading text-xl font-bold">{planKey === 'premium' ? 'Premium Plan' : planKey === 'starter' ? 'Starter Plan' : 'Business Plan'}</h3>
+              <div className="flex items-start justify-between">
+                <Crown className="h-8 w-8 text-accent mb-3" />
+                <Badge variant={statusVariant as any} size="sm" dot>{status}</Badge>
+              </div>
+              <h3 className="font-heading text-xl font-bold">{sub?.plan?.name || (planKey === 'premium' ? 'Premium Plan' : planKey === 'starter' ? 'Starter Plan' : 'Business Plan')}</h3>
               <p className="font-body text-sm text-white/70 mt-1">KES {price.toLocaleString()}/month</p>
               {sub?.planExpiresAt && (
-                <p className="font-body text-xs text-white/50 mt-1">Renews {new Date(sub.planExpiresAt).toLocaleDateString('en-KE')}</p>
+                <p className="font-body text-xs text-white/50 mt-1">
+                  {status === 'EXPIRED' ? 'Expired' : 'Renews'} {new Date(sub.planExpiresAt).toLocaleDateString('en-KE')}
+                </p>
+              )}
+              {!sub?.planExpiresAt && sub?.trialEndsAt && (
+                <p className="font-body text-xs text-white/50 mt-1">Trial ends {new Date(sub.trialEndsAt).toLocaleDateString('en-KE')}</p>
               )}
               <div className="mt-4 space-y-2">
                 {(planKey === 'starter'
@@ -1089,9 +1150,104 @@ export default function SettingsPage() {
                 ))}
               </div>
             </div>
+
+            {outstanding && outstanding.count > 0 && (
+              <div className="flex items-center justify-between rounded-xl border border-amber-300 bg-amber-50 p-3 text-amber-800 dark:border-amber-900/50 dark:bg-amber-900/20 dark:text-amber-300">
+                <div className="flex items-center gap-2 text-sm font-accent">
+                  <CreditCard className="h-4 w-4" />
+                  {outstanding.count} unpaid invoice{outstanding.count === 1 ? '' : 's'}
+                </div>
+                <span className="font-heading font-bold">KES {Number(outstanding.amountKes).toLocaleString()}</span>
+              </div>
+            )}
+
+            <div className="rounded-2xl border border-gray-100 p-4 dark:border-white/10">
+              <div className="mb-3 flex items-center justify-between">
+                <h4 className="font-heading text-sm font-bold text-text-primary dark:text-white">Invoices</h4>
+                <button
+                  onClick={() => void loadBilling()}
+                  className="text-xs font-accent text-secondary hover:underline disabled:opacity-50"
+                  disabled={billingLoading}
+                >
+                  {billingLoading ? 'Refreshing…' : 'Refresh'}
+                </button>
+              </div>
+
+              {invoices.length === 0 ? (
+                <p className="py-6 text-center text-sm text-text-secondary dark:text-white/50">
+                  No invoices yet. Your invoices will appear here.
+                </p>
+              ) : (
+                <div className="space-y-2">
+                  {invoices.map((inv) => (
+                    <div key={inv.id} className="flex items-center justify-between gap-3 rounded-xl bg-black/[0.03] p-3 dark:bg-white/5">
+                      <div className="min-w-0">
+                        <p className="truncate font-accent text-sm font-semibold text-text-primary dark:text-white">{inv.invoiceNumber}</p>
+                        <p className="text-xs text-text-secondary dark:text-white/50">
+                          KES {Number(inv.amountKes).toLocaleString()} · due {new Date(inv.periodEnd).toLocaleDateString('en-KE')}
+                        </p>
+                      </div>
+                      <div className="flex shrink-0 items-center gap-2">
+                        <Badge variant={invoiceVariant(inv.status) as any} size="sm">{inv.status}</Badge>
+                        {(inv.status === 'PENDING' || inv.status === 'OVERDUE') && (
+                          <Button size="sm" variant="secondary" onClick={() => { setPayInvoice(inv); setClaimForm({ method: 'MPESA', reference: '', notes: '' }) }}>
+                            Pay
+                          </Button>
+                        )}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+
+            <p className="font-body text-xs text-text-secondary dark:text-white/40">
+              Pay the invoice to the MenuMoja account, then submit your M-Pesa/bank transaction code. Your plan is extended once the payment is verified.
+            </p>
+
             <Button variant="secondary" fullWidth onClick={() => window.open('https://menumoja.vercel.app', '_blank')}>
               <Crown className="h-4 w-4" /> {t('subscription.upgrade')}
             </Button>
+
+            <Modal open={!!payInvoice} onClose={() => setPayInvoice(null)} title={`Pay ${payInvoice?.invoiceNumber || 'invoice'}`} size="sm">
+              <div className="space-y-3">
+                <div className="rounded-xl bg-black/5 p-3 dark:bg-white/5">
+                  <p className="text-xs text-text-secondary dark:text-white/50">Amount due</p>
+                  <p className="font-heading text-xl font-bold text-text-primary dark:text-white">
+                    KES {Number(payInvoice?.amountKes || 0).toLocaleString()}
+                  </p>
+                </div>
+                <div>
+                  <label className="mb-1 block text-xs font-accent font-medium text-text-secondary dark:text-white/60">Payment method</label>
+                  <select
+                    value={claimForm.method}
+                    onChange={(e) => setClaimForm((p) => ({ ...p, method: e.target.value as any }))}
+                    className="w-full rounded-xl border border-gray-200 bg-white px-3 py-2.5 text-sm text-text-primary outline-none focus:border-secondary dark:border-white/10 dark:bg-primary-light dark:text-white"
+                  >
+                    <option value="MPESA">M-Pesa</option>
+                    <option value="BANK">Bank transfer</option>
+                    <option value="CASH">Cash</option>
+                    <option value="CARD">Card</option>
+                  </select>
+                </div>
+                <Input
+                  label="Transaction reference / code"
+                  value={claimForm.reference}
+                  onChange={(e) => setClaimForm((p) => ({ ...p, reference: e.target.value }))}
+                  placeholder="e.g. QWE1ABC2DE"
+                />
+                <Input
+                  label="Notes (optional)"
+                  value={claimForm.notes}
+                  onChange={(e) => setClaimForm((p) => ({ ...p, notes: e.target.value }))}
+                  placeholder="Anything we should know"
+                />
+                <div className="flex gap-2 pt-1">
+                  <Button variant="ghost" fullWidth onClick={() => setPayInvoice(null)}>Cancel</Button>
+                  <Button fullWidth loading={claiming} onClick={handleClaimPayment}>Submit</Button>
+                </div>
+              </div>
+            </Modal>
           </div>
         )
       }
