@@ -821,4 +821,26 @@ Two production scenarios: (1) shared cloud (Supabase Pro + Render/Railway backen
 
 ---
 
+## 21. AI Command Layer ("Jarvis") — Phase A
+
+A unified, server-authoritative command layer now sits beside the existing AI
+Manager/actions:
+
+- `POST /api/v1/ai/command` — natural-language → read answer / clarification /
+  write proposal.
+- `POST /api/v1/ai/command/:id/{confirm,reject,undo}` — confirm-everything,
+  with compensating (not rollback) undo.
+- 15 tools (8 read, 7 write) in `backend/src/ai/tools/`.
+- Security invariants: JWT-derived role/tenant, strict request bodies, role
+  filtering, fail-closed tenant guard, re-resolution at confirm, audit entries.
+- No auto-run, always clarify ambiguous entities, no offline queuing of AI text.
+- Groq Whisper transcription endpoint is stubbed until `GROQ_API_KEY` is set.
+- Evals: `backend/tests/evals/command-prompts.ts` (60+ messy English/Kiswahili/
+  Swanglish prompts) + `backend/tests/ai-evals.test.ts`.
+
+See **`docs/AI_COMMAND_LAYER.md`** for the full contract, principles, tool
+catalog, offline/voice/proactive plans, migrations and security checklist.
+
+---
+
 *Document generated from full source analysis — schema, routes, services, middleware, frontend store/API/pages, infra configs, and business docs. Last verified against `git` HEAD `7b3df9c` ("fix: order tracking steps + smooth floor-plan dragging", branch `main`).*

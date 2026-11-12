@@ -10,6 +10,7 @@ import { aiService } from '@/services';
 import * as openai from '@/integrations/openai';
 import * as cloudinary from '@/integrations/cloudinary';
 import logger from '@/utils/logger';
+import commandRoutes from './command.routes';
 
 const router = Router();
 
@@ -642,5 +643,8 @@ router.get('/manager/actions',
     res.json({ success: true, data: actions });
   })
 );
+
+// AI Command ("Jarvis") — unified read/write tool layer (Phase A).
+router.use('/', commandRoutes);
 
 export default router;

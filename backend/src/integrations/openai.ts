@@ -114,6 +114,96 @@ export async function generateManagerAction(
   }, { action: null, args: {}, reply: '' });
 }
 
+export interface CommandToolSpec {
+  key: string;
+  description: string;
+  jsonSchema: Record<string, unknown>;
+}
+
+export interface CommandSelectionResult {
+  action: string | null;
+  args: Record<string, unknown>;
+  reply: string;
+  usage?: { promptTokens: number; completionTokens: number };
+}
+
+/**
+ * Selects exactly one unified Command tool for a free-text instruction.
+ *
+ * Security/quality rules baked into the prompt:
+ *  - choose at most one tool;
+ *  - never invent IDs or names;
+ *  - pass entity names exactly as spoken (the server resolves them and asks
+ *    for clarification on ambiguity);
+ *  - if no tool fits, do not call one.
+ * The LLM never executes anything; the server validates and proposes.
+ */
+export async function selectCommandTool(
+  text: string,
+  tools: CommandToolSpec[],
+  context: { role?: string; uiContext?: Record<string, unknown>; history?: Array<{ role: string; content: string }> } = {}
+): Promise<CommandSelectionResult> {
+  return withRetry(async () => {
+    const client = getClient();
+    const toolSpecs = tools.map((t) => ({
+      type: 'function' as const,
+      function: { name: t.key, description: t.description, parameters: t.jsonSchema },
+    }));
+
+    const contextLines: string[] = [];
+    if (context.role) contextLines.push(`Operator role: ${context.role}`);
+    if (context.uiContext && Object.keys(context.uiContext).length > 0) {
+      contextLines.push(`Current screen context (a hint only): ${JSON.stringify(context.uiContext).slice(0, 500)}`);
+    }
+    const historyText = (context.history || [])
+      .slice(-6)
+      .map((m) => `${m.role}: ${m.content}`)
+      .join('\n');
+
+    const response = await client.chat.completions.create({
+      model: AI_MODEL,
+      messages: [
+        {
+          role: 'system',
+          content:
+            'You are Menu Moja Command, a restaurant operations assistant. Choose AT MOST ONE tool that best matches the operator instruction. ' +
+            'Rules: (1) Never invent menu items, staff, tables, orders or IDs — pass human names exactly as the operator said them. ' +
+            '(2) If an entity is ambiguous, still pass the name as spoken; the server will ask for clarification. Never pick one arbitrarily. ' +
+            '(3) Do not call a tool for destructive or financial actions not offered. (4) If no tool fits, do not call a tool and reply with one short sentence asking what they need. ' +
+            '(5) Fill every required argument. Prices are KES. Do not change the meaning of the instruction. ' +
+            (contextLines.length ? `\n${contextLines.join('\n')}` : ''),
+        },
+        ...(historyText
+          ? [{ role: 'system' as const, content: `Recent conversation:\n${historyText}` }]
+          : []),
+        { role: 'user', content: text },
+      ],
+      tools: toolSpecs,
+      tool_choice: 'auto',
+      max_tokens: 400,
+      temperature: 0.1,
+    });
+
+    const choice = response.choices[0]?.message;
+    const toolCall = choice?.tool_calls?.[0];
+    const usage = {
+      promptTokens: response.usage?.prompt_tokens || 0,
+      completionTokens: response.usage?.completion_tokens || 0,
+    };
+
+    if (!toolCall) return { action: null, args: {}, reply: choice?.content || '', usage };
+
+    let args: Record<string, unknown> = {};
+    try {
+      args = JSON.parse(toolCall.function.arguments || '{}');
+    } catch {
+      args = {};
+    }
+
+    return { action: toolCall.function.name, args, reply: choice?.content || '', usage };
+  }, { action: null, args: {}, reply: '', usage: { promptTokens: 0, completionTokens: 0 } });
+}
+
 const AI_BASE_URL = config.aiProvider === 'deepseek' ? 'https://api.deepseek.com/v1' : undefined;
 
 function getClient(): OpenAI {

@@ -337,7 +337,18 @@ jest.mock('../src/config/database', () => {
       groupBy: jest.fn(),
     },
     aiConversation: {
-      findMany: jest.fn(),
+      findFirst: jest.fn().mockResolvedValue(null),
+      findUnique: jest.fn().mockResolvedValue(null),
+      findMany: jest.fn().mockResolvedValue([]),
+      create: jest.fn(),
+      update: jest.fn(),
+    },
+    aiAction: {
+      findFirst: jest.fn().mockResolvedValue(null),
+      findUnique: jest.fn().mockResolvedValue(null),
+      findMany: jest.fn().mockResolvedValue([]),
+      create: jest.fn(),
+      update: jest.fn(),
     },
     notification: {
       findMany: jest.fn(),

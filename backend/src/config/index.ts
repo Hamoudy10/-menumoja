@@ -21,6 +21,8 @@ interface Config {
   deepseekApiKey: string;
   aiProvider: 'openai' | 'deepseek';
   deepseekModel: string;
+  groqApiKey: string;
+  groqWhisperModel: string;
   mpesaConsumerKey: string;
   mpesaConsumerSecret: string;
   mpesaPasskey: string;
@@ -87,6 +89,8 @@ function loadConfig(): Config {
     deepseekApiKey: process.env.DEEPSEEK_API_KEY || process.env.OPENAI_API_KEY || '',
     aiProvider: (process.env.AI_PROVIDER === 'deepseek' || !!process.env.DEEPSEEK_API_KEY) ? 'deepseek' : 'openai',
     deepseekModel: process.env.DEEPSEEK_MODEL || 'deepseek-v4-flash',
+    groqApiKey: process.env.GROQ_API_KEY || '',
+    groqWhisperModel: process.env.GROQ_WHISPER_MODEL || 'whisper-large-v3-turbo',
     mpesaConsumerKey: process.env.MPESA_CONSUMER_KEY || '',
     mpesaConsumerSecret: process.env.MPESA_CONSUMER_SECRET || '',
     mpesaPasskey: process.env.MPESA_PASSKEY || '',
