@@ -270,6 +270,31 @@ export const readTools: Tool[] = [
     inputSchema: z.object({}).strict(),
     jsonSchema: { type: 'object', properties: {}, additionalProperties: false },
     resolve: async (_ctx, args) => ({ ok: true, args, preview: { summary: 'Daily briefing' } }),
+    summarize: (data) => {
+      const date = data?.date ? new Date(data.date).toLocaleDateString('en-KE') : 'Yesterday';
+      const revenue = Number(data?.revenue || 0);
+      const orders = Number(data?.orders || 0);
+      const averageOrderValue = Number(data?.averageOrderValue || 0);
+      const lines = [
+        `**Daily briefing — ${date}**`,
+        `Revenue **KES ${revenue.toLocaleString()}** · **${orders}** paid order${orders === 1 ? '' : 's'} · avg **KES ${averageOrderValue.toLocaleString()}**.`,
+      ];
+
+      if (data?.changePct !== null && data?.changePct !== undefined) {
+        lines.push(`Change vs the prior period: **${data.changePct > 0 ? '+' : ''}${data.changePct}%**.`);
+      }
+
+      const notes = (Array.isArray(data?.insights) ? data.insights : []).filter(
+        (insight: any) => insight.type !== 'revenue'
+      );
+      if (notes.length > 0) {
+        lines.push('');
+        for (const note of notes.slice(0, 3)) {
+          lines.push(`- ${note.title}${note.reason ? ` — ${note.reason}` : ''}`);
+        }
+      }
+      return lines.join('\n');
+    },
     run: async (ctx) => ({ data: await generateDailyBriefing(ctx.restaurantId) }),
   },
 ];

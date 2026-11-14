@@ -76,6 +76,12 @@ export interface Tool {
   /** Execute the read or the confirmed write. */
   run: (ctx: ToolContext, args: Record<string, unknown>) => Promise<ToolRunResult>;
   /**
+   * Optional deterministic summary for a read result. When present, the command
+   * layer uses it instead of an LLM answer (cheaper, consistent, no raw JSON
+   * artifacts like "changePct: null" leaking into the reply).
+   */
+  summarize?: (data: any) => string;
+  /**
    * Compensating action for low/high-risk reversible writes. Undo is a *new*
    * domain action, never a database rollback.
    */

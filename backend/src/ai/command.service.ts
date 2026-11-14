@@ -333,9 +333,12 @@ export async function handleCommand(ctx: ToolContext, input: CommandInput): Prom
     if (step.tool.kind === 'read') {
       const result = await step.tool.run(ctx, step.args);
       const dataText = formatToolData(step.tool.label, result.data);
-      let reply = result.message || dataText;
+      const deterministic = step.tool.summarize ? step.tool.summarize(result.data) : null;
+      let reply = result.message || deterministic || dataText;
 
-      if (withinBudget) {
+      // If a tool provides a deterministic summary, skip the LLM entirely:
+      // it is cheaper, stable, and avoids leaking raw keys like "changePct: null".
+      if (withinBudget && !deterministic) {
         try {
           const answer = await openai.generateManagerAnswer(text, dataText);
           reply = answer.reply || reply;

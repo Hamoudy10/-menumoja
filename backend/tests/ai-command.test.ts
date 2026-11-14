@@ -102,6 +102,22 @@ describe('handleCommand — reads', () => {
     expect(result.toolUsed).toBe('get_sales_summary');
     expect(result.reply).toContain('5,000');
   });
+
+  it('returns a deterministic daily briefing without calling the LLM answer', async () => {
+    (openai.selectCommandPlan as jest.Mock).mockResolvedValue({
+      actions: [{ action: 'get_daily_briefing', args: {} }],
+      reply: '',
+    });
+    (prisma.order.aggregate as jest.Mock).mockResolvedValue({ _sum: { totalAmount: 0 }, _count: { id: 0 } });
+
+    const result = await handleCommand(ctx, { text: 'daily briefing' });
+
+    expect(result.kind).toBe('answer');
+    expect(result.toolUsed).toBe('get_daily_briefing');
+    expect(result.reply).toContain('Daily briefing');
+    expect(result.reply).toContain('Revenue');
+    expect(openai.generateManagerAnswer).not.toHaveBeenCalled();
+  });
 });
 
 describe('handleCommand — writes are proposed, never executed', () => {

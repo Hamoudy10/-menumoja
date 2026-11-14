@@ -7,6 +7,8 @@ import {
 } from 'lucide-react'
 import * as commandApi from '@/api/command'
 import { showErrorToast, showInfoToast } from '@/components/ui/Toast'
+import MarkdownText from './MarkdownText'
+import DataSummary from './DataSummary'
 
 /**
  * Phase B — the "Jarvis" command bar for restaurant admins.
@@ -30,6 +32,7 @@ interface ChatMessage {
   text: string
   kind?: 'answer' | 'clarify' | 'proposal' | 'plan' | 'refused' | 'error'
   data?: any
+  toolUsed?: string | null
   options?: Array<{ id: string; label: string }>
   proposal?: commandApi.CommandProposal
   proposalState?: ProposalState
@@ -133,7 +136,7 @@ export default function JarvisCommandBar() {
         if (result.conversationId) setConversationId(result.conversationId)
 
         if (result.kind === 'answer') {
-          push({ id: uid(), role: 'assistant', kind: 'answer', text: result.reply, data: result.data })
+          push({ id: uid(), role: 'assistant', kind: 'answer', text: result.reply, data: result.data, toolUsed: result.toolUsed })
         } else if (result.kind === 'refused') {
           push({ id: uid(), role: 'assistant', kind: 'refused', text: result.reply })
         } else if (result.kind === 'clarify') {
@@ -521,7 +524,7 @@ export default function JarvisCommandBar() {
                 : 'border border-black/5 bg-white text-text-primary dark:border-white/10 dark:bg-primary-light dark:text-white'
           }`}
         >
-          {message.text}
+          {message.kind === 'answer' ? <MarkdownText text={message.text} /> : message.text}
         </div>
 
         {message.options && message.options.length > 0 && (
@@ -538,13 +541,8 @@ export default function JarvisCommandBar() {
           </div>
         )}
 
-        {message.data !== undefined && (
-          <details className="rounded-xl border border-black/5 bg-black/[0.02] p-2 text-[10px] text-text-secondary dark:border-white/10 dark:bg-white/5 dark:text-white/50">
-            <summary className="cursor-pointer select-none font-accent font-medium">View data</summary>
-            <pre className="mt-1 max-h-40 overflow-auto whitespace-pre-wrap break-words">
-              {JSON.stringify(message.data, null, 2)}
-            </pre>
-          </details>
+        {message.kind === 'answer' && message.data !== undefined && (
+          <DataSummary tool={message.toolUsed} data={message.data} />
         )}
       </div>
     )
