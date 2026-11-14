@@ -275,14 +275,6 @@ export async function handleCommand(ctx: ToolContext, input: CommandInput): Prom
         toolUsed: null,
       });
     }
-    if (tool.kind !== 'write' && selection.actions.length > 1) {
-      return finalize(conversationId, text, {
-        kind: 'answer',
-        reply: 'I can combine write actions into one plan. Please ask for that report separately.',
-        toolUsed: tool.key,
-      });
-    }
-
     // Validate the model's arguments strictly. Missing/invalid → ask, never guess.
     const parsed = tool.inputSchema.safeParse(step.args ?? {});
     if (!parsed.success) {
@@ -390,6 +382,63 @@ export async function handleCommand(ctx: ToolContext, input: CommandInput): Prom
         risk: step.tool.risk || 'high',
         undoWindowSeconds: step.tool.compensate ? step.tool.undoWindowSeconds ?? 15 : undefined,
       },
+    });
+  }
+
+  // Multiple reads: execute them all and combine into one grounded answer.
+  // (The planner may return several read tools for questions that span domains.)
+  const readSteps = prepared.filter((step) => step.tool.kind === 'read');
+  const writeSteps = prepared.filter((step) => step.tool.kind === 'write');
+
+  if (readSteps.length > 0 && writeSteps.length > 0) {
+    return finalize(conversationId, text, {
+      kind: 'answer',
+      reply: 'I can combine the write actions into one plan, but please ask for that report separately so I can answer it accurately.',
+      toolUsed: null,
+    });
+  }
+
+  if (readSteps.length > 1) {
+    const results: Array<{ tool: string; label: string; data: any; summary?: string }> = [];
+
+    for (const step of readSteps) {
+      const result = await step.tool.run(ctx, step.args);
+      results.push({
+        tool: step.tool.key,
+        label: step.tool.label,
+        data: result.data,
+        summary: step.tool.summarize ? step.tool.summarize(result.data) : undefined,
+      });
+    }
+
+    const deterministic = results.every((result) => result.summary)
+      ? results.map((result) => result.summary).join('\n\n')
+      : null;
+    const dataText = results.map((result) => `${result.label}:\n${JSON.stringify(result.data, null, 2)}`).join('\n\n');
+    let reply = deterministic || dataText;
+
+    if (withinBudget && !deterministic) {
+      try {
+        const answer = await openai.generateManagerAnswer(text, dataText);
+        reply = answer.reply || reply;
+        await recordAiUsage({
+          restaurantId: ctx.restaurantId,
+          feature: 'COMMAND_ANSWER',
+          provider: providerName(),
+          model: providerForModel(answer.model || openai.MODEL_NAME),
+          promptTokens: answer.usage?.promptTokens || 0,
+          completionTokens: answer.usage?.completionTokens || 0,
+        }).catch(() => undefined);
+      } catch (error) {
+        logger.warn('AI multi-read answer generation failed — returning structured data', { error: (error as Error).message });
+      }
+    }
+
+    return finalize(conversationId, text, {
+      kind: 'answer',
+      reply,
+      data: { results: results.map((result) => ({ tool: result.tool, label: result.label, data: result.data })) },
+      toolUsed: 'multi',
     });
   }
 

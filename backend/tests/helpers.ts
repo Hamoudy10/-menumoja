@@ -64,6 +64,7 @@ jest.mock('../src/config/database', () => {
       groupBy: jest.fn().mockResolvedValue([]),
     },
     restaurantSettings: {
+      findUnique: jest.fn().mockResolvedValue(null),
       upsert: jest.fn(),
       create: jest.fn(),
     },
@@ -129,6 +130,7 @@ jest.mock('../src/config/database', () => {
       updateMany: jest.fn(),
       count: jest.fn(),
       aggregate: jest.fn(),
+      groupBy: jest.fn().mockResolvedValue([]),
     },    receipt: {
       findFirst: jest.fn().mockResolvedValue(null),
       findUnique: jest.fn().mockResolvedValue(null),
@@ -316,6 +318,13 @@ jest.mock('../src/config/database', () => {
       create: jest.fn(),
       update: jest.fn(),
       delete: jest.fn(),
+    },
+    staffShift: {
+      findFirst: jest.fn().mockResolvedValue(null),
+      findMany: jest.fn().mockResolvedValue([]),
+      create: jest.fn(),
+      update: jest.fn(),
+      count: jest.fn().mockResolvedValue(0),
     },
     qrCode: {
       findFirst: jest.fn(),

@@ -204,6 +204,32 @@ export async function selectCommandTool(
   }, { action: null, args: {}, reply: '', usage: { promptTokens: 0, completionTokens: 0 } });
 }
 
+const SYSTEM_MAP = [
+  'SYSTEM MAP — Menu Moja restaurant OS:',
+  '- Menu: categories and items (name, price, availability, special, dietary).',
+  '- Orders: active queue + history/search; statuses PENDING→CONFIRMED→PREPARING→READY→SERVED.',
+  '- Payments: M-Pesa/cash/card totals, receipts, shifts/reconciliation.',
+  '- Inventory: stock levels, low/out of stock, suppliers, purchase orders.',
+  '- Recipes & costing: ingredients, cost, margin.',
+  '- Customers/CRM: profiles, spend, visits, segments.',
+  '- Loyalty: points, rules, rewards.',
+  '- Reservations & waitlist.',
+  '- Promotions: special/offer/event/giveaway.',
+  '- QR codes and scan analytics.',
+  '- Staff: roles, shifts, performance.',
+  '- Billing: plan, invoices, usage, trial/expiry.',
+  '- Settings: payment toggles, tax, service charge, languages (never secrets).',
+  '- Analytics: sales, top items, profitability.',
+  'GLOSSARY:',
+  '- Revenue = sum of PAID, non-cancelled order totals.',
+  '- AOV = revenue / paid orders.',
+  '- Margin = (price − recipe cost) / price.',
+  '- Open order = PENDING/CONFIRMED/PREPARING/READY.',
+  '- Low stock = current stock < reorder level.',
+  '- Paid = payment status PAID.',
+  'If the data is not covered by an available tool, say what you can answer instead; never invent numbers.',
+].join('\n');
+
 export interface CommandPlanSelection {
   actions: Array<{ action: string; args: Record<string, unknown> }>;
   reply: string;
@@ -273,6 +299,7 @@ export async function selectCommandPlan(
             '(8) Read-only tools are for questions only. Do not answer a change request with a read tool. ' +
             '(9) For greetings or small talk, reply briefly and do not repeat earlier data unless the operator asks. ' +
             languageLine +
+            `\n\n${SYSTEM_MAP}` +
             (contextLines.length ? `\n${contextLines.join('\n')}` : ''),
         },
         ...(historyText ? [{ role: 'system' as const, content: `Recent conversation:\n${historyText}` }] : []),

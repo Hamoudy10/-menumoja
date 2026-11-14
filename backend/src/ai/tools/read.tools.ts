@@ -2,6 +2,7 @@ import { z } from 'zod';
 import { prisma } from '@/config/database';
 import { getSalesSummary, getProfitabilitySnapshot, getInventoryRisk, getStaffMetrics } from '@/services/manager.service';
 import { generateDailyBriefing } from '@/services/ai-manager.service';
+import { domainReadTools } from './read-domain.tools';
 import type { Tool, ToolContext } from './types';
 
 /**
@@ -384,4 +385,6 @@ export const readTools: Tool[] = [
     },
     run: async (ctx) => ({ data: await generateDailyBriefing(ctx.restaurantId) }),
   },
+
+  ...domainReadTools,
 ];

@@ -168,7 +168,7 @@ the client should fall back to typing.
 
 ---
 
-## 5. Tool catalog (16 tools)
+## 5. Tool catalog (26 tools)
 
 Read (no side effects) — roles: owner, manager (some also cashier/waiter/kitchen/super_admin):
 
@@ -183,6 +183,16 @@ Read (no side effects) — roles: owner, manager (some also cashier/waiter/kitch
 | `get_staff_performance` | Orders per waiter, collections per cashier. |
 | `get_profitability` | Net sales, COGS, contribution, margin %. |
 | `get_daily_briefing` | Deterministic yesterday briefing (revenue, top seller, margin, low stock, comparison). |
+| `get_payments_summary` | Payments by method, totals and recent payments. |
+| `get_order_history` | Past orders by period, status, order/customer search. |
+| `get_customers` | Customer list with spend, visits and segments. |
+| `get_recipe_costs` | Recipe cost, selling price and margin. |
+| `get_reservations` | Reservations for a period with party size/status. |
+| `get_promotions` | Active and scheduled promotions. |
+| `get_qr_stats` | QR scan totals and top-performing codes. |
+| `get_subscription` | Plan, status, usage and unpaid invoices. |
+| `get_staff_shifts` | Active or recent staff shifts. |
+| `get_settings` | Non-secret ordering/payment/tax/language settings. |
 
 Write (proposed → confirmed) — roles as noted:
 
@@ -292,6 +302,10 @@ layer: safe markdown rendering plus structured result cards, with raw JSON moved
 behind a collapsed disclosure. The daily briefing uses a concise deterministic
 summary instead of an LLM answer.
 
+Multiple **read** tools in one request are executed together and combined into
+one grounded answer (e.g. “show sales and low stock”). Mixed read/write requests
+ask the operator to split the report from the change.
+
 See **`docs/MULTI_STEP_WORKFLOWS.md`** for the full contract and safety
 invariants.
 
@@ -314,7 +328,7 @@ The LLM is used only once a day to write the narrative daily briefing.
 
 ## 10. Evals
 
-`backend/tests/evals/command-prompts.ts` contains **65+ messy prompts** in
+`backend/tests/evals/command-prompts.ts` contains **86+ messy prompts** in
 English, Kiswahili and Swanglish, including:
 
 - every tool covered at least once,
@@ -341,7 +355,7 @@ Run the command tests:
 cd backend && npx jest tests/ai-command.test.ts
 ```
 
-**Live result (2026-11-14):** ✅ all 65+ prompts pass. The first run exposed a
+**Live result (2026-11-14):** ✅ all 86+ prompts pass. The first run exposed a
 real write-vs-read miss ("move order … table 2 → table 8" chose
 `get_table_status`). Fixed by strengthening the planner's write-vs-read rule
 and the tool descriptions. Two under-specified prompts were corrected to expect
@@ -399,6 +413,7 @@ refuses writes (never guesses).
 | **B** | Admin-only access policy, command bar, hold-to-talk, confirmation cards, undo UI, Groq wiring (key pending). | ✅ Done (voice key pending) |
 | **C** | Deterministic proactive nudges + daily briefing push + actionable notifications. | ✅ Done (`docs/PROACTIVE_ALERTS.md`) |
 | **D** | Multi-step plans + language-aware replies. Autopilot deliberately deferred (conflicts with no-auto-run). | ✅ Done (`docs/MULTI_STEP_WORKFLOWS.md`) |
+| **E1** | Domain read coverage (payments, history, CRM, costing, reservations, promotions, QR, billing, shifts, settings), system map/glossary, multi-read answers. | ✅ Done (`docs/JARVIS_KNOWLEDGE.md`) |
 
 ---
 

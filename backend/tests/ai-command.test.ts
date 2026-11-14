@@ -63,8 +63,8 @@ beforeEach(() => {
 
 describe('command registry', () => {
   it('exposes the registered tools with unique keys', () => {
-    expect(ALL_TOOLS).toHaveLength(16);
-    expect(new Set(ALL_TOOLS.map((t) => t.key)).size).toBe(16);
+    expect(ALL_TOOLS).toHaveLength(26);
+    expect(new Set(ALL_TOOLS.map((t) => t.key)).size).toBe(26);
     for (const tool of ALL_TOOLS) {
       expect(tool.inputSchema).toBeDefined();
       expect(tool.resolve).toBeInstanceOf(Function);
@@ -73,7 +73,7 @@ describe('command registry', () => {
   });
 
   it('filters tools by role (least privilege)', () => {
-    expect(toolsForRole('owner')).toHaveLength(16);
+    expect(toolsForRole('owner')).toHaveLength(26);
     expect(toolsForRole('kitchen').map((t) => t.key)).toEqual(['get_open_orders', 'update_order_status']);
     expect(toolsForRole('cashier').some((t) => t.key === 'set_item_price')).toBe(false);
     expect(toolsForRole('waiter').some((t) => t.key === 'transfer_table')).toBe(true);
@@ -117,6 +117,36 @@ describe('handleCommand — reads', () => {
     expect(result.reply).toContain('Daily briefing');
     expect(result.reply).toContain('Revenue');
     expect(openai.generateManagerAnswer).not.toHaveBeenCalled();
+  });
+
+  it('combines multiple read tools into one grounded answer', async () => {
+    (openai.selectCommandPlan as jest.Mock).mockResolvedValue({
+      actions: [
+        { action: 'get_sales_summary', args: { period: 'today' } },
+        { action: 'get_low_stock', args: {} },
+      ],
+      reply: '',
+    });
+    (prisma.order.aggregate as jest.Mock).mockResolvedValue({ _sum: { totalAmount: 5000 }, _count: { id: 10 } });
+    (prisma.orderItem.groupBy as jest.Mock).mockResolvedValue([]);
+    (prisma.menuItem.findMany as jest.Mock).mockResolvedValue([]);
+    (prisma.inventoryItem.findMany as jest.Mock).mockResolvedValue([]);
+    (prisma.stockMovement.groupBy as jest.Mock).mockResolvedValue([]);
+    (prisma.stockMovement.findMany as jest.Mock).mockResolvedValue([]);
+    (openai.generateManagerAnswer as jest.Mock).mockResolvedValue({
+      reply: 'You made KES 5,000 and no stock is critically low.',
+      model: 'deepseek-v4-flash',
+      usage: { promptTokens: 5, completionTokens: 5 },
+    });
+
+    const result = await handleCommand(ctx, { text: 'show sales and low stock' });
+
+    expect(result.kind).toBe('answer');
+    expect(result.toolUsed).toBe('multi');
+    if (result.kind === 'answer') {
+      expect(result.data.results).toHaveLength(2);
+      expect(result.data.results.map((row: any) => row.tool)).toEqual(['get_sales_summary', 'get_low_stock']);
+    }
   });
 });
 

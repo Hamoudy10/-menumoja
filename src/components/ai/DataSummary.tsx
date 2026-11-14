@@ -286,6 +286,266 @@ function StaffPerformance({ data }: { data: any }) {
   )
 }
 
+function PaymentsSummary({ data }: { data: any }) {
+  const methods = Array.isArray(data?.byMethod) ? data.byMethod : []
+  const recent = Array.isArray(data?.recent) ? data.recent : []
+  return (
+    <Card>
+      <div className="grid grid-cols-2 gap-2">
+        <Metric label="Collected" value={money(data?.total)} />
+        <Metric label="Payments" value={Number(data?.count || 0)} />
+      </div>
+      {methods.length > 0 && (
+        <ul className="mt-2 space-y-1.5">
+          {methods.map((row: any, index: number) => (
+            <Row key={index} left={row.method} right={`${money(row.amount)} · ${row.count}`} />
+          ))}
+        </ul>
+      )}
+      {recent.length > 0 && (
+        <ul className="mt-2 space-y-1.5 border-t border-black/5 pt-2 dark:border-white/10">
+          {recent.slice(0, 4).map((payment: any, index: number) => (
+            <Row
+              key={index}
+              left={payment.orderNumber || 'Payment'}
+              right={`${money(payment.amount)} · ${payment.method}`}
+            />
+          ))}
+        </ul>
+      )}
+    </Card>
+  )
+}
+
+function OrderHistory({ data }: { data: any }) {
+  const orders = Array.isArray(data?.orders) ? data.orders : []
+  return (
+    <Card>
+      <div className="mb-2 flex items-center justify-between">
+        <p className="text-[10px] font-accent uppercase tracking-wide text-text-secondary dark:text-white/40">
+          Orders · {String(data?.period || '')}
+        </p>
+        <span className="text-[10px] font-accent text-text-secondary dark:text-white/50">{Number(data?.total || 0)} total</span>
+      </div>
+      {orders.length === 0 ? (
+        <p className="text-xs text-text-secondary dark:text-white/50">No orders found.</p>
+      ) : (
+        <ul className="max-h-56 space-y-1.5 overflow-auto pr-1">
+          {orders.slice(0, 10).map((order: any, index: number) => (
+            <Row
+              key={index}
+              left={
+                <span>
+                  <span className="font-medium">{order.orderNumber}</span>
+                  <span className="text-text-secondary dark:text-white/50"> · {order.table}</span>
+                </span>
+              }
+              right={`${order.status} · ${money(order.total)}`}
+            />
+          ))}
+        </ul>
+      )}
+    </Card>
+  )
+}
+
+function Customers({ data }: { data: any }) {
+  const customers = Array.isArray(data?.customers) ? data.customers : []
+  const segments = data?.segments && typeof data.segments === 'object' ? Object.entries(data.segments) : []
+  const topSegment = segments.sort((a: any, b: any) => Number(b[1]) - Number(a[1]))[0]
+  return (
+    <Card>
+      <div className="grid grid-cols-2 gap-2">
+        <Metric label="Customers" value={Number(data?.total || 0)} />
+        <Metric label="Top segment" value={topSegment ? `${topSegment[0]} (${topSegment[1]})` : '—'} />
+      </div>
+      {customers.length > 0 && (
+        <ul className="mt-2 space-y-1.5">
+          {customers.slice(0, 8).map((customer: any, index: number) => (
+            <Row
+              key={index}
+              left={customer.name}
+              right={`${money(customer.totalSpend)} · ${customer.visits} visits`}
+            />
+          ))}
+        </ul>
+      )}
+    </Card>
+  )
+}
+
+function RecipeCosts({ data }: { data: any }) {
+  const recipes = Array.isArray(data?.recipes) ? data.recipes : []
+  return (
+    <Card>
+      <div className="mb-2 flex items-center justify-between">
+        <p className="text-[10px] font-accent uppercase tracking-wide text-text-secondary dark:text-white/40">Recipe margins</p>
+        <span className="text-[10px] font-accent text-text-secondary dark:text-white/50">{Number(data?.total || 0)} costed</span>
+      </div>
+      {recipes.length === 0 ? (
+        <p className="text-xs text-text-secondary dark:text-white/50">No costed recipes yet.</p>
+      ) : (
+        <ul className="max-h-56 space-y-1.5 overflow-auto pr-1">
+          {recipes.slice(0, 10).map((recipe: any, index: number) => (
+            <Row
+              key={index}
+              left={recipe.item}
+              right={`${money(recipe.price)} · cost ${money(recipe.cost)} · ${recipe.marginPct}%`}
+            />
+          ))}
+        </ul>
+      )}
+    </Card>
+  )
+}
+
+function Reservations({ data }: { data: any }) {
+  const reservations = Array.isArray(data?.reservations) ? data.reservations : []
+  return (
+    <Card>
+      <div className="mb-2 flex items-center justify-between">
+        <p className="text-[10px] font-accent uppercase tracking-wide text-text-secondary dark:text-white/40">
+          Reservations · {String(data?.period || '')}
+        </p>
+        <span className="text-[10px] font-accent text-text-secondary dark:text-white/50">{Number(data?.total || 0)}</span>
+      </div>
+      {reservations.length === 0 ? (
+        <p className="text-xs text-text-secondary dark:text-white/50">No reservations for this period.</p>
+      ) : (
+        <ul className="max-h-56 space-y-1.5 overflow-auto pr-1">
+          {reservations.slice(0, 8).map((reservation: any, index: number) => (
+            <Row
+              key={index}
+              left={reservation.name}
+              right={`${reservation.partySize}p · ${new Date(reservation.at).toLocaleTimeString('en-KE', { hour: '2-digit', minute: '2-digit' })} · ${reservation.status}`}
+            />
+          ))}
+        </ul>
+      )}
+    </Card>
+  )
+}
+
+function Promotions({ data }: { data: any }) {
+  const promotions = Array.isArray(data?.promotions) ? data.promotions : []
+  return (
+    <Card>
+      <div className="mb-2 flex items-center justify-between">
+        <p className="text-[10px] font-accent uppercase tracking-wide text-text-secondary dark:text-white/40">Promotions</p>
+        <span className="text-[10px] font-accent text-text-secondary dark:text-white/50">{Number(data?.total || 0)}</span>
+      </div>
+      {promotions.length === 0 ? (
+        <p className="text-xs text-text-secondary dark:text-white/50">No promotions found.</p>
+      ) : (
+        <ul className="space-y-1.5">
+          {promotions.slice(0, 8).map((promotion: any, index: number) => (
+            <Row
+              key={index}
+              left={
+                <span>
+                  <span className="font-medium">{promotion.title}</span>
+                  <span className="text-text-secondary dark:text-white/50"> · {promotion.type}</span>
+                </span>
+              }
+              right={promotion.specialPrice !== null ? money(promotion.specialPrice) : undefined}
+            />
+          ))}
+        </ul>
+      )}
+    </Card>
+  )
+}
+
+function QrStats({ data }: { data: any }) {
+  const codes = Array.isArray(data?.codes) ? data.codes : []
+  return (
+    <Card>
+      <div className="grid grid-cols-2 gap-2">
+        <Metric label="Scans" value={Number(data?.totalScans || 0)} />
+        <Metric label="Codes" value={codes.length} />
+      </div>
+      {codes.length > 0 && (
+        <ul className="mt-2 space-y-1.5">
+          {codes.slice(0, 6).map((code: any, index: number) => (
+            <Row key={index} left={code.label} right={`${code.scans} scans`} />
+          ))}
+        </ul>
+      )}
+    </Card>
+  )
+}
+
+function Subscription({ data }: { data: any }) {
+  const invoices = Array.isArray(data?.outstandingInvoices) ? data.outstandingInvoices : []
+  return (
+    <Card>
+      <div className="grid grid-cols-2 gap-2">
+        <Metric label="Plan" value={data?.plan?.name || '—'} />
+        <Metric label="Status" value={data?.status || '—'} />
+        <Metric label="Renews" value={data?.planExpiresAt ? new Date(data.planExpiresAt).toLocaleDateString('en-KE') : '—'} />
+        <Metric label="Trial ends" value={data?.trialEndsAt ? new Date(data.trialEndsAt).toLocaleDateString('en-KE') : '—'} />
+      </div>
+      {invoices.length > 0 && (
+        <ul className="mt-2 space-y-1.5">
+          {invoices.map((invoice: any, index: number) => (
+            <Row key={index} left={invoice.invoiceNumber} right={`${money(invoice.amountKes)} · ${invoice.status}`} />
+          ))}
+        </ul>
+      )}
+    </Card>
+  )
+}
+
+function StaffShifts({ data }: { data: any }) {
+  const shifts = Array.isArray(data?.shifts) ? data.shifts : []
+  return (
+    <Card>
+      <div className="grid grid-cols-2 gap-2">
+        <Metric label="Active shifts" value={Number(data?.active || 0)} />
+        <Metric label="Listed" value={Number(data?.total || 0)} />
+      </div>
+      {shifts.length > 0 && (
+        <ul className="mt-2 space-y-1.5">
+          {shifts.slice(0, 8).map((shift: any, index: number) => (
+            <Row
+              key={index}
+              left={`${shift.staff}${shift.role ? ` · ${shift.role}` : ''}`}
+              right={shift.active ? 'On shift' : new Date(shift.clockOut || shift.clockIn).toLocaleTimeString('en-KE', { hour: '2-digit', minute: '2-digit' })}
+            />
+          ))}
+        </ul>
+      )}
+    </Card>
+  )
+}
+
+function Settings({ data }: { data: any }) {
+  const languages = Array.isArray(data?.languages) ? data.languages.join(', ') : '—'
+  return (
+    <Card>
+      <div className="grid grid-cols-2 gap-2">
+        <Metric label="Ordering" value={data?.allowOrdering ? 'On' : 'Off'} />
+        <Metric label="M-Pesa" value={data?.payments?.mpesa ? 'On' : 'Off'} />
+        <Metric label="Cash" value={data?.payments?.cash ? 'On' : 'Off'} />
+        <Metric label="Tax" value={`${Number(data?.taxPercent || 0)}%`} />
+        <Metric label="Service charge" value={`${Number(data?.serviceChargePercent || 0)}%`} />
+        <Metric label="Languages" value={languages} />
+      </div>
+    </Card>
+  )
+}
+
+function MultiResults({ data }: { data: any }) {
+  const results = Array.isArray(data?.results) ? data.results : []
+  return (
+    <div className="space-y-2">
+      {results.map((result: any, index: number) => (
+        <DataSummary key={index} tool={result.tool} data={result.data} />
+      ))}
+    </div>
+  )
+}
+
 export default function DataSummary({ tool, data }: { tool?: string | null; data: any }) {
   if (data === undefined || data === null) return null
 
@@ -308,6 +568,28 @@ export default function DataSummary({ tool, data }: { tool?: string | null; data
       return <Profitability data={data} />
     case 'get_staff_performance':
       return <StaffPerformance data={data} />
+    case 'get_payments_summary':
+      return <PaymentsSummary data={data} />
+    case 'get_order_history':
+      return <OrderHistory data={data} />
+    case 'get_customers':
+      return <Customers data={data} />
+    case 'get_recipe_costs':
+      return <RecipeCosts data={data} />
+    case 'get_reservations':
+      return <Reservations data={data} />
+    case 'get_promotions':
+      return <Promotions data={data} />
+    case 'get_qr_stats':
+      return <QrStats data={data} />
+    case 'get_subscription':
+      return <Subscription data={data} />
+    case 'get_staff_shifts':
+      return <StaffShifts data={data} />
+    case 'get_settings':
+      return <Settings data={data} />
+    case 'multi':
+      return <MultiResults data={data} />
     default:
       return <Raw data={data} />
   }

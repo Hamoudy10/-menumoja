@@ -31,6 +31,16 @@ export const EXPECTED_TOOL_KEYS = [
   'get_staff_performance',
   'get_profitability',
   'get_daily_briefing',
+  'get_payments_summary',
+  'get_order_history',
+  'get_customers',
+  'get_recipe_costs',
+  'get_reservations',
+  'get_promotions',
+  'get_qr_stats',
+  'get_subscription',
+  'get_staff_shifts',
+  'get_settings',
   'set_item_availability',
   'mark_item_special',
   'set_item_price',
@@ -94,6 +104,47 @@ export const COMMAND_EVAL_CASES: CommandEvalCase[] = [
   { text: 'Give me the daily briefing', expectedTool: 'get_daily_briefing', language: 'en' },
   { text: 'Nipe briefing ya leo', expectedTool: 'get_daily_briefing', language: 'sw' },
   { text: 'What should I know about yesterday?', expectedTool: 'get_daily_briefing', language: 'en' },
+
+  // ── Payments ──
+  { text: 'How much did we collect today?', expectedTool: 'get_payments_summary', language: 'en' },
+  { text: 'Cash vs M-Pesa this week?', expectedTool: 'get_payments_summary', language: 'en' },
+  { text: 'Malipo ya leo ni kiasi gani?', expectedTool: 'get_payments_summary', language: 'sw' },
+
+  // ── Order history ──
+  { text: "Show me yesterday's orders", expectedTool: 'get_order_history', language: 'en' },
+  { text: 'Find order ORD-1234', expectedTool: 'get_order_history', language: 'en' },
+  { text: 'How many cancelled orders this month?', expectedTool: 'get_order_history', language: 'en' },
+
+  // ── Customers ──
+  { text: 'Who are our top customers?', expectedTool: 'get_customers', language: 'en' },
+  { text: 'How many VIP customers do we have?', expectedTool: 'get_customers', language: 'en' },
+  { text: 'Wateja wetu wa juu ni akina nani?', expectedTool: 'get_customers', language: 'sw' },
+
+  // ── Recipe costs ──
+  { text: 'Which dish has the best margin?', expectedTool: 'get_recipe_costs', language: 'en' },
+  { text: "What's the food cost of chicken curry?", expectedTool: 'get_recipe_costs', language: 'en' },
+
+  // ── Reservations ──
+  { text: 'Any reservations tonight?', expectedTool: 'get_reservations', language: 'en' },
+  { text: 'Show upcoming reservations', expectedTool: 'get_reservations', language: 'en' },
+
+  // ── Promotions ──
+  { text: 'What promotions are running?', expectedTool: 'get_promotions', language: 'en' },
+  { text: 'Any specials today?', expectedTool: 'get_promotions', language: 'en' },
+
+  // ── QR analytics ──
+  { text: 'How many QR scans this week?', expectedTool: 'get_qr_stats', language: 'en' },
+
+  // ── Billing ──
+  { text: 'What plan am I on?', expectedTool: 'get_subscription', language: 'en' },
+  { text: 'Any invoices due?', expectedTool: 'get_subscription', language: 'en' },
+
+  // ── Staff shifts ──
+  { text: 'Who is on shift right now?', expectedTool: 'get_staff_shifts', language: 'en' },
+
+  // ── Settings ──
+  { text: 'Is M-Pesa enabled?', expectedTool: 'get_settings', language: 'en' },
+  { text: 'What is our tax rate?', expectedTool: 'get_settings', language: 'en' },
 
   // ── Set availability ──
   { text: '86 the grilled tilapia whole', expectedTool: 'set_item_availability', language: 'en' },
