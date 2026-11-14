@@ -1,12 +1,20 @@
 import { prisma, setupTestApp, generateTestToken, getAuthHeader, createTestOwner, cleanupTestData } from './helpers';
 import request from 'supertest';
 import * as openai from '@/integrations/openai';
-import { handleCommand, confirmCommand, undoCommand } from '@/ai/command.service';
+import {
+  handleCommand,
+  confirmCommand,
+  undoCommand,
+  confirmWorkflow,
+  cancelWorkflow,
+  undoWorkflow,
+} from '@/ai/command.service';
 import { ALL_TOOLS, toolsForRole } from '@/ai/tools';
 import type { ToolContext } from '@/ai/tools/types';
 
 jest.mock('@/integrations/openai', () => ({
   selectCommandTool: jest.fn(),
+  selectCommandPlan: jest.fn(),
   generateManagerAnswer: jest.fn(),
   generateManagerAction: jest.fn(),
   MODEL_NAME: 'deepseek-v4-flash',
@@ -41,6 +49,7 @@ function prime() {
   (prisma.aiAction.update as jest.Mock).mockResolvedValue({});
   (prisma.auditLog.create as jest.Mock).mockResolvedValue({ id: 'audit-1' });
   (openai.selectCommandTool as jest.Mock).mockReset();
+  (openai.selectCommandPlan as jest.Mock).mockReset();
   (openai.generateManagerAnswer as jest.Mock).mockReset();
 }
 
@@ -73,9 +82,8 @@ describe('command registry', () => {
 
 describe('handleCommand — reads', () => {
   it('executes a read tool and grounds the answer in data', async () => {
-    (openai.selectCommandTool as jest.Mock).mockResolvedValue({
-      action: 'get_sales_summary',
-      args: { period: 'today' },
+    (openai.selectCommandPlan as jest.Mock).mockResolvedValue({
+      actions: [{ action: 'get_sales_summary', args: { period: 'today' } }],
       reply: '',
       usage: { promptTokens: 10, completionTokens: 5 },
     });
@@ -99,9 +107,8 @@ describe('handleCommand — reads', () => {
 describe('handleCommand — writes are proposed, never executed', () => {
   it('asks for clarification when the entity is ambiguous', async () => {
     (prisma.menuItem.findMany as jest.Mock).mockResolvedValue([tilapiaWhole, tilapiaFillet]);
-    (openai.selectCommandTool as jest.Mock).mockResolvedValue({
-      action: 'set_item_availability',
-      args: { item: 'Tilapia', available: false },
+    (openai.selectCommandPlan as jest.Mock).mockResolvedValue({
+      actions: [{ action: 'set_item_availability', args: { item: 'Tilapia', available: false } }],
       reply: '',
     });
 
@@ -120,9 +127,8 @@ describe('handleCommand — writes are proposed, never executed', () => {
   it('creates a PENDING proposal for a unique match and does not write yet', async () => {
     (prisma.menuItem.findMany as jest.Mock).mockResolvedValue([tilapiaWhole]);
     (prisma.aiAction.create as jest.Mock).mockImplementation(async ({ data }: any) => ({ id: 'act-1', ...data }));
-    (openai.selectCommandTool as jest.Mock).mockResolvedValue({
-      action: 'set_item_availability',
-      args: { item: 'Grilled Tilapia Whole', available: false },
+    (openai.selectCommandPlan as jest.Mock).mockResolvedValue({
+      actions: [{ action: 'set_item_availability', args: { item: 'Grilled Tilapia Whole', available: false } }],
       reply: '',
     });
 
@@ -152,9 +158,8 @@ describe('handleCommand — writes are proposed, never executed', () => {
     const previous = process.env.AI_COMMAND_ALLOWED_ROLES;
     process.env.AI_COMMAND_ALLOWED_ROLES = 'owner,kitchen';
     try {
-      (openai.selectCommandTool as jest.Mock).mockResolvedValue({
-        action: 'set_item_price',
-        args: { item: 'Anything', price: 100 },
+      (openai.selectCommandPlan as jest.Mock).mockResolvedValue({
+        actions: [{ action: 'set_item_price', args: { item: 'Anything', price: 100 } }],
         reply: '',
       });
 
@@ -256,6 +261,117 @@ describe('confirm / undo', () => {
   });
 });
 
+describe('Phase D — multi-step plans', () => {
+  const curry = { id: 'm-3', name: 'Chicken Curry', price: 900, isAvailable: true, isTodaysSpecial: false };
+
+  it('proposes a plan for multiple writes and does not execute', async () => {
+    (prisma.menuItem.findMany as jest.Mock).mockResolvedValue([tilapiaWhole, curry]);
+    let counter = 0;
+    (prisma.aiAction.create as jest.Mock).mockImplementation(async ({ data }: any) => ({ id: `act-${++counter}`, ...data }));
+    (openai.selectCommandPlan as jest.Mock).mockResolvedValue({
+      actions: [
+        { action: 'set_item_availability', args: { item: 'Grilled Tilapia Whole', available: false } },
+        { action: 'set_item_price', args: { item: 'Chicken Curry', price: 950 } },
+      ],
+      reply: 'Two menu updates',
+    });
+
+    const result = await handleCommand(ctx, { text: '86 the tilapia and set chicken curry to 950' });
+
+    expect(result.kind).toBe('plan');
+    if (result.kind === 'plan') {
+      expect(result.plan.steps).toHaveLength(2);
+      expect(result.plan.title).toBe('Two menu updates');
+    }
+    expect(prisma.aiAction.create).toHaveBeenCalledTimes(2);
+    expect(prisma.aiAction.create).toHaveBeenCalledWith(
+      expect.objectContaining({ data: expect.objectContaining({ workflowId: expect.any(String), stepOrder: 0, status: 'PENDING' }) })
+    );
+    expect(prisma.aiAction.create).toHaveBeenCalledWith(
+      expect.objectContaining({ data: expect.objectContaining({ workflowId: expect.any(String), stepOrder: 1, status: 'PENDING' }) })
+    );
+    expect(prisma.menuItem.update).not.toHaveBeenCalled();
+  });
+
+  it('asks for clarification instead of creating a partial plan', async () => {
+    (prisma.menuItem.findMany as jest.Mock).mockResolvedValue([tilapiaWhole, tilapiaFillet, curry]);
+    (openai.selectCommandPlan as jest.Mock).mockResolvedValue({
+      actions: [
+        { action: 'set_item_availability', args: { item: 'Tilapia', available: false } },
+        { action: 'set_item_price', args: { item: 'Chicken Curry', price: 950 } },
+      ],
+      reply: '',
+    });
+
+    const result = await handleCommand(ctx, { text: '86 the tilapia and set chicken curry to 950' });
+
+    expect(result.kind).toBe('clarify');
+    expect(prisma.aiAction.create).not.toHaveBeenCalled();
+  });
+
+  it('executes a confirmed plan in order', async () => {
+    (prisma.aiAction.findMany as jest.Mock).mockResolvedValue([
+      { id: 'act-1', restaurantId: RESTAURANT_ID, conversationId: 'conv-1', workflowId: 'wf-1', stepOrder: 0, tool: 'set_item_availability', status: 'PENDING', args: { item: 'Grilled Tilapia Whole', available: false }, beforeState: { itemId: 'm-1', isAvailable: true }, summary: 'Mark tilapia unavailable' },
+      { id: 'act-2', restaurantId: RESTAURANT_ID, conversationId: 'conv-1', workflowId: 'wf-1', stepOrder: 1, tool: 'set_item_price', status: 'PENDING', args: { item: 'Chicken Curry', price: 950 }, beforeState: { itemId: 'm-3', price: 900 }, summary: 'Set curry price' },
+    ]);
+    (prisma.menuItem.findMany as jest.Mock).mockResolvedValue([tilapiaWhole, curry]);
+    (prisma.menuItem.update as jest.Mock).mockImplementation(async ({ where, data }: any) => ({
+      id: where.id,
+      name: where.id === 'm-1' ? 'Grilled Tilapia Whole' : 'Chicken Curry',
+      ...data,
+    }));
+
+    const result = await confirmWorkflow(ctx, 'wf-1');
+
+    expect(result.status).toBe('COMPLETED');
+    expect(result.steps.filter((step: any) => step.status === 'EXECUTED')).toHaveLength(2);
+    expect(prisma.menuItem.update).toHaveBeenCalledTimes(2);
+  });
+
+  it('stops and skips remaining steps when one fails', async () => {
+    (prisma.aiAction.findMany as jest.Mock).mockResolvedValue([
+      { id: 'act-1', restaurantId: RESTAURANT_ID, conversationId: null, workflowId: 'wf-1', stepOrder: 0, tool: 'set_item_availability', status: 'PENDING', args: { item: 'Grilled Tilapia Whole', available: false }, summary: 'Mark tilapia unavailable' },
+      { id: 'act-2', restaurantId: RESTAURANT_ID, conversationId: null, workflowId: 'wf-1', stepOrder: 1, tool: 'set_item_price', status: 'PENDING', args: { item: 'Chicken Curry', price: 950 }, summary: 'Set curry price' },
+    ]);
+    (prisma.menuItem.findMany as jest.Mock).mockResolvedValue([tilapiaWhole, curry]);
+    (prisma.menuItem.update as jest.Mock).mockRejectedValue(new Error('db write failed'));
+
+    const result = await confirmWorkflow(ctx, 'wf-1');
+
+    expect(result.status).toBe('FAILED');
+    expect(result.steps[0].status).toBe('FAILED');
+    expect(result.steps[1].status).toBe('SKIPPED');
+    expect(prisma.menuItem.update).toHaveBeenCalledTimes(1);
+  });
+
+  it('cancels pending steps', async () => {
+    (prisma.aiAction.findMany as jest.Mock).mockResolvedValue([
+      { id: 'act-1', status: 'PENDING', conversationId: null },
+      { id: 'act-2', status: 'PENDING', conversationId: null },
+    ]);
+
+    const result = await cancelWorkflow(ctx, 'wf-1');
+
+    expect(result.status).toBe('CANCELLED');
+    expect(result.cancelled).toBe(2);
+    expect(prisma.aiAction.updateMany).toHaveBeenCalled();
+  });
+
+  it('undoes executed steps in reverse order', async () => {
+    (prisma.aiAction.findMany as jest.Mock).mockResolvedValue([
+      { id: 'act-2', restaurantId: RESTAURANT_ID, conversationId: null, stepOrder: 1, tool: 'set_item_price', status: 'EXECUTED', undoExpiresAt: new Date(Date.now() + 10_000), resolvedArgs: { itemId: 'm-3', price: 950 }, beforeState: { itemId: 'm-3', price: 900 }, summary: 'price' },
+      { id: 'act-1', restaurantId: RESTAURANT_ID, conversationId: null, stepOrder: 0, tool: 'set_item_availability', status: 'EXECUTED', undoExpiresAt: new Date(Date.now() + 10_000), resolvedArgs: { itemId: 'm-1', available: false }, beforeState: { itemId: 'm-1', isAvailable: true }, summary: 'availability' },
+    ]);
+    (prisma.menuItem.update as jest.Mock).mockResolvedValue({ id: 'm-1', name: 'X', isAvailable: true });
+
+    const result = await undoWorkflow(ctx, 'wf-1');
+
+    expect(result.status).toBe('UNDONE');
+    expect(result.steps).toHaveLength(2);
+    expect(prisma.menuItem.update).toHaveBeenCalledTimes(2);
+  });
+});
+
 describe('command routes — security', () => {
   it('requires authentication (401)', async () => {
     const res = await request(app).post('/api/v1/ai/command').send({ text: 'hello' });
@@ -272,7 +388,7 @@ describe('command routes — security', () => {
       .send({ text: 'show sales', role: 'super_admin', restaurantId: '99999999-9999-9999-9999-999999999999' });
 
     expect(res.status).toBe(422);
-    expect(openai.selectCommandTool).not.toHaveBeenCalled();
+    expect(openai.selectCommandPlan).not.toHaveBeenCalled();
   });
 
   it('blocks staff roles from AI commands (403) — manual UI only', async () => {
@@ -284,14 +400,14 @@ describe('command routes — security', () => {
         .send({ text: 'show sales' });
       expect(res.status).toBe(403);
     }
-    expect(openai.selectCommandTool).not.toHaveBeenCalled();
+    expect(openai.selectCommandPlan).not.toHaveBeenCalled();
   });
 
   it('blocks a service call from a staff role (defense in depth)', async () => {
     await expect(
       handleCommand({ ...ctx, role: 'cashier' }, { text: 'show sales' })
     ).rejects.toThrow();
-    expect(openai.selectCommandTool).not.toHaveBeenCalled();
+    expect(openai.selectCommandPlan).not.toHaveBeenCalled();
   });
 
   it('fails closed when a super-admin has no restaurant context (400)', async () => {
@@ -302,23 +418,22 @@ describe('command routes — security', () => {
       .send({ text: 'show sales' });
 
     expect(res.status).toBe(400);
-    expect(openai.selectCommandTool).not.toHaveBeenCalled();
+    expect(openai.selectCommandPlan).not.toHaveBeenCalled();
   });
 
   it('rejects a service call without a valid restaurant id (defense in depth)', async () => {
     await expect(
       handleCommand({ restaurantId: '', userId: OWNER_ID, role: 'owner' }, { text: 'show sales' })
     ).rejects.toThrow();
-    expect(openai.selectCommandTool).not.toHaveBeenCalled();
+    expect(openai.selectCommandPlan).not.toHaveBeenCalled();
   });
 
   it('derives context from the token and returns an answer', async () => {
     const owner = await createTestOwner({ id: OWNER_ID });
     const token = generateTestToken(owner.id, 'owner', RESTAURANT_ID);
 
-    (openai.selectCommandTool as jest.Mock).mockResolvedValue({
-      action: 'get_low_stock',
-      args: {},
+    (openai.selectCommandPlan as jest.Mock).mockResolvedValue({
+      actions: [{ action: 'get_low_stock', args: {} }],
       reply: '',
     });
     (prisma.inventoryItem.findMany as jest.Mock).mockResolvedValue([]);

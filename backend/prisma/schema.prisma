@@ -124,6 +124,7 @@ enum AiActionStatus {
   REJECTED
   FAILED
   UNDONE
+  SKIPPED
 }
 
 enum SyncChangeStatus {
@@ -328,6 +329,9 @@ model AiAction {
   id              String          @id @default(uuid()) @db.Uuid
   restaurantId    String          @map("restaurant_id") @db.Uuid
   conversationId  String?         @map("conversation_id") @db.Uuid
+  workflowId      String?         @map("workflow_id") @db.Uuid
+  stepOrder       Int?            @map("step_order")
+  workflowTitle   String?         @map("workflow_title")
   tool            String
   label           String
   args            Json
@@ -350,6 +354,7 @@ model AiAction {
   @@index([restaurantId])
   @@index([status])
   @@index([conversationId])
+  @@index([workflowId])
   @@map("ai_actions")
 }
 

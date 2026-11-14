@@ -196,7 +196,7 @@ export const readTools: Tool[] = [
   {
     key: 'get_table_status',
     label: 'Table status',
-    description: 'Get the live status of every table (free, occupied, reserved, unavailable) and the active orders on each table.',
+    description: 'Read-only: the live status of every table (free, occupied, reserved, unavailable) and the active orders on each table. Use ONLY when the operator is asking a question about tables. Do NOT use when they want to move or transfer an order.',
     kind: 'read',
     roles: ['owner', 'manager', 'cashier', 'waiter', 'super_admin'],
     inputSchema: z.object({}).strict(),
@@ -208,7 +208,7 @@ export const readTools: Tool[] = [
   {
     key: 'get_open_orders',
     label: 'Open orders',
-    description: 'Get all active (open) orders with table, status, payment status, waiter and elapsed minutes. Use for "what is still open?" or "which orders are waiting?".',
+    description: 'Read-only: list active (open) orders with table, status, payment status, waiter and elapsed minutes. Use for "what is still open?" or "which orders are waiting?" — not when the operator wants to change an order.',
     kind: 'read',
     roles: ['owner', 'manager', 'cashier', 'waiter', 'kitchen', 'super_admin'],
     inputSchema: z.object({}).strict(),

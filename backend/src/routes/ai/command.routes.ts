@@ -4,7 +4,17 @@ import multer from 'multer';
 import { authenticate, enforceRestaurantScope, validate, validateParams, aiChatLimiter, asyncHandler } from '@/middleware';
 import { AppError } from '@/utils/errors';
 import { prisma } from '@/config/database';
-import { handleCommand, confirmCommand, rejectCommand, undoCommand, getConversation } from '@/ai/command.service';
+import {
+  handleCommand,
+  confirmCommand,
+  rejectCommand,
+  undoCommand,
+  confirmWorkflow,
+  cancelWorkflow,
+  undoWorkflow,
+  getWorkflow,
+  getConversation,
+} from '@/ai/command.service';
 import { isTranscriptionConfigured, transcribeAudio } from '@/integrations/groq';
 import { isCommandRoleAllowed } from '@/ai/access';
 import type { ToolContext } from '@/ai/tools/types';
@@ -33,6 +43,7 @@ const commandSchema = z
     text: z.string().min(1, 'Command is required').max(1000, 'Command is too long'),
     conversationId: z.string().uuid('Invalid conversation ID').optional(),
     uiContext: uiContextSchema.optional(),
+    language: z.enum(['en', 'sw']).optional(),
   })
   .strict();
 
@@ -86,6 +97,7 @@ router.post(
       text: req.body.text,
       uiContext: req.body.uiContext,
       conversationId: req.body.conversationId,
+      language: req.body.language,
     });
     res.json({ success: true, data: result });
   })
@@ -120,6 +132,52 @@ router.post(
   validateParams(actionIdParamSchema),
   asyncHandler(async (req: any, res: any) => {
     const result = await undoCommand(contextFrom(req), String(req.params.id));
+    res.json({ success: true, data: result });
+  })
+);
+
+// ── Multi-step plans (Phase D) ──
+
+// POST /ai/command/workflows/:id/confirm — execute a plan step by step in order.
+router.post(
+  '/command/workflows/:id/confirm',
+  enforceRestaurantScope,
+  validateParams(actionIdParamSchema),
+  asyncHandler(async (req: any, res: any) => {
+    const result = await confirmWorkflow(contextFrom(req), String(req.params.id));
+    res.json({ success: true, data: result });
+  })
+);
+
+// POST /ai/command/workflows/:id/cancel — decline all pending steps.
+router.post(
+  '/command/workflows/:id/cancel',
+  enforceRestaurantScope,
+  validateParams(actionIdParamSchema),
+  asyncHandler(async (req: any, res: any) => {
+    const result = await cancelWorkflow(contextFrom(req), String(req.params.id));
+    res.json({ success: true, data: result });
+  })
+);
+
+// POST /ai/command/workflows/:id/undo — compensating undo in reverse order.
+router.post(
+  '/command/workflows/:id/undo',
+  enforceRestaurantScope,
+  validateParams(actionIdParamSchema),
+  asyncHandler(async (req: any, res: any) => {
+    const result = await undoWorkflow(contextFrom(req), String(req.params.id));
+    res.json({ success: true, data: result });
+  })
+);
+
+// GET /ai/command/workflows/:id — plan status/steps (tenant-scoped).
+router.get(
+  '/command/workflows/:id',
+  enforceRestaurantScope,
+  validateParams(actionIdParamSchema),
+  asyncHandler(async (req: any, res: any) => {
+    const result = await getWorkflow(contextFrom(req), String(req.params.id));
     res.json({ success: true, data: result });
   })
 );

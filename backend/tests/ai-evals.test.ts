@@ -48,16 +48,18 @@ const runLive = process.env.RUN_LIVE_AI_EVALS === '1';
 
 (runLive ? describe : describe.skip)('AI command live tool selection (RUN_LIVE_AI_EVALS=1)', () => {
   it('selects the expected tool for every prompt', async () => {
-    const { selectCommandTool } = await import('@/integrations/openai');
+    const { selectCommandPlan } = await import('@/integrations/openai');
     const { toLlmToolSpecs, toolsForRole } = await import('@/ai/tools');
     const tools = toLlmToolSpecs(toolsForRole('owner'));
 
+    const failures: Array<{ text: string; expected: string | null; got: string | null }> = [];
     for (const testCase of COMMAND_EVAL_CASES) {
-      const result = await selectCommandTool(testCase.text, tools, { role: 'owner' });
-      expect({ text: testCase.text, action: result.action }).toEqual({
-        text: testCase.text,
-        action: testCase.expectedTool,
-      });
+      const result = await selectCommandPlan(testCase.text, tools, { role: 'owner' });
+      const firstAction = result.actions[0]?.action ?? null;
+      if (firstAction !== testCase.expectedTool) {
+        failures.push({ text: testCase.text, expected: testCase.expectedTool, got: firstAction });
+      }
     }
+    expect(failures).toEqual([]);
   }, 300_000);
 });

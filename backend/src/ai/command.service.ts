@@ -1,3 +1,4 @@
+import { randomUUID } from 'crypto';
 import { prisma } from '@/config/database';
 import logger from '@/utils/logger';
 import { AppError, NotFoundError, ConflictError } from '@/utils/errors';
@@ -28,6 +29,8 @@ export interface CommandInput {
   text: string;
   uiContext?: UIContext;
   conversationId?: string;
+  /** Reply language for the assistant text ("en" | "sw"; omit for auto). */
+  language?: string;
 }
 
 export interface ProposedActionView {
@@ -40,16 +43,34 @@ export interface ProposedActionView {
   undoWindowSeconds?: number;
 }
 
+export interface PlanStepView {
+  actionId: string;
+  tool: string;
+  label: string;
+  args: Record<string, unknown>;
+  summary: string;
+  risk: 'low' | 'high';
+  undoWindowSeconds?: number;
+}
+
+export interface PlanView {
+  id: string;
+  title: string;
+  steps: PlanStepView[];
+}
+
 export type CommandResponse =
   | { kind: 'answer'; reply: string; data?: any; toolUsed: string | null; conversationId: string }
   | { kind: 'clarify'; reply: string; clarification: { question: string; options: Array<{ id: string; label: string }> }; toolUsed: string | null; conversationId: string }
   | { kind: 'proposal'; reply: string; proposal: ProposedActionView; toolUsed: string; conversationId: string }
+  | { kind: 'plan'; reply: string; plan: PlanView; toolUsed: 'plan'; conversationId: string }
   | { kind: 'refused'; reply: string; toolUsed: null; conversationId: string };
 
 type CommandBody =
   | { kind: 'answer'; reply: string; data?: any; toolUsed: string | null }
   | { kind: 'clarify'; reply: string; clarification: { question: string; options: Array<{ id: string; label: string }> }; toolUsed: string | null }
   | { kind: 'proposal'; reply: string; proposal: ProposedActionView; toolUsed: string }
+  | { kind: 'plan'; reply: string; plan: PlanView; toolUsed: 'plan' }
   | { kind: 'refused'; reply: string; toolUsed: null };
 
 const FALLBACK_MAP: Record<string, string> = {
@@ -165,7 +186,9 @@ async function finalize(conversationId: string, userText: string, body: CommandB
   const assistantText =
     response.kind === 'proposal'
       ? `${response.reply} [proposal ${response.proposal.id}]`
-      : response.reply;
+      : response.kind === 'plan'
+        ? `${response.reply} [plan ${response.plan.id}]`
+        : response.reply;
   await appendMessages(conversationId, [
     { role: 'user', content: userText },
     { role: 'assistant', content: assistantText },
@@ -194,16 +217,17 @@ export async function handleCommand(ctx: ToolContext, input: CommandInput): Prom
   }
 
   const withinBudget = await isWithinDailyBudget(ctx.restaurantId).catch(() => false);
-  let selection: { action: string | null; args: Record<string, unknown>; reply: string } = { action: null, args: {}, reply: '' };
+  let selection: { actions: Array<{ action: string; args: Record<string, unknown> }>; reply: string } = { actions: [], reply: '' };
 
   if (withinBudget) {
     try {
-      const result = await openai.selectCommandTool(text, toLlmToolSpecs(allowed), {
+      const result = await openai.selectCommandPlan(text, toLlmToolSpecs(allowed), {
         role: normalizeRole(ctx.role),
         uiContext: input.uiContext as Record<string, unknown> | undefined,
         history,
+        language: input.language,
       });
-      selection = { action: result.action, args: result.args, reply: result.reply };
+      selection = { actions: result.actions, reply: result.reply };
       await recordAiUsage({
         restaurantId: ctx.restaurantId,
         feature: 'COMMAND_SELECT',
@@ -219,120 +243,196 @@ export async function handleCommand(ctx: ToolContext, input: CommandInput): Prom
     const fallback = detectIntent(text);
     const mapped = fallback ? FALLBACK_MAP[fallback] : null;
     if (mapped && allowed.some((t) => t.key === mapped)) {
-      selection = { action: mapped, args: {}, reply: '' };
+      selection = { actions: [{ action: mapped, args: {} }], reply: '' };
     }
   }
 
-  if (!selection.action) {
+  if (selection.actions.length === 0) {
     const reply = selection.reply || (withinBudget ? helpText() : budgetText());
     return finalize(conversationId, text, { kind: 'answer', reply, toolUsed: null });
   }
 
-  const tool = getTool(selection.action);
-  if (!tool) {
-    return finalize(conversationId, text, { kind: 'answer', reply: helpText(), toolUsed: null });
+  // Resolve every step before proposing anything. A plan is all-or-nothing at
+  // proposal time: if any entity is ambiguous, we ask instead of creating a
+  // partial plan.
+  interface PreparedStep {
+    tool: Tool;
+    rawArgs: Record<string, unknown>;
+    args: Record<string, unknown>;
+    preview: { summary: string; before?: Record<string, unknown> };
   }
-  if (!isToolAllowed(ctx.role, tool)) {
-    return finalize(conversationId, text, {
-      kind: 'refused',
-      reply: `That action is not available for your role (${normalizeRole(ctx.role)}).`,
-      toolUsed: null,
-    });
-  }
+  const prepared: PreparedStep[] = [];
 
-  // Validate the model's arguments strictly. Missing/invalid → ask, never guess.
-  const parsed = tool.inputSchema.safeParse(selection.args ?? {});
-  if (!parsed.success) {
-    const issues = parsed.error.issues
-      .map((issue) => `${issue.path.join('.') || 'argument'}: ${issue.message}`)
-      .join('; ');
-    return finalize(conversationId, text, {
-      kind: 'clarify',
-      reply: `I need a bit more detail before I can do that (${issues}).`,
-      clarification: { question: `Please provide: ${issues}`, options: [] },
-      toolUsed: tool.key,
-    });
-  }
-
-  let resolved;
-  try {
-    resolved = await tool.resolve(ctx, parsed.data as Record<string, unknown>);
-  } catch (error) {
-    logger.warn('AI command resolution failed', { tool: tool.key, restaurantId: ctx.restaurantId, error: (error as Error).message });
-    return finalize(conversationId, text, {
-      kind: 'answer',
-      reply: 'I could not resolve that request. Please rephrase it.',
-      toolUsed: tool.key,
-    });
-  }
-
-  if (!resolved.ok) {
-    return finalize(conversationId, text, {
-      kind: 'clarify',
-      reply: resolved.clarification.question,
-      clarification: resolved.clarification,
-      toolUsed: tool.key,
-    });
-  }
-
-  if (tool.kind === 'read') {
-    const result = await tool.run(ctx, resolved.args);
-    const dataText = formatToolData(tool.label, result.data);
-    let reply = result.message || dataText;
-
-    if (withinBudget) {
-      try {
-        const answer = await openai.generateManagerAnswer(text, dataText);
-        reply = answer.reply || reply;
-        await recordAiUsage({
-          restaurantId: ctx.restaurantId,
-          feature: 'COMMAND_ANSWER',
-          provider: providerName(),
-          model: providerForModel(answer.model || openai.MODEL_NAME),
-          promptTokens: answer.usage?.promptTokens || 0,
-          completionTokens: answer.usage?.completionTokens || 0,
-        }).catch(() => undefined);
-      } catch (error) {
-        logger.warn('AI command answer generation failed — returning structured data', { error: (error as Error).message });
-      }
+  for (const step of selection.actions) {
+    const tool = getTool(step.action);
+    if (!tool) {
+      return finalize(conversationId, text, { kind: 'answer', reply: helpText(), toolUsed: null });
+    }
+    if (!isToolAllowed(ctx.role, tool)) {
+      return finalize(conversationId, text, {
+        kind: 'refused',
+        reply: `One of those actions is not available for your role (${normalizeRole(ctx.role)}).`,
+        toolUsed: null,
+      });
+    }
+    if (tool.kind !== 'write' && selection.actions.length > 1) {
+      return finalize(conversationId, text, {
+        kind: 'answer',
+        reply: 'I can combine write actions into one plan. Please ask for that report separately.',
+        toolUsed: tool.key,
+      });
     }
 
-    return finalize(conversationId, text, { kind: 'answer', reply, data: result.data, toolUsed: tool.key });
+    // Validate the model's arguments strictly. Missing/invalid → ask, never guess.
+    const parsed = tool.inputSchema.safeParse(step.args ?? {});
+    if (!parsed.success) {
+      const issues = parsed.error.issues
+        .map((issue) => `${issue.path.join('.') || 'argument'}: ${issue.message}`)
+        .join('; ');
+      return finalize(conversationId, text, {
+        kind: 'clarify',
+        reply: `I need a bit more detail before I can do that (${issues}).`,
+        clarification: { question: `Please provide: ${issues}`, options: [] },
+        toolUsed: tool.key,
+      });
+    }
+
+    let resolved;
+    try {
+      resolved = await tool.resolve(ctx, parsed.data as Record<string, unknown>);
+    } catch (error) {
+      logger.warn('AI command resolution failed', { tool: tool.key, restaurantId: ctx.restaurantId, error: (error as Error).message });
+      return finalize(conversationId, text, {
+        kind: 'answer',
+        reply: 'I could not resolve that request. Please rephrase it.',
+        toolUsed: tool.key,
+      });
+    }
+
+    if (!resolved.ok) {
+      return finalize(conversationId, text, {
+        kind: 'clarify',
+        reply: resolved.clarification.question,
+        clarification: resolved.clarification,
+        toolUsed: tool.key,
+      });
+    }
+
+    prepared.push({
+      tool,
+      rawArgs: parsed.data as Record<string, unknown>,
+      args: resolved.args,
+      preview: { summary: resolved.preview.summary, before: resolved.preview.before },
+    });
   }
 
-  // Write: propose only. Nothing is executed here.
+  // Single step: preserve the original read-answer / single-proposal behavior.
+  if (prepared.length === 1) {
+    const step = prepared[0];
+
+    if (step.tool.kind === 'read') {
+      const result = await step.tool.run(ctx, step.args);
+      const dataText = formatToolData(step.tool.label, result.data);
+      let reply = result.message || dataText;
+
+      if (withinBudget) {
+        try {
+          const answer = await openai.generateManagerAnswer(text, dataText);
+          reply = answer.reply || reply;
+          await recordAiUsage({
+            restaurantId: ctx.restaurantId,
+            feature: 'COMMAND_ANSWER',
+            provider: providerName(),
+            model: providerForModel(answer.model || openai.MODEL_NAME),
+            promptTokens: answer.usage?.promptTokens || 0,
+            completionTokens: answer.usage?.completionTokens || 0,
+          }).catch(() => undefined);
+        } catch (error) {
+          logger.warn('AI command answer generation failed — returning structured data', { error: (error as Error).message });
+        }
+      }
+
+      return finalize(conversationId, text, { kind: 'answer', reply, data: result.data, toolUsed: step.tool.key });
+    }
+
+    // Write: propose only. Nothing is executed here.
+    await assertRestaurantUsable(ctx.restaurantId);
+    const action = await prisma.aiAction.create({
+      data: {
+        restaurantId: ctx.restaurantId,
+        conversationId,
+        tool: step.tool.key,
+        label: step.tool.label,
+        // `args` keeps the raw (validated) arguments so confirmation can
+        // re-resolve entities; `resolvedArgs` is the resolved execution payload.
+        args: serializeForStorage(step.rawArgs) as any,
+        resolvedArgs: serializeForStorage(step.args) as any,
+        summary: step.preview.summary,
+        status: 'PENDING',
+        uiContext: serializeForStorage(input.uiContext),
+        beforeState: serializeForStorage(step.preview.before),
+      },
+    });
+
+    return finalize(conversationId, text, {
+      kind: 'proposal',
+      reply: `I can do that — ${step.preview.summary} Please confirm to apply it.`,
+      toolUsed: step.tool.key,
+      proposal: {
+        id: action.id,
+        tool: step.tool.key,
+        label: step.tool.label,
+        args: step.args,
+        summary: step.preview.summary,
+        risk: step.tool.risk || 'high',
+        undoWindowSeconds: step.tool.compensate ? step.tool.undoWindowSeconds ?? 15 : undefined,
+      },
+    });
+  }
+
+  // Multi-step plan (writes only). Each step is a PENDING AiAction sharing a
+  // workflowId; confirmation executes them in order.
   await assertRestaurantUsable(ctx.restaurantId);
+  const workflowId = randomUUID();
+  const workflowTitle = (selection.reply || 'Multi-step plan').trim().slice(0, 120) || 'Multi-step plan';
+  const planSteps: PlanStepView[] = [];
 
-  const action = await prisma.aiAction.create({
-    data: {
-      restaurantId: ctx.restaurantId,
-      conversationId,
-      tool: tool.key,
-      label: tool.label,
-      // `args` keeps the raw (validated) arguments so confirmation can
-      // re-resolve entities; `resolvedArgs` is the resolved execution payload.
-      args: serializeForStorage(parsed.data) as any,
-      resolvedArgs: serializeForStorage(resolved.args) as any,
-      summary: resolved.preview.summary,
-      status: 'PENDING',
-      uiContext: serializeForStorage(input.uiContext),
-      beforeState: serializeForStorage(resolved.preview.before),
-    },
-  });
+  for (let index = 0; index < prepared.length; index++) {
+    const step = prepared[index];
+    const action = await prisma.aiAction.create({
+      data: {
+        restaurantId: ctx.restaurantId,
+        conversationId,
+        workflowId,
+        stepOrder: index,
+        workflowTitle,
+        tool: step.tool.key,
+        label: step.tool.label,
+        args: serializeForStorage(step.rawArgs) as any,
+        resolvedArgs: serializeForStorage(step.args) as any,
+        summary: step.preview.summary,
+        status: 'PENDING',
+        uiContext: serializeForStorage(input.uiContext),
+        beforeState: serializeForStorage(step.preview.before),
+      },
+    });
+    planSteps.push({
+      actionId: action.id,
+      tool: step.tool.key,
+      label: step.tool.label,
+      args: step.args,
+      summary: step.preview.summary,
+      risk: step.tool.risk || 'high',
+      undoWindowSeconds: step.tool.compensate ? step.tool.undoWindowSeconds ?? 15 : undefined,
+    });
+  }
 
+  const reply = `I can do these ${planSteps.length} steps in order:\n${planSteps.map((s, i) => `${i + 1}. ${s.summary}`).join('\n')}\nPlease confirm to apply them.`;
   return finalize(conversationId, text, {
-    kind: 'proposal',
-    reply: `I can do that — ${resolved.preview.summary} Please confirm to apply it.`,
-    toolUsed: tool.key,
-    proposal: {
-      id: action.id,
-      tool: tool.key,
-      label: tool.label,
-      args: resolved.args,
-      summary: resolved.preview.summary,
-      risk: tool.risk || 'high',
-      undoWindowSeconds: tool.compensate ? tool.undoWindowSeconds ?? 15 : undefined,
-    },
+    kind: 'plan',
+    reply,
+    plan: { id: workflowId, title: workflowTitle, steps: planSteps },
+    toolUsed: 'plan',
   });
 }
 
@@ -346,13 +446,11 @@ function assertActionPending(action: any): void {
   if (action.status === 'EXECUTED') throw new ConflictError('Action already executed', 'Kitendo tayari kimetekelezwa');
   if (action.status === 'REJECTED') throw new ConflictError('Action was rejected', 'Kitendo kilikataliwa');
   if (action.status === 'UNDONE') throw new ConflictError('Action was undone', 'Kitendo kilirudishwa');
+  if (action.status === 'SKIPPED') throw new ConflictError('Action was skipped', 'Kitendo kilirukwa');
   if (action.status !== 'PENDING') throw new ConflictError(`Action cannot be executed from status ${action.status}`, 'Kitendo hakiwezi kutekelezwa');
 }
 
-export async function confirmCommand(ctx: ToolContext, actionId: string): Promise<any> {
-  assertRestaurantContext(ctx);
-  assertCommandAccess(ctx);
-  const action = await loadActionForUpdate(ctx, actionId);
+async function executePendingAction(ctx: ToolContext, action: any): Promise<any> {
   assertActionPending(action);
 
   const tool = getTool(action.tool);
@@ -435,6 +533,13 @@ export async function confirmCommand(ctx: ToolContext, actionId: string): Promis
   };
 }
 
+export async function confirmCommand(ctx: ToolContext, actionId: string): Promise<any> {
+  assertRestaurantContext(ctx);
+  assertCommandAccess(ctx);
+  const action = await loadActionForUpdate(ctx, actionId);
+  return executePendingAction(ctx, action);
+}
+
 export async function rejectCommand(ctx: ToolContext, actionId: string): Promise<void> {
   assertRestaurantContext(ctx);
   assertCommandAccess(ctx);
@@ -449,11 +554,7 @@ export async function rejectCommand(ctx: ToolContext, actionId: string): Promise
   }
 }
 
-export async function undoCommand(ctx: ToolContext, actionId: string): Promise<any> {
-  assertRestaurantContext(ctx);
-  assertCommandAccess(ctx);
-  const action = await loadActionForUpdate(ctx, actionId);
-
+async function undoExecutedAction(ctx: ToolContext, action: any): Promise<any> {
   if (action.status !== 'EXECUTED') {
     throw new ConflictError('Only executed actions can be undone', 'Vitendo vilivyotekelezwa pekee vinaweza kurudishwa');
   }
@@ -492,6 +593,167 @@ export async function undoCommand(ctx: ToolContext, actionId: string): Promise<a
   return { actionId: action.id, status: 'UNDONE', message: result.message || 'Undone.', data: result.data };
 }
 
+export async function undoCommand(ctx: ToolContext, actionId: string): Promise<any> {
+  assertRestaurantContext(ctx);
+  assertCommandAccess(ctx);
+  const action = await loadActionForUpdate(ctx, actionId);
+  return undoExecutedAction(ctx, action);
+}
+
+// ── Multi-step plans (Phase D) ──
+
+export async function confirmWorkflow(ctx: ToolContext, workflowId: string): Promise<any> {
+  assertRestaurantContext(ctx);
+  assertCommandAccess(ctx);
+
+  const actions = await prisma.aiAction.findMany({
+    where: { restaurantId: ctx.restaurantId, workflowId },
+    orderBy: { stepOrder: 'asc' },
+  });
+  if (actions.length === 0) {
+    throw new NotFoundError('Plan not found', 'Mpango haukupatikana');
+  }
+
+  const steps: any[] = [];
+  let failed = false;
+
+  for (const action of actions) {
+    if (failed) {
+      if (action.status === 'PENDING') {
+        await prisma.aiAction.update({
+          where: { id: action.id },
+          data: {
+            status: 'SKIPPED',
+            executedById: ctx.userId,
+            executedAt: new Date(),
+            result: { error: 'Skipped because an earlier step failed' } as any,
+          },
+        });
+        steps.push({ actionId: action.id, tool: action.tool, summary: action.summary, status: 'SKIPPED' });
+      }
+      continue;
+    }
+
+    if (action.status !== 'PENDING') {
+      steps.push({ actionId: action.id, tool: action.tool, summary: action.summary, status: action.status });
+      continue;
+    }
+
+    try {
+      const result = await executePendingAction(ctx, action);
+      steps.push({
+        actionId: action.id,
+        tool: action.tool,
+        summary: action.summary,
+        status: 'EXECUTED',
+        message: result.message,
+        undoUntil: result.undoUntil,
+      });
+    } catch (error) {
+      failed = true;
+      steps.push({
+        actionId: action.id,
+        tool: action.tool,
+        summary: action.summary,
+        status: 'FAILED',
+        message: (error as Error).message,
+      });
+    }
+  }
+
+  const executed = steps.filter((step) => step.status === 'EXECUTED').length;
+  const status = failed ? (executed > 0 ? 'PARTIAL' : 'FAILED') : 'COMPLETED';
+
+  if (actions[0]?.conversationId) {
+    await appendMessages(actions[0].conversationId, [
+      { role: 'assistant', content: `Plan ${status.toLowerCase()}: ${executed}/${steps.length} step(s) applied.` },
+    ]);
+  }
+
+  return { workflowId, status, steps };
+}
+
+export async function cancelWorkflow(ctx: ToolContext, workflowId: string): Promise<any> {
+  assertRestaurantContext(ctx);
+  assertCommandAccess(ctx);
+
+  const actions = await prisma.aiAction.findMany({
+    where: { restaurantId: ctx.restaurantId, workflowId },
+    select: { id: true, status: true, conversationId: true },
+  });
+  if (actions.length === 0) {
+    throw new NotFoundError('Plan not found', 'Mpango haukupatikana');
+  }
+
+  const pending = actions.filter((action) => action.status === 'PENDING');
+  if (pending.length > 0) {
+    await prisma.aiAction.updateMany({
+      where: { restaurantId: ctx.restaurantId, workflowId, status: 'PENDING' },
+      data: { status: 'SKIPPED', executedById: ctx.userId, executedAt: new Date() },
+    });
+  }
+
+  if (actions[0]?.conversationId) {
+    await appendMessages(actions[0].conversationId, [{ role: 'assistant', content: `Cancelled ${pending.length} pending step(s).` }]);
+  }
+
+  return { workflowId, status: 'CANCELLED', cancelled: pending.length };
+}
+
+export async function undoWorkflow(ctx: ToolContext, workflowId: string): Promise<any> {
+  assertRestaurantContext(ctx);
+  assertCommandAccess(ctx);
+
+  const actions = await prisma.aiAction.findMany({
+    where: { restaurantId: ctx.restaurantId, workflowId, status: 'EXECUTED' },
+    orderBy: { stepOrder: 'desc' },
+  });
+  if (actions.length === 0) {
+    throw new ConflictError('No executed steps to undo', 'Hakuna hatua zilizotekelezwa za kurudisha');
+  }
+
+  const steps: any[] = [];
+  let failed = false;
+  for (const action of actions) {
+    try {
+      const result = await undoExecutedAction(ctx, action);
+      steps.push({ actionId: action.id, tool: action.tool, summary: action.summary, status: 'UNDONE', message: result.message });
+    } catch (error) {
+      failed = true;
+      steps.push({ actionId: action.id, tool: action.tool, summary: action.summary, status: 'FAILED', message: (error as Error).message });
+    }
+  }
+
+  return { workflowId, status: failed ? 'PARTIAL' : 'UNDONE', steps };
+}
+
+export async function getWorkflow(ctx: ToolContext, workflowId: string): Promise<any> {
+  assertRestaurantContext(ctx);
+  assertCommandAccess(ctx);
+
+  const actions = await prisma.aiAction.findMany({
+    where: { restaurantId: ctx.restaurantId, workflowId },
+    orderBy: { stepOrder: 'asc' },
+  });
+  if (actions.length === 0) {
+    throw new NotFoundError('Plan not found', 'Mpango haukupatikana');
+  }
+
+  return {
+    id: workflowId,
+    title: actions[0].workflowTitle || 'Multi-step plan',
+    steps: actions.map((action) => ({
+      actionId: action.id,
+      tool: action.tool,
+      label: action.label,
+      summary: action.summary,
+      status: action.status,
+      undoUntil: action.undoExpiresAt,
+      executedAt: action.executedAt,
+    })),
+  };
+}
+
 export async function getConversation(ctx: ToolContext, conversationId: string): Promise<any> {
   assertRestaurantContext(ctx);
   assertCommandAccess(ctx);
@@ -503,4 +765,14 @@ export async function getConversation(ctx: ToolContext, conversationId: string):
   return conversation;
 }
 
-export default { handleCommand, confirmCommand, rejectCommand, undoCommand, getConversation };
+export default {
+  handleCommand,
+  confirmCommand,
+  rejectCommand,
+  undoCommand,
+  confirmWorkflow,
+  cancelWorkflow,
+  undoWorkflow,
+  getWorkflow,
+  getConversation,
+};

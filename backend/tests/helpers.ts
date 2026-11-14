@@ -349,6 +349,7 @@ jest.mock('../src/config/database', () => {
       findMany: jest.fn().mockResolvedValue([]),
       create: jest.fn(),
       update: jest.fn(),
+      updateMany: jest.fn().mockResolvedValue({ count: 0 }),
     },
     notification: {
       findMany: jest.fn(),

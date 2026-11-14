@@ -277,7 +277,7 @@ export const writeTools: Tool[] = [
   {
     key: 'update_order_status',
     label: 'Update order status',
-    description: 'Advance an active order: confirm, start preparing, mark ready, or mark served. Do not use for cancellation (that requires a manager on the POS).',
+    description: 'Write: advance an active order — confirm, start preparing, mark ready, or mark served. Use for "mark ... ready/served", "start preparing", "confirm order". Do not use for cancellation (that requires a manager on the POS).',
     kind: 'write',
     risk: 'high',
     roles: ['owner', 'manager', 'cashier', 'waiter', 'kitchen', 'super_admin'],
@@ -350,7 +350,7 @@ export const writeTools: Tool[] = [
   {
     key: 'assign_waiter',
     label: 'Assign waiter to order',
-    description: 'Assign an active order to a waiter (or reassign it). Use full or partial waiter name.',
+    description: 'Write: assign or reassign an active order to a waiter. Use for "assign/move this order to waiter X" or "reassign table 6 to Brian". Use full or partial waiter name.',
     kind: 'write',
     risk: 'low',
     roles: ['owner', 'manager', 'super_admin'],
@@ -406,7 +406,7 @@ export const writeTools: Tool[] = [
   {
     key: 'transfer_table',
     label: 'Transfer order to another table',
-    description: 'Move an active order from its current table to a free table. Do not use if the target table is occupied, reserved or unavailable.',
+    description: 'Write: move/transfer an active order (or a table\'s order) to a different free table. Use for requests like "move order ORD-1234 from table 2 to table 8" or "transfer table 4\'s order to table 9". Do not use a read-only table tool for this.',
     kind: 'write',
     risk: 'high',
     roles: ['owner', 'manager', 'waiter', 'super_admin'],

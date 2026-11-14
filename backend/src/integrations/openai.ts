@@ -204,6 +204,108 @@ export async function selectCommandTool(
   }, { action: null, args: {}, reply: '', usage: { promptTokens: 0, completionTokens: 0 } });
 }
 
+export interface CommandPlanSelection {
+  actions: Array<{ action: string; args: Record<string, unknown> }>;
+  reply: string;
+  usage?: { promptTokens: number; completionTokens: number };
+}
+
+/**
+ * Multi-step planner (Phase D).
+ *
+ * Returns **one or more** tool calls for a single instruction. The model is
+ * instructed to use multiple tools ONLY when the request genuinely requires
+ * separate operations; a single-intent request must return exactly one.
+ *
+ * The server still validates every step, resolves entities and requires an
+ * explicit confirmation. Nothing here executes.
+ */
+export async function selectCommandPlan(
+  text: string,
+  tools: CommandToolSpec[],
+  context: {
+    role?: string;
+    uiContext?: Record<string, unknown>;
+    history?: Array<{ role: string; content: string }>;
+    language?: string;
+    maxSteps?: number;
+  } = {}
+): Promise<CommandPlanSelection> {
+  return withRetry(async () => {
+    const client = getClient();
+    const toolSpecs = tools.map((t) => ({
+      type: 'function' as const,
+      function: { name: t.key, description: t.description, parameters: t.jsonSchema },
+    }));
+
+    const maxSteps = Math.max(1, Math.min(context.maxSteps ?? (Number(process.env.AI_COMMAND_MAX_STEPS) || 4), 6));
+    const languageLine =
+      context.language === 'sw'
+        ? 'Write the reply in Kiswahili.'
+        : context.language === 'en'
+          ? 'Write the reply in English.'
+          : "Write the reply in the operator's language (English or Kiswahili).";
+
+    const contextLines: string[] = [];
+    if (context.role) contextLines.push(`Operator role: ${context.role}`);
+    if (context.uiContext && Object.keys(context.uiContext).length > 0) {
+      contextLines.push(`Current screen context (a hint only): ${JSON.stringify(context.uiContext).slice(0, 500)}`);
+    }
+    const historyText = (context.history || [])
+      .slice(-6)
+      .map((m) => `${m.role}: ${m.content}`)
+      .join('\n');
+
+    const response = await client.chat.completions.create({
+      model: AI_MODEL,
+      messages: [
+        {
+          role: 'system',
+          content:
+            'You are Menu Moja Command, a restaurant operations planner. ' +
+            `Return ONE tool call for a single operation, or up to ${maxSteps} tool calls ONLY when the instruction genuinely requires multiple separate operations (e.g. two different menu changes, or an update plus a restock). ` +
+            'Rules: (1) Never invent menu items, staff, tables, orders or IDs — pass human names exactly as the operator said them. ' +
+            '(2) If an entity is ambiguous, still pass the name as spoken; the server will ask for clarification. Never pick arbitrarily. ' +
+            '(3) Never call destructive or financial tools that are not offered. (4) If no tool fits, call none and ask one short clarifying question. ' +
+            '(5) Fill every required argument; prices are KES. Do not change the meaning of the instruction. ' +
+            '(6) Do not repeat the same tool call twice. ' +
+            '(7) If the operator asks to change, move, transfer, assign, set, mark, restock, 86 or hide something, you MUST choose the corresponding WRITE tool — never a read-only tool. ' +
+            '(8) Read-only tools are for questions only. Do not answer a change request with a read tool. ' +
+            languageLine +
+            (contextLines.length ? `\n${contextLines.join('\n')}` : ''),
+        },
+        ...(historyText ? [{ role: 'system' as const, content: `Recent conversation:\n${historyText}` }] : []),
+        { role: 'user', content: text },
+      ],
+      tools: toolSpecs,
+      tool_choice: 'auto',
+      max_tokens: 600,
+      temperature: 0.1,
+    });
+
+    const choice = response.choices[0]?.message;
+    const toolCalls = (choice?.tool_calls || []).slice(0, maxSteps);
+    const actions = toolCalls.map((toolCall) => {
+      let args: Record<string, unknown> = {};
+      try {
+        args = JSON.parse(toolCall.function.arguments || '{}');
+      } catch {
+        args = {};
+      }
+      return { action: toolCall.function.name, args };
+    });
+
+    return {
+      actions,
+      reply: choice?.content || '',
+      usage: {
+        promptTokens: response.usage?.prompt_tokens || 0,
+        completionTokens: response.usage?.completion_tokens || 0,
+      },
+    };
+  }, { actions: [], reply: '', usage: { promptTokens: 0, completionTokens: 0 } });
+}
+
 const AI_BASE_URL = config.aiProvider === 'deepseek' ? 'https://api.deepseek.com/v1' : undefined;
 
 function getClient(): OpenAI {

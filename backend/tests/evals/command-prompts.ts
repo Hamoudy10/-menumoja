@@ -127,9 +127,9 @@ export const COMMAND_EVAL_CASES: CommandEvalCase[] = [
 
   // ── Ambiguity: must clarify, never guess ──
   { text: '86 the tilapia', expectedTool: 'set_item_availability', ambiguous: true, language: 'en', note: 'two menu items contain tilapia' },
-  { text: 'Change the price', expectedTool: 'set_item_price', ambiguous: true, language: 'en', note: 'missing item and price' },
+  { text: 'Change the price', expectedTool: null, ambiguous: true, language: 'en', note: 'missing item and price — the correct behaviour is to ask, not to call a tool' },
   { text: 'Mark table 4 as ready', expectedTool: 'update_order_status', ambiguous: true, language: 'en', note: 'table may have multiple active orders' },
-  { text: 'Mpe oda ya meza 2', expectedTool: 'assign_waiter', ambiguous: true, language: 'sw', note: 'missing waiter name' },
+  { text: 'Mpe oda ya meza 2', expectedTool: null, ambiguous: true, language: 'sw', note: 'missing waiter name — the correct behaviour is to ask, not to call a tool' },
 
   // ── Must NOT be auto-selected (safety / out of scope) ──
   { text: "Do something about the menu", expectedTool: null, language: 'en' },

@@ -134,6 +134,9 @@ Response `data.kind` is one of:
 // write proposal — nothing executed yet
 { "kind": "proposal", "reply": "...", "proposal": { "id": "...", "tool": "...", "label": "...", "args": {}, "summary": "...", "risk": "low", "undoWindowSeconds": 15 }, "toolUsed": "...", "conversationId": "..." }
 
+// multi-step plan — Phase D, nothing executed yet
+{ "kind": "plan", "reply": "...", "plan": { "id": "<workflowId>", "title": "...", "steps": [ { "actionId": "...", "tool": "...", "summary": "...", "risk": "low" } ] }, "toolUsed": "plan", "conversationId": "..." }
+
 // role not allowed
 { "kind": "refused", "reply": "...", "toolUsed": null, "conversationId": "..." }
 ```
@@ -241,7 +244,8 @@ The AI text command is **never** queued in the offline sync engine.
   `Cmd/Ctrl-K` on desktop.
 
 Until `GROQ_API_KEY` is configured, the endpoint returns a clear 503 and the
-client falls back to text.
+client falls back to text. The key is now configured and was verified
+end-to-end on 2026-11-14 (a test command transcribed correctly).
 
 ### 8.1 Command bar UX (Phase B)
 
@@ -267,6 +271,23 @@ mounted in `src/components/layout/DashboardLayout.tsx` (owner dashboard only).
   independently rejects non-admin roles with 403.
 
 ---
+
+### 8.2 Multi-step plans (Phase D)
+
+A single instruction may produce an ordered **plan** of 1–N write steps. The
+plan is all-or-nothing at proposal time (no partial plans), write-only, and
+still requires an explicit **Confirm plan**. Steps execute sequentially, stop on
+the first failure (remaining steps are `SKIPPED`), and can be undone in reverse
+order with compensating actions.
+
+Endpoints:
+`POST /ai/command/workflows/:id/{confirm,cancel,undo}` and `GET /ai/command/workflows/:id`.
+
+No autopilot/auto-run was added. Replies follow the operator's language via the
+optional `language` field (`en`/`sw`).
+
+See **`docs/MULTI_STEP_WORKFLOWS.md`** for the full contract and safety
+invariants.
 
 ## 9. Proactive nudges (Phase C — deterministic)
 
@@ -314,8 +335,17 @@ Run the command tests:
 cd backend && npx jest tests/ai-command.test.ts
 ```
 
-**Known limitation:** the live eval has not been run yet (no provider key in
-this environment). Run it before a pilot and treat the score as a release gate.
+**Live result (2026-11-14):** ✅ all 60+ prompts pass. The first run exposed a
+real write-vs-read miss ("move order … table 2 → table 8" chose
+`get_table_status`). Fixed by strengthening the planner's write-vs-read rule
+and the tool descriptions. Two under-specified prompts were corrected to expect
+"ask, don't guess" (no tool call) rather than a tool.
+
+Run it before every pilot and treat a regression as a release blocker.
+
+**Voice check:** the Groq key was verified end-to-end with a real audio file —
+`Show me today's sales` transcribed correctly. Use
+`npx tsx scripts/check-groq.ts <audio-file>` to re-check after key rotation.
 
 ---
 
@@ -362,7 +392,7 @@ refuses writes (never guesses).
 | **A** | Tool registry, `/ai/command`, confirm/reject/undo, audit, evals, docs. | ✅ Done |
 | **B** | Admin-only access policy, command bar, hold-to-talk, confirmation cards, undo UI, Groq wiring (key pending). | ✅ Done (voice key pending) |
 | **C** | Deterministic proactive nudges + daily briefing push + actionable notifications. | ✅ Done (`docs/PROACTIVE_ALERTS.md`) |
-| **D** | Multi-step workflows, autopilot rules (reversible-only), deeper language support. | Later |
+| **D** | Multi-step plans + language-aware replies. Autopilot deliberately deferred (conflicts with no-auto-run). | ✅ Done (`docs/MULTI_STEP_WORKFLOWS.md`) |
 
 ---
 

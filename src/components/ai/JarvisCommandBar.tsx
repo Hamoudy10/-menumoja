@@ -1,8 +1,9 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { useLocation } from 'react-router-dom'
+import { useTranslation } from 'react-i18next'
 import { AnimatePresence, motion } from 'framer-motion'
 import {
-  Sparkles, X, Send, Mic, Loader2, Check, XCircle, Undo2, ShieldAlert, Bot,
+  Sparkles, X, Send, Mic, Loader2, Check, XCircle, Undo2, ShieldAlert, Bot, ListChecks,
 } from 'lucide-react'
 import * as commandApi from '@/api/command'
 import { showErrorToast, showInfoToast } from '@/components/ui/Toast'
@@ -21,16 +22,20 @@ import { showErrorToast, showInfoToast } from '@/components/ui/Toast'
  */
 
 type ProposalState = 'pending' | 'executing' | 'done' | 'rejected' | 'failed'
+type PlanState = 'pending' | 'executing' | 'done' | 'partial' | 'failed' | 'cancelled' | 'undone'
 
 interface ChatMessage {
   id: string
   role: 'user' | 'assistant'
   text: string
-  kind?: 'answer' | 'clarify' | 'proposal' | 'refused' | 'error'
+  kind?: 'answer' | 'clarify' | 'proposal' | 'plan' | 'refused' | 'error'
   data?: any
   options?: Array<{ id: string; label: string }>
   proposal?: commandApi.CommandProposal
   proposalState?: ProposalState
+  plan?: commandApi.CommandPlan
+  planState?: PlanState
+  planSteps?: commandApi.WorkflowStepResult[]
   undoUntil?: string
 }
 
@@ -50,6 +55,8 @@ function errorMessage(error: any, fallback: string): string {
 
 export default function JarvisCommandBar() {
   const location = useLocation()
+  const { i18n } = useTranslation()
+  const replyLanguage: 'en' | 'sw' = String(i18n.language || '').startsWith('sw') ? 'sw' : 'en'
   const [open, setOpen] = useState(false)
   const [messages, setMessages] = useState<ChatMessage[]>([])
   const [input, setInput] = useState('')
@@ -121,6 +128,7 @@ export default function JarvisCommandBar() {
         const result = await commandApi.sendCommand(trimmed, {
           conversationId,
           uiContext: { route: location.pathname },
+          language: replyLanguage,
         })
         if (result.conversationId) setConversationId(result.conversationId)
 
@@ -135,6 +143,15 @@ export default function JarvisCommandBar() {
             kind: 'clarify',
             text: result.clarification.question || result.reply,
             options: result.clarification.options,
+          })
+        } else if (result.kind === 'plan') {
+          push({
+            id: uid(),
+            role: 'assistant',
+            kind: 'plan',
+            text: result.reply,
+            plan: result.plan,
+            planState: 'pending',
           })
         } else {
           push({
@@ -157,7 +174,7 @@ export default function JarvisCommandBar() {
         setSending(false)
       }
     },
-    [conversationId, location.pathname, push, sending]
+    [conversationId, location.pathname, push, replyLanguage, sending]
   )
 
   // Proactive notifications can launch a command (e.g. "Review with Jarvis").
@@ -214,6 +231,47 @@ export default function JarvisCommandBar() {
       patch(message.id, { text: result?.message || 'Undone.', undoUntil: undefined })
     } catch (error: any) {
       patch(message.id, { undoUntil: undefined, text: errorMessage(error, 'The undo window has passed.') })
+    }
+  }
+
+  const confirmPlan = async (message: ChatMessage) => {
+    if (!message.plan) return
+    patch(message.id, { planState: 'executing' })
+    try {
+      const result: any = await commandApi.confirmWorkflow(message.plan.id)
+      const state: PlanState =
+        result?.status === 'COMPLETED' ? 'done' : result?.status === 'PARTIAL' ? 'partial' : 'failed'
+      patch(message.id, {
+        planState: state,
+        planSteps: result?.steps || [],
+        text: `Plan ${String(result?.status || '').toLowerCase()}: ${(result?.steps || []).filter((s: any) => s.status === 'EXECUTED').length}/${(result?.steps || []).length} step(s) applied.`,
+      })
+    } catch (error: any) {
+      patch(message.id, { planState: 'failed', text: errorMessage(error, 'Could not apply this plan.') })
+    }
+  }
+
+  const cancelPlan = async (message: ChatMessage) => {
+    if (!message.plan) return
+    patch(message.id, { planState: 'cancelled', text: 'Plan cancelled — no steps were applied.' })
+    try {
+      await commandApi.cancelWorkflow(message.plan.id)
+    } catch {
+      /* already reflected in the UI */
+    }
+  }
+
+  const undoPlan = async (message: ChatMessage) => {
+    if (!message.plan) return
+    try {
+      const result: any = await commandApi.undoWorkflow(message.plan.id)
+      patch(message.id, {
+        planState: result?.status === 'PARTIAL' ? 'partial' : 'undone',
+        planSteps: result?.steps || message.planSteps,
+        text: result?.status === 'PARTIAL' ? 'Some steps could not be undone (window expired).' : 'Plan reversed.',
+      })
+    } catch (error: any) {
+      patch(message.id, { text: errorMessage(error, 'The undo window has passed.') })
     }
   }
 
@@ -300,6 +358,104 @@ export default function JarvisCommandBar() {
   }, [])
 
   const renderAssistant = (message: ChatMessage) => {
+    if (message.kind === 'plan' && message.plan) {
+      const state = message.planState || 'pending'
+      const results = new Map((message.planSteps || []).map((step) => [step.actionId, step]))
+      const canUndo =
+        (state === 'done' || state === 'partial') &&
+        (message.planSteps || []).some((step) => step.status === 'EXECUTED')
+
+      return (
+        <div key={message.id} className="space-y-2">
+          <div className="rounded-2xl border border-secondary/30 bg-secondary/5 p-3 dark:border-secondary/40 dark:bg-secondary/10">
+            <div className="mb-2 flex items-center gap-1.5 text-[10px] font-accent font-semibold uppercase tracking-wide text-secondary">
+              <ListChecks className="h-3.5 w-3.5" /> Plan · {message.plan.steps.length} steps
+            </div>
+            <p className="font-body text-sm font-medium text-text-primary dark:text-white">{message.plan.title}</p>
+
+            <ol className="mt-2 space-y-2">
+              {message.plan.steps.map((step, index) => {
+                const result = results.get(step.actionId)
+                return (
+                  <li key={step.actionId} className="flex items-start gap-2">
+                    <span className="mt-0.5 flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-black/5 text-[10px] font-bold text-text-secondary dark:bg-white/10 dark:text-white/60">
+                      {index + 1}
+                    </span>
+                    <div className="min-w-0 flex-1">
+                      <p className="font-body text-xs text-text-primary dark:text-white/90">{step.summary}</p>
+                      {result && (
+                        <p
+                          className={`mt-0.5 text-[10px] font-accent ${
+                            result.status === 'EXECUTED'
+                              ? 'text-success'
+                              : result.status === 'FAILED'
+                                ? 'text-danger'
+                                : 'text-text-secondary dark:text-white/40'
+                          }`}
+                        >
+                          {result.status}
+                          {result.message ? ` — ${result.message}` : ''}
+                        </p>
+                      )}
+                    </div>
+                    <span className="shrink-0 rounded-full bg-black/5 px-1.5 py-0.5 text-[9px] font-accent uppercase text-text-secondary dark:bg-white/10 dark:text-white/50">
+                      {step.risk}
+                    </span>
+                  </li>
+                )
+              })}
+            </ol>
+
+            {state === 'pending' && (
+              <div className="mt-3 flex gap-2">
+                <button
+                  onClick={() => void confirmPlan(message)}
+                  className="flex flex-1 items-center justify-center gap-1.5 rounded-xl bg-secondary px-3 py-2 text-xs font-accent font-semibold text-white hover:bg-secondary-dark"
+                >
+                  <Check className="h-3.5 w-3.5" /> Confirm plan
+                </button>
+                <button
+                  onClick={() => void cancelPlan(message)}
+                  className="flex flex-1 items-center justify-center gap-1.5 rounded-xl border border-black/10 px-3 py-2 text-xs font-accent font-medium text-text-secondary hover:bg-black/5 dark:border-white/10 dark:text-white/70 dark:hover:bg-white/10"
+                >
+                  <XCircle className="h-3.5 w-3.5" /> Cancel
+                </button>
+              </div>
+            )}
+
+            {state === 'executing' && (
+              <p className="mt-3 flex items-center gap-2 text-xs text-text-secondary dark:text-white/60">
+                <Loader2 className="h-3.5 w-3.5 animate-spin" /> Applying plan…
+              </p>
+            )}
+
+            {state !== 'pending' && state !== 'executing' && (
+              <p
+                className={`mt-2 text-sm ${
+                  state === 'done' || state === 'undone'
+                    ? 'text-success'
+                    : state === 'failed'
+                      ? 'text-danger'
+                      : 'text-amber-600 dark:text-amber-400'
+                }`}
+              >
+                {message.text}
+              </p>
+            )}
+
+            {canUndo && (
+              <button
+                onClick={() => void undoPlan(message)}
+                className="mt-2 flex items-center gap-1.5 rounded-lg bg-black/5 px-2.5 py-1.5 text-xs font-accent font-medium text-text-secondary hover:bg-black/10 dark:bg-white/10 dark:text-white/70 dark:hover:bg-white/20"
+              >
+                <Undo2 className="h-3.5 w-3.5" /> Undo plan
+              </button>
+            )}
+          </div>
+        </div>
+      )
+    }
+
     if (message.kind === 'proposal' && message.proposal) {
       const state = message.proposalState || 'pending'
       const undoRemaining = message.undoUntil ? Math.max(0, Math.ceil((new Date(message.undoUntil).getTime() - now) / 1000)) : 0
