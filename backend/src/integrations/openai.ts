@@ -334,6 +334,51 @@ export async function selectCommandPlan(
   }, { actions: [], reply: '', usage: { promptTokens: 0, completionTokens: 0 } });
 }
 
+/**
+ * Grounded product/help answer with citations. Used only for knowledge-base
+ * results; business data answers still use `generateManagerAnswer`.
+ */
+export async function generateKnowledgeAnswer(
+  question: string,
+  results: Array<{ title: string; source: string; content: string }>
+): Promise<{ reply: string; model: string; usage?: { promptTokens: number; completionTokens: number } }> {
+  const excerpts = results
+    .map((result, index) => `[${index + 1}] ${result.title} (${result.source})\n${result.content}`)
+    .join('\n\n');
+
+  return withRetry(async () => {
+    const client = getClient();
+    const response = await client.chat.completions.create({
+      model: AI_MODEL,
+      messages: [
+        {
+          role: 'system',
+          content:
+            'You are Menu Moja Help, a product support assistant. Answer using ONLY the knowledge excerpts. ' +
+            'Cite sources inline as [1], [2] using the excerpt numbers. If the excerpts do not contain the answer, ' +
+            'say so and suggest contacting support. Be concise, use short markdown, and never invent steps, prices or policies.',
+        },
+        { role: 'user', content: `QUESTION: ${question}\n\nEXCERPTS:\n${excerpts || '(none)'}` },
+      ],
+      max_tokens: 600,
+      temperature: 0.2,
+    });
+
+    return {
+      reply: response.choices[0]?.message?.content || 'I could not produce an answer right now.',
+      model: AI_MODEL,
+      usage: {
+        promptTokens: response.usage?.prompt_tokens || 0,
+        completionTokens: response.usage?.completion_tokens || 0,
+      },
+    };
+  }, {
+    reply: 'I found related documentation below. Please review the sources.',
+    model: AI_MODEL,
+    usage: { promptTokens: 0, completionTokens: 0 },
+  });
+}
+
 const AI_BASE_URL = config.aiProvider === 'deepseek' ? 'https://api.deepseek.com/v1' : undefined;
 
 function getClient(): OpenAI {

@@ -535,6 +535,35 @@ function Settings({ data }: { data: any }) {
   )
 }
 
+function KnowledgeResults({ data }: { data: any }) {
+  const results = Array.isArray(data?.results) ? data.results : []
+  return (
+    <Card>
+      <div className="mb-2 flex items-center justify-between">
+        <p className="text-[10px] font-accent uppercase tracking-wide text-text-secondary dark:text-white/40">Knowledge</p>
+        <span className="text-[10px] font-accent text-text-secondary dark:text-white/50">{results.length} source(s)</span>
+      </div>
+      {results.length === 0 ? (
+        <p className="text-xs text-text-secondary dark:text-white/50">No matching documentation.</p>
+      ) : (
+        <ul className="space-y-2">
+          {results.map((result: any, index: number) => (
+            <li key={index} className="text-xs">
+              <p className="font-medium text-text-primary dark:text-white/90">
+                [{index + 1}] {result.title}
+                <span className="text-text-secondary dark:text-white/50"> · {result.source}</span>
+              </p>
+              <p className="mt-0.5 line-clamp-3 whitespace-pre-wrap text-text-secondary dark:text-white/50">
+                {result.content}
+              </p>
+            </li>
+          ))}
+        </ul>
+      )}
+    </Card>
+  )
+}
+
 function MultiResults({ data }: { data: any }) {
   const results = Array.isArray(data?.results) ? data.results : []
   return (
@@ -588,6 +617,8 @@ export default function DataSummary({ tool, data }: { tool?: string | null; data
       return <StaffShifts data={data} />
     case 'get_settings':
       return <Settings data={data} />
+    case 'search_knowledge':
+      return <KnowledgeResults data={data} />
     case 'multi':
       return <MultiResults data={data} />
     default:

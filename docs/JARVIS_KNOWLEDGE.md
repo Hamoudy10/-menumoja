@@ -15,7 +15,7 @@ a prompt. It is a combination of:
 | Live business data | **Tools** (tenant-scoped queries) | Fresh, authorized, no hallucinated numbers |
 | Routing knowledge | **System map** in the planner prompt | The model knows which domain/tool to use |
 | Definitions | **Glossary** in the planner prompt | Consistent revenue/AOV/margin/open-order meanings |
-| Product knowledge | **RAG** over docs/FAQs (next) | Too large for a prompt; changes rarely |
+| Product knowledge | **RAG** — `search_knowledge` (lexical FTS + citations) | Too large for a prompt; changes rarely |
 | Context | JWT role/tenant + `uiContext` | Correct scope and screen awareness |
 | Memory | `AiConversation` history | Follow-ups and clarifications |
 | Quality | **Evals** (86+ prompts) + feedback | Catches routing regressions |
@@ -47,6 +47,7 @@ The model never sees the database directly and never executes SQL.
 | Analytics | `get_profitability` | Net sales, COGS, contribution, margin |
 | Briefing | `get_daily_briefing` | Deterministic yesterday briefing |
 | Settings | `get_settings` | Non-secret payment/tax/language settings |
+| Help | `search_knowledge` | Product docs + restaurant FAQs, with citations |
 
 Write tools (7): availability, special, price, restock, order status, assign
 waiter, transfer table. All still require explicit confirmation.
@@ -113,14 +114,14 @@ numbers.
 
 ---
 
-## 7. Next (E2–E3)
+## 7. E2/E3 status and next steps
 
-- **E2 — Product knowledge RAG:** index `docs/` + FAQs with Supabase
-  `pgvector`; retrieve 3–5 chunks with citations for “how do I…” questions.
-  Structured business data stays on tools.
-- **E3 — Learning loop:** 👍/👎 feedback, log failed/misrouted prompts, and add
-  them to the eval set. Add per-domain eval suites.
-- **E4 — Polish:** suggested follow-ups, richer cards, optional manager access
-  (currently owner/super-admin only).
-- **Cost control:** the tool list is now 26; if prompt cost grows, add a cheap
+- **E2 — Product knowledge RAG: ✅ implemented.** Lexical retrieval over
+  curated `docs/` + restaurant FAQs, with citations. See `docs/KNOWLEDGE_BASE.md`.
+  (pgvector embeddings can be added later as a hybrid ranker.)
+- **E3 — Learning loop: ✅ implemented.** 👍/👎 feedback from the command panel,
+  tenant-scoped feedback storage, and a super-admin feedback list.
+- **E4 — Polish (next):** suggested follow-ups, richer cards, optional manager
+  access, and a “most failed questions” report from feedback.
+- **Cost control:** the tool list is now 27; if prompt cost grows, add a cheap
   domain pre-filter before function calling.

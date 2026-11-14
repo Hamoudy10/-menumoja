@@ -80,6 +80,13 @@ export const cancelWorkflow = (workflowId: string) =>
 export const undoWorkflow = (workflowId: string) =>
   api.post(`/ai/command/workflows/${workflowId}/undo`).then(unwrap)
 
+export const sendFeedback = (data: {
+  conversationId?: string
+  tool?: string
+  rating: 'up' | 'down'
+  comment?: string
+}) => api.post('/ai/command/feedback', data).then(unwrap)
+
 export const transcribeAudio = (form: FormData) =>
   api
     .post('/ai/command/transcribe', form, { headers: { 'Content-Type': 'multipart/form-data' } })

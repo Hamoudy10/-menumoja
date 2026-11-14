@@ -168,7 +168,7 @@ the client should fall back to typing.
 
 ---
 
-## 5. Tool catalog (26 tools)
+## 5. Tool catalog (27 tools)
 
 Read (no side effects) — roles: owner, manager (some also cashier/waiter/kitchen/super_admin):
 
@@ -193,6 +193,7 @@ Read (no side effects) — roles: owner, manager (some also cashier/waiter/kitch
 | `get_subscription` | Plan, status, usage and unpaid invoices. |
 | `get_staff_shifts` | Active or recent staff shifts. |
 | `get_settings` | Non-secret ordering/payment/tax/language settings. |
+| `search_knowledge` | Product docs + restaurant FAQs with citations (see `docs/KNOWLEDGE_BASE.md`). |
 
 Write (proposed → confirmed) — roles as noted:
 
@@ -328,7 +329,7 @@ The LLM is used only once a day to write the narrative daily briefing.
 
 ## 10. Evals
 
-`backend/tests/evals/command-prompts.ts` contains **86+ messy prompts** in
+`backend/tests/evals/command-prompts.ts` contains **92+ messy prompts** in
 English, Kiswahili and Swanglish, including:
 
 - every tool covered at least once,
@@ -355,7 +356,7 @@ Run the command tests:
 cd backend && npx jest tests/ai-command.test.ts
 ```
 
-**Live result (2026-11-14):** ✅ all 86+ prompts pass. The first run exposed a
+**Live result (2026-11-14):** ✅ all 92+ prompts pass. The first run exposed a
 real write-vs-read miss ("move order … table 2 → table 8" chose
 `get_table_status`). Fixed by strengthening the planner's write-vs-read rule
 and the tool descriptions. Two under-specified prompts were corrected to expect
@@ -414,6 +415,7 @@ refuses writes (never guesses).
 | **C** | Deterministic proactive nudges + daily briefing push + actionable notifications. | ✅ Done (`docs/PROACTIVE_ALERTS.md`) |
 | **D** | Multi-step plans + language-aware replies. Autopilot deliberately deferred (conflicts with no-auto-run). | ✅ Done (`docs/MULTI_STEP_WORKFLOWS.md`) |
 | **E1** | Domain read coverage (payments, history, CRM, costing, reservations, promotions, QR, billing, shifts, settings), system map/glossary, multi-read answers. | ✅ Done (`docs/JARVIS_KNOWLEDGE.md`) |
+| **E2/E3** | Product-knowledge RAG with citations; 👍/👎 feedback loop + super-admin review. | ✅ Done (`docs/KNOWLEDGE_BASE.md`) |
 
 ---
 

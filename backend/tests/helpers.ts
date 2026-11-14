@@ -360,6 +360,18 @@ jest.mock('../src/config/database', () => {
       update: jest.fn(),
       updateMany: jest.fn().mockResolvedValue({ count: 0 }),
     },
+    restaurantFaq: {
+      findFirst: jest.fn().mockResolvedValue(null),
+      findMany: jest.fn().mockResolvedValue([]),
+      create: jest.fn(),
+      update: jest.fn(),
+      delete: jest.fn(),
+    },
+    aiCommandFeedback: {
+      create: jest.fn().mockImplementation(async ({ data }: any) => ({ id: uuidv4(), ...data })),
+      findMany: jest.fn().mockResolvedValue([]),
+      count: jest.fn().mockResolvedValue(0),
+    },
     notification: {
       findMany: jest.fn(),
       findUnique: jest.fn(),
@@ -383,6 +395,7 @@ jest.mock('../src/config/database', () => {
     auditLog: {
       create: jest.fn().mockResolvedValue({ id: uuidv4() }),
     },
+    $queryRaw: jest.fn().mockResolvedValue([]),
     $transaction: jest.fn((fn: any) => fn(mockPrisma)),
   };
   return { prisma: mockPrisma };

@@ -41,6 +41,7 @@ export const EXPECTED_TOOL_KEYS = [
   'get_subscription',
   'get_staff_shifts',
   'get_settings',
+  'search_knowledge',
   'set_item_availability',
   'mark_item_special',
   'set_item_price',
@@ -145,6 +146,14 @@ export const COMMAND_EVAL_CASES: CommandEvalCase[] = [
   // ── Settings ──
   { text: 'Is M-Pesa enabled?', expectedTool: 'get_settings', language: 'en' },
   { text: 'What is our tax rate?', expectedTool: 'get_settings', language: 'en' },
+
+  // ── Product knowledge / help ──
+  { text: 'How do I set up M-Pesa?', expectedTool: 'search_knowledge', language: 'en' },
+  { text: 'How does offline mode work?', expectedTool: 'search_knowledge', language: 'en' },
+  { text: 'What is included in the Business plan?', expectedTool: 'search_knowledge', language: 'en' },
+  { text: 'How do I add a menu item?', expectedTool: 'search_knowledge', language: 'en' },
+  { text: 'Where can I find my receipts?', expectedTool: 'search_knowledge', language: 'en' },
+  { text: 'Ninawezaje kuweka M-Pesa?', expectedTool: 'search_knowledge', language: 'sw' },
 
   // ── Set availability ──
   { text: '86 the grilled tilapia whole', expectedTool: 'set_item_availability', language: 'en' },

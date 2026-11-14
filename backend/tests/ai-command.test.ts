@@ -17,6 +17,7 @@ jest.mock('@/integrations/openai', () => ({
   selectCommandPlan: jest.fn(),
   generateManagerAnswer: jest.fn(),
   generateManagerAction: jest.fn(),
+  generateKnowledgeAnswer: jest.fn(),
   MODEL_NAME: 'deepseek-v4-flash',
 }));
 
@@ -63,8 +64,8 @@ beforeEach(() => {
 
 describe('command registry', () => {
   it('exposes the registered tools with unique keys', () => {
-    expect(ALL_TOOLS).toHaveLength(26);
-    expect(new Set(ALL_TOOLS.map((t) => t.key)).size).toBe(26);
+    expect(ALL_TOOLS).toHaveLength(27);
+    expect(new Set(ALL_TOOLS.map((t) => t.key)).size).toBe(27);
     for (const tool of ALL_TOOLS) {
       expect(tool.inputSchema).toBeDefined();
       expect(tool.resolve).toBeInstanceOf(Function);
@@ -73,7 +74,7 @@ describe('command registry', () => {
   });
 
   it('filters tools by role (least privilege)', () => {
-    expect(toolsForRole('owner')).toHaveLength(26);
+    expect(toolsForRole('owner')).toHaveLength(27);
     expect(toolsForRole('kitchen').map((t) => t.key)).toEqual(['get_open_orders', 'update_order_status']);
     expect(toolsForRole('cashier').some((t) => t.key === 'set_item_price')).toBe(false);
     expect(toolsForRole('waiter').some((t) => t.key === 'transfer_table')).toBe(true);
@@ -147,6 +148,32 @@ describe('handleCommand — reads', () => {
       expect(result.data.results).toHaveLength(2);
       expect(result.data.results.map((row: any) => row.tool)).toEqual(['get_sales_summary', 'get_low_stock']);
     }
+  });
+
+  it('answers product questions from the knowledge base with citations', async () => {
+    (openai.selectCommandPlan as jest.Mock).mockResolvedValue({
+      actions: [{ action: 'search_knowledge', args: { query: 'mpesa setup' } }],
+      reply: '',
+    });
+    (prisma.$queryRaw as jest.Mock).mockResolvedValue([
+      { id: 'k-1', source: 'docs/MPESA_INTEGRATION.md', title: 'M-Pesa setup', content: 'Configure Daraja credentials.' },
+    ]);
+    (prisma.restaurantFaq.findMany as jest.Mock).mockResolvedValue([]);
+    (openai.generateKnowledgeAnswer as jest.Mock).mockResolvedValue({
+      reply: 'Configure Daraja credentials [1].',
+      model: 'deepseek-v4-flash',
+      usage: { promptTokens: 5, completionTokens: 5 },
+    });
+
+    const result = await handleCommand(ctx, { text: 'how do I set up mpesa?' });
+
+    expect(result.kind).toBe('answer');
+    expect(result.toolUsed).toBe('search_knowledge');
+    if (result.kind === 'answer') {
+      expect(result.data.results).toHaveLength(1);
+      expect(result.data.results[0].source).toBe('docs/MPESA_INTEGRATION.md');
+    }
+    expect(openai.generateKnowledgeAnswer).toHaveBeenCalled();
   });
 });
 
@@ -499,5 +526,67 @@ describe('command routes — security', () => {
     expect(res.status).toBe(200);
     expect(res.body.data.kind).toBe('answer');
     expect(res.body.data.toolUsed).toBe('get_low_stock');
+  });
+
+  it('records command feedback for an owner (201)', async () => {
+    const owner = await createTestOwner({ id: OWNER_ID });
+    const token = generateTestToken(owner.id, 'owner', RESTAURANT_ID);
+    (prisma.aiConversation.findFirst as jest.Mock).mockResolvedValue({ id: 'conv-1' });
+    (prisma.aiCommandFeedback.create as jest.Mock).mockResolvedValue({ id: 'fb-1' });
+
+    const res = await request(app)
+      .post('/api/v1/ai/command/feedback')
+      .set(getAuthHeader(token))
+      .send({ rating: 'up', tool: 'get_sales_summary', conversationId: '11111111-1111-1111-1111-111111111111' });
+
+    expect(res.status).toBe(201);
+    expect(prisma.aiCommandFeedback.create).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: expect.objectContaining({ restaurantId: RESTAURANT_ID, userId: OWNER_ID, rating: 'UP' }),
+      })
+    );
+  });
+
+  it('rejects an invalid feedback rating (422)', async () => {
+    const owner = await createTestOwner({ id: OWNER_ID });
+    const token = generateTestToken(owner.id, 'owner', RESTAURANT_ID);
+
+    const res = await request(app)
+      .post('/api/v1/ai/command/feedback')
+      .set(getAuthHeader(token))
+      .send({ rating: 'meh' });
+
+    expect(res.status).toBe(422);
+  });
+
+  it('rejects feedback for another tenant conversation (404)', async () => {
+    const owner = await createTestOwner({ id: OWNER_ID });
+    const token = generateTestToken(owner.id, 'owner', RESTAURANT_ID);
+    (prisma.aiConversation.findFirst as jest.Mock).mockResolvedValue(null);
+
+    const res = await request(app)
+      .post('/api/v1/ai/command/feedback')
+      .set(getAuthHeader(token))
+      .send({ rating: 'down', conversationId: '11111111-1111-1111-1111-111111111111' });
+
+    expect(res.status).toBe(404);
+    expect(prisma.aiCommandFeedback.create).not.toHaveBeenCalled();
+  });
+
+  it('lets a super admin review command feedback', async () => {
+    const token = generateTestToken('admin-1', 'SUPER_ADMIN');
+    (prisma.aiCommandFeedback.findMany as jest.Mock).mockResolvedValue([]);
+    (prisma.aiCommandFeedback.count as jest.Mock).mockResolvedValue(0);
+
+    const res = await request(app).get('/api/v1/admin/command-feedback').set(getAuthHeader(token));
+    expect(res.status).toBe(200);
+  });
+
+  it('blocks owners from the admin feedback list (403)', async () => {
+    const owner = await createTestOwner({ id: OWNER_ID });
+    const token = generateTestToken(owner.id, 'owner', RESTAURANT_ID);
+
+    const res = await request(app).get('/api/v1/admin/command-feedback').set(getAuthHeader(token));
+    expect(res.status).toBe(403);
   });
 });

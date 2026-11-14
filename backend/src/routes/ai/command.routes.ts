@@ -2,7 +2,7 @@ import { Router, Request, Response, NextFunction } from 'express';
 import { z } from 'zod';
 import multer from 'multer';
 import { authenticate, enforceRestaurantScope, validate, validateParams, aiChatLimiter, asyncHandler } from '@/middleware';
-import { AppError } from '@/utils/errors';
+import { AppError, NotFoundError } from '@/utils/errors';
 import { prisma } from '@/config/database';
 import {
   handleCommand,
@@ -190,6 +190,49 @@ router.get(
   asyncHandler(async (req: any, res: any) => {
     const conversation = await getConversation(contextFrom(req), String(req.params.id));
     res.json({ success: true, data: conversation });
+  })
+);
+
+// ── Feedback (E3) ──
+
+const feedbackSchema = z.object({
+  conversationId: z.string().uuid().optional(),
+  tool: z.string().max(80).optional(),
+  rating: z.enum(['up', 'down']),
+  comment: z.string().max(1000).optional(),
+}).strict();
+
+router.post(
+  '/command/feedback',
+  enforceRestaurantScope,
+  aiChatLimiter,
+  validate(feedbackSchema),
+  asyncHandler(async (req: any, res: any) => {
+    const restaurantId = req.restaurantId as string;
+    const { conversationId, tool, rating, comment } = req.body;
+
+    if (conversationId) {
+      const conversation = await prisma.aiConversation.findFirst({
+        where: { id: conversationId, restaurantId },
+        select: { id: true },
+      });
+      if (!conversation) {
+        throw new NotFoundError('Conversation not found', 'Mazungumzo hayakupatikana');
+      }
+    }
+
+    const feedback = await prisma.aiCommandFeedback.create({
+      data: {
+        restaurantId,
+        userId: req.user!.userId,
+        conversationId: conversationId ?? null,
+        tool: tool ?? null,
+        rating: String(rating).toUpperCase() as any,
+        comment: comment ?? null,
+      },
+    });
+
+    res.status(201).json({ success: true, data: { id: feedback.id } });
   })
 );
 

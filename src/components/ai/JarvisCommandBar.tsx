@@ -4,6 +4,7 @@ import { useTranslation } from 'react-i18next'
 import { AnimatePresence, motion } from 'framer-motion'
 import {
   Sparkles, X, Send, Mic, Loader2, Check, XCircle, Undo2, ShieldAlert, Bot, ListChecks,
+  ThumbsUp, ThumbsDown,
 } from 'lucide-react'
 import * as commandApi from '@/api/command'
 import { showErrorToast, showInfoToast } from '@/components/ui/Toast'
@@ -40,6 +41,7 @@ interface ChatMessage {
   planState?: PlanState
   planSteps?: commandApi.WorkflowStepResult[]
   undoUntil?: string
+  feedback?: 'up' | 'down'
 }
 
 const SUGGESTIONS = ['Sales today', 'What stock is low?', 'Show open orders', 'Daily briefing']
@@ -275,6 +277,20 @@ export default function JarvisCommandBar() {
       })
     } catch (error: any) {
       patch(message.id, { text: errorMessage(error, 'The undo window has passed.') })
+    }
+  }
+
+  const rateAnswer = async (message: ChatMessage, rating: 'up' | 'down') => {
+    if (message.feedback) return
+    patch(message.id, { feedback: rating })
+    try {
+      await commandApi.sendFeedback({
+        conversationId: conversationId || undefined,
+        tool: message.toolUsed || undefined,
+        rating,
+      })
+    } catch {
+      /* feedback is best-effort */
     }
   }
 
@@ -549,6 +565,38 @@ export default function JarvisCommandBar() {
 
         {message.kind === 'answer' && message.data !== undefined && (
           <DataSummary tool={message.toolUsed} data={message.data} />
+        )}
+
+        {message.kind === 'answer' && (
+          <div className="flex items-center gap-1 pl-1">
+            <button
+              onClick={() => void rateAnswer(message, 'up')}
+              disabled={Boolean(message.feedback)}
+              className={`flex h-7 w-7 items-center justify-center rounded-lg transition-colors ${
+                message.feedback === 'up'
+                  ? 'bg-success/15 text-success'
+                  : 'text-text-secondary/50 hover:bg-black/5 hover:text-text-secondary dark:hover:bg-white/10 dark:hover:text-white/70'
+              }`}
+              title="Helpful"
+            >
+              <ThumbsUp className="h-3.5 w-3.5" />
+            </button>
+            <button
+              onClick={() => void rateAnswer(message, 'down')}
+              disabled={Boolean(message.feedback)}
+              className={`flex h-7 w-7 items-center justify-center rounded-lg transition-colors ${
+                message.feedback === 'down'
+                  ? 'bg-red-500/10 text-red-500'
+                  : 'text-text-secondary/50 hover:bg-black/5 hover:text-text-secondary dark:hover:bg-white/10 dark:hover:text-white/70'
+              }`}
+              title="Not helpful"
+            >
+              <ThumbsDown className="h-3.5 w-3.5" />
+            </button>
+            {message.feedback && (
+              <span className="text-[10px] font-accent text-text-secondary dark:text-white/40">Thanks</span>
+            )}
+          </div>
         )}
       </div>
     )

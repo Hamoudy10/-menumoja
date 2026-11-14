@@ -328,11 +328,18 @@ export async function handleCommand(ctx: ToolContext, input: CommandInput): Prom
       const deterministic = step.tool.summarize ? step.tool.summarize(result.data) : null;
       let reply = result.message || deterministic || dataText;
 
+      const isKnowledge = step.tool.key === 'search_knowledge';
+      const knowledgeResults = Array.isArray(result.data?.results) ? result.data.results : [];
+
       // If a tool provides a deterministic summary, skip the LLM entirely:
       // it is cheaper, stable, and avoids leaking raw keys like "changePct: null".
-      if (withinBudget && !deterministic) {
+      if (isKnowledge && knowledgeResults.length === 0) {
+        reply = "I couldn't find that in the knowledge base. Try rephrasing the question, or contact support.";
+      } else if (withinBudget && !deterministic) {
         try {
-          const answer = await openai.generateManagerAnswer(text, dataText);
+          const answer = isKnowledge
+            ? await openai.generateKnowledgeAnswer(text, knowledgeResults)
+            : await openai.generateManagerAnswer(text, dataText);
           reply = answer.reply || reply;
           await recordAiUsage({
             restaurantId: ctx.restaurantId,

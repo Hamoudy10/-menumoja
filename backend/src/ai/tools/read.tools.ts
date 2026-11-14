@@ -3,6 +3,7 @@ import { prisma } from '@/config/database';
 import { getSalesSummary, getProfitabilitySnapshot, getInventoryRisk, getStaffMetrics } from '@/services/manager.service';
 import { generateDailyBriefing } from '@/services/ai-manager.service';
 import { domainReadTools } from './read-domain.tools';
+import { knowledgeTools } from './knowledge.tools';
 import type { Tool, ToolContext } from './types';
 
 /**
@@ -387,4 +388,5 @@ export const readTools: Tool[] = [
   },
 
   ...domainReadTools,
+  ...knowledgeTools,
 ];

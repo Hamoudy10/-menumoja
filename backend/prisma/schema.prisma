@@ -558,6 +558,8 @@ model Restaurant {
   smsLogs                SmsLog[]
   notifications          Notification[]
   auditLogs              AuditLog[]
+  knowledgeChunks        KnowledgeChunk[]
+  commandFeedback        AiCommandFeedback[]
 
   @@index([ownerId])
   @@index([planId])
@@ -1631,8 +1633,9 @@ model AiConversation {
   createdAt        DateTime         @default(now()) @map("created_at")
   updatedAt        DateTime         @updatedAt @map("updated_at")
 
-  restaurant Restaurant @relation(fields: [restaurantId], references: [id], onDelete: Cascade)
-  aiActions  AiAction[]
+  restaurant      Restaurant          @relation(fields: [restaurantId], references: [id], onDelete: Cascade)
+  aiActions       AiAction[]
+  commandFeedback AiCommandFeedback[]
 
   @@index([restaurantId])
   @@index([sessionId])
@@ -1866,4 +1869,55 @@ model AuditLog {
   @@index([action])
   @@index([createdAt])
   @@map("audit_logs")
+}
+
+// ==============================
+// AI KNOWLEDGE & FEEDBACK (Phase E)
+// ==============================
+
+enum CommandFeedbackRating {
+  UP
+  DOWN
+}
+
+/**
+ * Product/help knowledge chunks for retrieval-augmented answers.
+ * `restaurantId = NULL` means a global product doc; otherwise it is a
+ * restaurant-specific knowledge item (tenant-scoped).
+ */
+model KnowledgeChunk {
+  id           String   @id @default(uuid()) @db.Uuid
+  restaurantId String?  @map("restaurant_id") @db.Uuid
+  source       String
+  title        String
+  category     String?
+  content      String   @db.Text
+  contentHash  String   @unique @map("content_hash")
+  createdAt    DateTime @default(now()) @map("created_at")
+  updatedAt    DateTime @updatedAt @map("updated_at")
+
+  restaurant Restaurant? @relation(fields: [restaurantId], references: [id], onDelete: Cascade)
+
+  @@index([restaurantId])
+  @@index([category])
+  @@map("knowledge_chunks")
+}
+
+model AiCommandFeedback {
+  id             String                @id @default(uuid()) @db.Uuid
+  restaurantId   String                @map("restaurant_id") @db.Uuid
+  userId         String?               @map("user_id") @db.Uuid
+  conversationId String?               @map("conversation_id") @db.Uuid
+  tool           String?
+  rating         CommandFeedbackRating
+  comment        String?
+  createdAt      DateTime              @default(now()) @map("created_at")
+
+  restaurant   Restaurant      @relation(fields: [restaurantId], references: [id], onDelete: Cascade)
+  conversation AiConversation? @relation(fields: [conversationId], references: [id], onDelete: SetNull)
+
+  @@index([restaurantId])
+  @@index([rating])
+  @@index([createdAt])
+  @@map("ai_command_feedback")
 }

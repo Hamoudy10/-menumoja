@@ -731,4 +731,26 @@ router.post('/proactive/run', asyncHandler(async (_req: AuthenticatedRequest, re
   res.json({ success: true, data: result });
 }));
 
+// ==================== AI COMMAND FEEDBACK ====================
+
+router.get('/command-feedback', asyncHandler(async (req: AuthenticatedRequest, res: Response) => {
+  const { page, perPage } = parsePagination(req.query as any);
+  const rating = String(req.query.rating || '').toUpperCase();
+  const where: any = {};
+  if (rating === 'UP' || rating === 'DOWN') where.rating = rating;
+
+  const [feedback, total] = await Promise.all([
+    prisma.aiCommandFeedback.findMany({
+      where,
+      orderBy: { createdAt: 'desc' },
+      skip: (page - 1) * perPage,
+      take: perPage,
+      include: { restaurant: { select: { id: true, name: true } } },
+    }),
+    prisma.aiCommandFeedback.count({ where }),
+  ]);
+
+  res.json({ success: true, data: feedback, meta: buildPaginationMeta(total, page, perPage) });
+}));
+
 export default router;
