@@ -20,7 +20,8 @@ export const MODEL_NAME = AI_MODEL;
  */
 export async function generateManagerAnswer(
   question: string,
-  dataText: string
+  dataText: string,
+  history: Array<{ role: string; content: string }> = []
 ): Promise<{ reply: string; model: string; usage?: { promptTokens: number; completionTokens: number } }> {
   return withRetry(async () => {
     const client = getClient();
@@ -28,6 +29,10 @@ export async function generateManagerAnswer(
       model: AI_MODEL,
       messages: [
         { role: 'system', content: 'You are Menu Moja AI Manager, an executive assistant for a restaurant owner. Answer using ONLY the numbers and facts in DATA. Never invent figures, percentages or claims not present in DATA. If the data does not contain the answer, say what data would be needed. Be concise, practical and specific. Use KES amounts as given. Add one short actionable recommendation based ONLY on the data where useful.' },
+        ...history.slice(-6).map((message) => ({
+          role: message.role === 'assistant' ? ('assistant' as const) : ('user' as const),
+          content: message.content.slice(0, 600),
+        })),
         { role: 'user', content: `QUESTION: ${question}\n\nDATA:\n${dataText}` },
       ],
       max_tokens: 600,
@@ -255,6 +260,8 @@ export async function selectCommandPlan(
     history?: Array<{ role: string; content: string }>;
     language?: string;
     maxSteps?: number;
+    /** Results from earlier read queries in this same turn (progressive analysis). */
+    toolResults?: Array<{ tool: string; label: string; data: any }>;
   } = {}
 ): Promise<CommandPlanSelection> {
   return withRetry(async () => {
@@ -282,6 +289,19 @@ export async function selectCommandPlan(
       .map((m) => `${m.role}: ${m.content}`)
       .join('\n');
 
+    const toolResultsText = (context.toolResults || [])
+      .slice(-4)
+      .map((result, index) => {
+        let json = '';
+        try {
+          json = JSON.stringify(result.data);
+        } catch {
+          json = '';
+        }
+        return `[R${index + 1}] ${result.label} (${result.tool}): ${json.slice(0, 1500)}`;
+      })
+      .join('\n');
+
     const response = await client.chat.completions.create({
       model: AI_MODEL,
       messages: [
@@ -298,8 +318,10 @@ export async function selectCommandPlan(
             '(7) If the operator asks to change, move, transfer, assign, set, mark, restock, 86 or hide something, you MUST choose the corresponding WRITE tool — never a read-only tool. ' +
             '(8) Read-only tools are for questions only. Do not answer a change request with a read tool. ' +
             '(9) For greetings or small talk, reply briefly and do not repeat earlier data unless the operator asks. ' +
+            `(10) If TOOL RESULTS are provided from earlier in this turn, use them. If they already contain enough to answer, return NO tool and give the final answer. If you need more data, call up to ${maxSteps} tools; never repeat a query that already returned results. ` +
             languageLine +
             `\n\n${SYSTEM_MAP}` +
+            (toolResultsText ? `\n\nTOOL RESULTS SO FAR:\n${toolResultsText}` : '') +
             (contextLines.length ? `\n${contextLines.join('\n')}` : ''),
         },
         ...(historyText ? [{ role: 'system' as const, content: `Recent conversation:\n${historyText}` }] : []),
@@ -340,7 +362,8 @@ export async function selectCommandPlan(
  */
 export async function generateKnowledgeAnswer(
   question: string,
-  results: Array<{ title: string; source: string; content: string }>
+  results: Array<{ title: string; source: string; content: string }>,
+  history: Array<{ role: string; content: string }> = []
 ): Promise<{ reply: string; model: string; usage?: { promptTokens: number; completionTokens: number } }> {
   const excerpts = results
     .map((result, index) => `[${index + 1}] ${result.title} (${result.source})\n${result.content}`)
@@ -358,6 +381,10 @@ export async function generateKnowledgeAnswer(
             'Cite sources inline as [1], [2] using the excerpt numbers. If the excerpts do not contain the answer, ' +
             'say so and suggest contacting support. Be concise, use short markdown, and never invent steps, prices or policies.',
         },
+        ...history.slice(-6).map((message) => ({
+          role: message.role === 'assistant' ? ('assistant' as const) : ('user' as const),
+          content: message.content.slice(0, 600),
+        })),
         { role: 'user', content: `QUESTION: ${question}\n\nEXCERPTS:\n${excerpts || '(none)'}` },
       ],
       max_tokens: 600,

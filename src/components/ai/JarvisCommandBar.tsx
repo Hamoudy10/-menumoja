@@ -4,10 +4,12 @@ import { useTranslation } from 'react-i18next'
 import { AnimatePresence, motion } from 'framer-motion'
 import {
   Sparkles, X, Send, Mic, Loader2, Check, XCircle, Undo2, ShieldAlert, Bot, ListChecks,
-  ThumbsUp, ThumbsDown,
+  ThumbsUp, ThumbsDown, RotateCcw,
 } from 'lucide-react'
 import * as commandApi from '@/api/command'
 import { showErrorToast, showInfoToast } from '@/components/ui/Toast'
+import { useStore } from '@/store/useStore'
+import { useJarvisStore, type JarvisMessage, type PlanState } from '@/store/useJarvisStore'
 import MarkdownText from './MarkdownText'
 import DataSummary from './DataSummary'
 
@@ -24,25 +26,7 @@ import DataSummary from './DataSummary'
  * never see it (and the API rejects them with 403 regardless).
  */
 
-type ProposalState = 'pending' | 'executing' | 'done' | 'rejected' | 'failed'
-type PlanState = 'pending' | 'executing' | 'done' | 'partial' | 'failed' | 'cancelled' | 'undone'
-
-interface ChatMessage {
-  id: string
-  role: 'user' | 'assistant'
-  text: string
-  kind?: 'answer' | 'clarify' | 'proposal' | 'plan' | 'refused' | 'error'
-  data?: any
-  toolUsed?: string | null
-  options?: Array<{ id: string; label: string }>
-  proposal?: commandApi.CommandProposal
-  proposalState?: ProposalState
-  plan?: commandApi.CommandPlan
-  planState?: PlanState
-  planSteps?: commandApi.WorkflowStepResult[]
-  undoUntil?: string
-  feedback?: 'up' | 'down'
-}
+type ChatMessage = JarvisMessage
 
 const SUGGESTIONS = ['Sales today', 'What stock is low?', 'Show open orders', 'Daily briefing']
 
@@ -61,12 +45,21 @@ function errorMessage(error: any, fallback: string): string {
 export default function JarvisCommandBar() {
   const location = useLocation()
   const { i18n } = useTranslation()
+  const { restaurant } = useStore()
+  const {
+    open,
+    setOpen,
+    messages,
+    setMessages,
+    conversationId,
+    setConversationId,
+    restaurantId,
+    setRestaurant,
+    reset,
+  } = useJarvisStore()
   const replyLanguage: 'en' | 'sw' = String(i18n.language || '').startsWith('sw') ? 'sw' : 'en'
-  const [open, setOpen] = useState(false)
-  const [messages, setMessages] = useState<ChatMessage[]>([])
   const [input, setInput] = useState('')
   const [sending, setSending] = useState(false)
-  const [conversationId, setConversationId] = useState<string | undefined>()
   const [recording, setRecording] = useState(false)
   const [transcribing, setTranscribing] = useState(false)
   const [voiceEnabled, setVoiceEnabled] = useState(true)
@@ -82,11 +75,52 @@ export default function JarvisCommandBar() {
 
   const push = useCallback((message: ChatMessage) => {
     setMessages((prev) => [...prev, message])
-  }, [])
+  }, [setMessages])
 
   const patch = useCallback((id: string, updates: Partial<ChatMessage>) => {
     setMessages((prev) => prev.map((m) => (m.id === id ? { ...m, ...updates } : m)))
-  }, [])
+  }, [setMessages])
+
+  // Scope the persisted chat to the current restaurant. Never show one
+  // account's conversation to another after a restaurant/account change.
+  useEffect(() => {
+    const currentRestaurantId = restaurant?.id || null
+    if (!currentRestaurantId) return
+    if (restaurantId && restaurantId !== currentRestaurantId) {
+      reset()
+      setRestaurant(currentRestaurantId)
+    } else if (!restaurantId) {
+      if (messages.length > 0) reset()
+      setRestaurant(currentRestaurantId)
+    }
+  }, [restaurant?.id, restaurantId, messages.length, reset, setRestaurant])
+
+  // Fallback restore: if only the conversation id survived (older session),
+  // reload the text history from the backend.
+  useEffect(() => {
+    if (!conversationId || messages.length > 0) return
+    let cancelled = false
+    commandApi
+      .getConversation(conversationId)
+      .then((conversation: any) => {
+        if (cancelled) return
+        const restored = (Array.isArray(conversation?.messages) ? conversation.messages : [])
+          .filter((message: any) => message && typeof message.content === 'string')
+          .map((message: any) => ({
+            id: uid(),
+            role: message.role === 'assistant' ? 'assistant' : 'user',
+            text: String(message.content),
+            ...(message.role === 'assistant' ? { kind: 'answer' as const } : {}),
+          }))
+        if (restored.length > 0) setMessages(restored)
+      })
+      .catch(() => {
+        /* restore is best-effort */
+      })
+    return () => {
+      cancelled = true
+    }
+  }, [conversationId, messages.length, setMessages])
 
   // ⌘/Ctrl+K toggles, Escape closes
   useEffect(() => {
@@ -638,13 +672,26 @@ export default function JarvisCommandBar() {
                   <p className="font-accent text-[10px] text-white/50">Admin assistant · confirms before changes</p>
                 </div>
               </div>
-              <button
-                onClick={() => setOpen(false)}
-                className="flex h-8 w-8 items-center justify-center rounded-xl text-white/60 hover:bg-white/10 hover:text-white"
-                aria-label="Close Jarvis"
-              >
-                <X className="h-4 w-4" />
-              </button>
+              <div className="flex items-center gap-1">
+                <button
+                  onClick={() => {
+                    reset()
+                    setInput('')
+                  }}
+                  className="flex h-8 w-8 items-center justify-center rounded-xl text-white/60 hover:bg-white/10 hover:text-white"
+                  title="New chat"
+                  aria-label="New chat"
+                >
+                  <RotateCcw className="h-4 w-4" />
+                </button>
+                <button
+                  onClick={() => setOpen(false)}
+                  className="flex h-8 w-8 items-center justify-center rounded-xl text-white/60 hover:bg-white/10 hover:text-white"
+                  aria-label="Close Jarvis"
+                >
+                  <X className="h-4 w-4" />
+                </button>
+              </div>
             </div>
 
             {/* Messages */}

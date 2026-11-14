@@ -201,6 +201,225 @@ function serializeForStorage(value: unknown): any {
   return JSON.parse(JSON.stringify(value));
 }
 
+// ── Progressive read analysis (E1+) ──
+
+interface GatheredRead {
+  tool: string;
+  label: string;
+  data: any;
+  summary?: string;
+}
+
+type GatherOutcome =
+  | { ok: true; kind: 'ok'; results: GatheredRead[] }
+  | { ok: false; kind: 'clarify'; clarification: { question: string; options: Array<{ id: string; label: string }> }; toolKey?: string }
+  | { ok: false; kind: 'refused'; reply: string; toolKey?: string }
+  | { ok: false; kind: 'answer'; reply: string; toolKey?: string };
+
+/**
+ * Runs read tools, then asks the planner whether it needs another query based
+ * on the data gathered so far. Up to 3 rounds, duplicate queries skipped.
+ * This is the "query, inspect, refine" loop — entirely over vetted tools, so
+ * no raw SQL and no cross-tenant access.
+ */
+async function gatherReadResults(
+  ctx: ToolContext,
+  text: string,
+  allowed: Tool[],
+  history: Array<{ role: string; content: string }>,
+  input: CommandInput,
+  withinBudget: boolean,
+  initialActions: Array<{ action: string; args: Record<string, unknown> }>
+): Promise<GatherOutcome> {
+  const results: GatheredRead[] = [];
+  const seen = new Set<string>();
+  let actions = initialActions;
+  // A single read with a deterministic summary is already complete; no need to
+  // spend another LLM call on refinement.
+  const skipRefine = initialActions.length === 1 && Boolean(getTool(initialActions[0].action)?.summarize);
+
+  for (let iteration = 0; iteration < 3; iteration++) {
+    for (const action of actions) {
+      const tool = getTool(action.action);
+      if (!tool) {
+        return { ok: false, kind: 'answer', reply: helpText(), toolKey: action.action };
+      }
+      if (!isToolAllowed(ctx.role, tool)) {
+        return { ok: false, kind: 'refused', reply: `That action is not available for your role (${normalizeRole(ctx.role)}).`, toolKey: tool.key };
+      }
+      if (tool.kind !== 'read') {
+        return { ok: false, kind: 'answer', reply: 'I can combine write actions into one plan, but please ask for that report separately.', toolKey: tool.key };
+      }
+
+      const parsed = tool.inputSchema.safeParse(action.args ?? {});
+      if (!parsed.success) {
+        const issues = parsed.error.issues
+          .map((issue) => `${issue.path.join('.') || 'argument'}: ${issue.message}`)
+          .join('; ');
+        return {
+          ok: false,
+          kind: 'clarify',
+          clarification: { question: `Please provide: ${issues}`, options: [] },
+          toolKey: tool.key,
+        };
+      }
+
+      const signature = `${tool.key}:${JSON.stringify(parsed.data)}`;
+      if (seen.has(signature)) continue;
+      seen.add(signature);
+
+      let resolved;
+      try {
+        resolved = await tool.resolve(ctx, parsed.data as Record<string, unknown>);
+      } catch (error) {
+        logger.warn('AI command resolution failed', { tool: tool.key, restaurantId: ctx.restaurantId, error: (error as Error).message });
+        return { ok: false, kind: 'answer', reply: 'I could not resolve that request. Please rephrase it.', toolKey: tool.key };
+      }
+
+      if (!resolved.ok) {
+        return { ok: false, kind: 'clarify', clarification: resolved.clarification, toolKey: tool.key };
+      }
+
+      const result = await tool.run(ctx, resolved.args);
+      results.push({
+        tool: tool.key,
+        label: tool.label,
+        data: result.data,
+        summary: tool.summarize ? tool.summarize(result.data) : undefined,
+      });
+    }
+
+    if (skipRefine || iteration === 2 || !withinBudget) break;
+
+    // Ask the planner whether it needs another read based on what we have.
+    try {
+      const next = await openai.selectCommandPlan(text, toLlmToolSpecs(allowed), {
+        role: normalizeRole(ctx.role),
+        uiContext: input.uiContext as Record<string, unknown> | undefined,
+        history,
+        language: input.language,
+        toolResults: results,
+      });
+      await recordAiUsage({
+        restaurantId: ctx.restaurantId,
+        feature: 'COMMAND_REFINE',
+        provider: providerName(),
+        model: providerForModel(openai.MODEL_NAME),
+        promptTokens: next.usage?.promptTokens || 0,
+        completionTokens: next.usage?.completionTokens || 0,
+      }).catch(() => undefined);
+
+      if (next.actions.length === 0) break;
+      const nextTools = next.actions.map((nextAction) => getTool(nextAction.action));
+      if (nextTools.some((nextTool) => !nextTool || nextTool.kind !== 'read')) break;
+      actions = next.actions;
+    } catch (error) {
+      logger.warn('AI progressive refinement failed', { error: (error as Error).message });
+      break;
+    }
+  }
+
+  return { ok: true, kind: 'ok', results };
+}
+
+async function buildReadAnswer(
+  ctx: ToolContext,
+  text: string,
+  history: Array<{ role: string; content: string }>,
+  withinBudget: boolean,
+  results: GatheredRead[]
+): Promise<{ reply: string; data: any; toolUsed: string }> {
+  if (results.length === 0) {
+    return { reply: 'I could not find data for that. Please rephrase the question.', data: undefined, toolUsed: 'none' };
+  }
+
+  if (results.length === 1) {
+    const result = results[0];
+    const dataText = formatToolData(result.label, result.data);
+
+    if (result.tool === 'search_knowledge') {
+      const knowledgeResults = Array.isArray(result.data?.results) ? result.data.results : [];
+      if (knowledgeResults.length === 0) {
+        return {
+          reply: "I couldn't find that in the knowledge base. Try rephrasing the question, or contact support.",
+          data: result.data,
+          toolUsed: result.tool,
+        };
+      }
+      if (withinBudget) {
+        try {
+          const answer = await openai.generateKnowledgeAnswer(text, knowledgeResults, history);
+          await recordAiUsage({
+            restaurantId: ctx.restaurantId,
+            feature: 'COMMAND_ANSWER',
+            provider: providerName(),
+            model: providerForModel(answer.model || openai.MODEL_NAME),
+            promptTokens: answer.usage?.promptTokens || 0,
+            completionTokens: answer.usage?.completionTokens || 0,
+          }).catch(() => undefined);
+          return { reply: answer.reply, data: result.data, toolUsed: result.tool };
+        } catch (error) {
+          logger.warn('Knowledge answer generation failed', { error: (error as Error).message });
+        }
+      }
+      return { reply: result.summary || dataText, data: result.data, toolUsed: result.tool };
+    }
+
+    if (result.summary) {
+      return { reply: result.summary, data: result.data, toolUsed: result.tool };
+    }
+
+    if (withinBudget) {
+      try {
+        const answer = await openai.generateManagerAnswer(text, dataText, history);
+        await recordAiUsage({
+          restaurantId: ctx.restaurantId,
+          feature: 'COMMAND_ANSWER',
+          provider: providerName(),
+          model: providerForModel(answer.model || openai.MODEL_NAME),
+          promptTokens: answer.usage?.promptTokens || 0,
+          completionTokens: answer.usage?.completionTokens || 0,
+        }).catch(() => undefined);
+        return { reply: answer.reply || dataText, data: result.data, toolUsed: result.tool };
+      } catch (error) {
+        logger.warn('AI command answer generation failed', { error: (error as Error).message });
+      }
+    }
+
+    return { reply: dataText, data: result.data, toolUsed: result.tool };
+  }
+
+  // Multiple read tools: combine into one grounded answer.
+  const deterministic = results.every((result) => result.summary)
+    ? results.map((result) => result.summary).join('\n\n')
+    : null;
+  const dataText = results.map((result) => `${result.label}:\n${JSON.stringify(result.data, null, 2)}`).join('\n\n');
+  let reply = deterministic || dataText;
+
+  if (withinBudget && !deterministic) {
+    try {
+      const answer = await openai.generateManagerAnswer(text, dataText, history);
+      reply = answer.reply || reply;
+      await recordAiUsage({
+        restaurantId: ctx.restaurantId,
+        feature: 'COMMAND_ANSWER',
+        provider: providerName(),
+        model: providerForModel(answer.model || openai.MODEL_NAME),
+        promptTokens: answer.usage?.promptTokens || 0,
+        completionTokens: answer.usage?.completionTokens || 0,
+      }).catch(() => undefined);
+    } catch (error) {
+      logger.warn('AI multi-read answer generation failed', { error: (error as Error).message });
+    }
+  }
+
+  return {
+    reply,
+    data: { results: results.map((result) => ({ tool: result.tool, label: result.label, data: result.data })) },
+    toolUsed: 'multi',
+  };
+}
+
 export async function handleCommand(ctx: ToolContext, input: CommandInput): Promise<CommandResponse> {
   assertRestaurantContext(ctx);
   assertCommandAccess(ctx);
@@ -250,6 +469,66 @@ export async function handleCommand(ctx: ToolContext, input: CommandInput): Prom
   if (selection.actions.length === 0) {
     const reply = selection.reply || (withinBudget ? helpText() : budgetText());
     return finalize(conversationId, text, { kind: 'answer', reply, toolUsed: null });
+  }
+
+  // Classify the initial plan. Reads go through the progressive analysis loop;
+  // writes go through the existing propose/confirm path.
+  const selectedTools = selection.actions.map((action) => getTool(action.action));
+  if (selectedTools.some((tool) => !tool)) {
+    return finalize(conversationId, text, { kind: 'answer', reply: helpText(), toolUsed: null });
+  }
+  if (selectedTools.some((tool) => !isToolAllowed(ctx.role, tool!))) {
+    return finalize(conversationId, text, {
+      kind: 'refused',
+      reply: `Those actions are not available for your role (${normalizeRole(ctx.role)}).`,
+      toolUsed: null,
+    });
+  }
+
+  const kinds = new Set(selectedTools.map((tool) => tool!.kind));
+  if (kinds.size > 1) {
+    return finalize(conversationId, text, {
+      kind: 'answer',
+      reply: 'I can combine write actions into one plan, but please ask for that report separately so I can answer it accurately.',
+      toolUsed: null,
+    });
+  }
+
+  if (kinds.has('read')) {
+    const gathered = await gatherReadResults(ctx, text, allowed, history, input, withinBudget, selection.actions);
+
+    if (gathered.kind === 'ok') {
+      const answer = await buildReadAnswer(ctx, text, history, withinBudget, gathered.results);
+      return finalize(conversationId, text, {
+        kind: 'answer',
+        reply: answer.reply,
+        data: answer.data,
+        toolUsed: answer.toolUsed,
+      });
+    }
+
+    if (gathered.kind === 'clarify') {
+      return finalize(conversationId, text, {
+        kind: 'clarify',
+        reply: gathered.clarification.question,
+        clarification: gathered.clarification,
+        toolUsed: gathered.toolKey ?? null,
+      });
+    }
+
+    if (gathered.kind === 'refused') {
+      return finalize(conversationId, text, {
+        kind: 'refused',
+        reply: gathered.reply,
+        toolUsed: null,
+      });
+    }
+
+    return finalize(conversationId, text, {
+      kind: 'answer',
+      reply: gathered.reply,
+      toolUsed: gathered.toolKey ?? null,
+    });
   }
 
   // Resolve every step before proposing anything. A plan is all-or-nothing at
@@ -338,8 +617,8 @@ export async function handleCommand(ctx: ToolContext, input: CommandInput): Prom
       } else if (withinBudget && !deterministic) {
         try {
           const answer = isKnowledge
-            ? await openai.generateKnowledgeAnswer(text, knowledgeResults)
-            : await openai.generateManagerAnswer(text, dataText);
+            ? await openai.generateKnowledgeAnswer(text, knowledgeResults, history)
+            : await openai.generateManagerAnswer(text, dataText, history);
           reply = answer.reply || reply;
           await recordAiUsage({
             restaurantId: ctx.restaurantId,
@@ -426,7 +705,7 @@ export async function handleCommand(ctx: ToolContext, input: CommandInput): Prom
 
     if (withinBudget && !deterministic) {
       try {
-        const answer = await openai.generateManagerAnswer(text, dataText);
+        const answer = await openai.generateManagerAnswer(text, dataText, history);
         reply = answer.reply || reply;
         await recordAiUsage({
           restaurantId: ctx.restaurantId,

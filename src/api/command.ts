@@ -87,6 +87,9 @@ export const sendFeedback = (data: {
   comment?: string
 }) => api.post('/ai/command/feedback', data).then(unwrap)
 
+export const getConversation = (id: string) =>
+  api.get(`/ai/command/conversations/${id}`).then(unwrap)
+
 export const transcribeAudio = (form: FormData) =>
   api
     .post('/ai/command/transcribe', form, { headers: { 'Content-Type': 'multipart/form-data' } })

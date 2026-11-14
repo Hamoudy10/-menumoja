@@ -82,7 +82,11 @@ function AppRoutes() {
           <BrandLoader />
         </div>
       }>
-        <Routes location={location} key={location.pathname}>
+        {/* No key on Routes: keying by pathname remounts the whole matched
+            tree on every navigation, which destroyed the dashboard layout and
+            Jarvis session on tab switches. PageTransition still animates the
+            incoming page. */}
+        <Routes location={location}>
           <Route path="/" element={<PageTransition><LandingPage /></PageTransition>} />
           <Route path="/login" element={<PageTransition><LoginPage /></PageTransition>} />
           <Route path="/signup" element={<PageTransition><SignUpPage /></PageTransition>} />

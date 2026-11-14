@@ -150,6 +150,43 @@ describe('handleCommand — reads', () => {
     }
   });
 
+  it('progressively refines reads across rounds', async () => {
+    (openai.selectCommandPlan as jest.Mock)
+      .mockResolvedValueOnce({
+        actions: [{ action: 'get_low_stock', args: {} }],
+        reply: '',
+        usage: { promptTokens: 1, completionTokens: 1 },
+      })
+      .mockResolvedValueOnce({
+        actions: [{ action: 'get_open_orders', args: {} }],
+        reply: '',
+        usage: { promptTokens: 1, completionTokens: 1 },
+      })
+      .mockResolvedValueOnce({
+        actions: [],
+        reply: '',
+        usage: { promptTokens: 1, completionTokens: 1 },
+      });
+    (prisma.inventoryItem.findMany as jest.Mock).mockResolvedValue([]);
+    (prisma.stockMovement.groupBy as jest.Mock).mockResolvedValue([]);
+    (prisma.stockMovement.findMany as jest.Mock).mockResolvedValue([]);
+    (prisma.order.findMany as jest.Mock).mockResolvedValue([]);
+    (openai.generateManagerAnswer as jest.Mock).mockResolvedValue({
+      reply: 'Stock is healthy and there are no open orders.',
+      model: 'deepseek-v4-flash',
+      usage: { promptTokens: 1, completionTokens: 1 },
+    });
+
+    const result = await handleCommand(ctx, { text: 'check stock and open orders' });
+
+    expect(result.kind).toBe('answer');
+    expect(result.toolUsed).toBe('multi');
+    if (result.kind === 'answer') {
+      expect(result.data.results.map((row: any) => row.tool)).toEqual(['get_low_stock', 'get_open_orders']);
+    }
+    expect(openai.selectCommandPlan).toHaveBeenCalledTimes(3);
+  });
+
   it('answers product questions from the knowledge base with citations', async () => {
     (openai.selectCommandPlan as jest.Mock).mockResolvedValue({
       actions: [{ action: 'search_knowledge', args: { query: 'mpesa setup' } }],

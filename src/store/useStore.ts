@@ -10,6 +10,7 @@ import * as staffApi from '@/api/staff'
 import * as surveillanceApi from '@/api/surveillance'
 import * as notificationsApi from '@/api/notifications'
 import * as qrcodesApi from '@/api/qrcodes'
+import { useJarvisStore } from '@/store/useJarvisStore'
 import type {
   MenuCategory, Order, Staff, FloorTable, FloorZone,
   Transaction, Camera, Customer, OnboardingData, CartItem,
@@ -266,6 +267,10 @@ export const useStore = create<AppState>()((set, get) => ({
       localStorage.removeItem('accessToken')
       localStorage.removeItem('refreshToken')
       localStorage.removeItem('google_email')
+      // Never let the next account see this account's Jarvis conversation.
+      useJarvisStore.getState().reset()
+      useJarvisStore.getState().setRestaurant(null)
+      useJarvisStore.getState().setOpen(false)
       set({
         isAuthenticated: false,
         userRole: null,

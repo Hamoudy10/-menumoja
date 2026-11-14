@@ -65,6 +65,10 @@ structured results (rendered as separate cards):
 Mixed read+write requests ask the operator to split the report from the change,
 so a report is never bundled into a mutation plan.
 
+The planner can also **refine across rounds**: it receives the tool results so
+far and may request another read (up to 3 rounds), e.g. top items → recipe
+margins → answer. See `docs/JARVIS_SESSION_AND_QUERYING.md`.
+
 ---
 
 ## 4. System map & glossary
