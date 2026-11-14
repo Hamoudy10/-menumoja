@@ -56,6 +56,16 @@ function DailyBriefing({ data }: { data: any }) {
 
   return (
     <Card>
+      <div className="mb-2 flex items-center justify-between">
+        <p className="text-[10px] font-accent font-semibold uppercase tracking-wide text-text-secondary dark:text-white/40">
+          Daily briefing
+        </p>
+        {data?.date && (
+          <span className="text-[10px] font-accent text-text-secondary dark:text-white/50">
+            {new Date(data.date).toLocaleDateString('en-KE')}
+          </span>
+        )}
+      </div>
       <div className="grid grid-cols-3 gap-2">
         <Metric label="Revenue" value={money(data?.revenue)} />
         <Metric label="Orders" value={Number(data?.orders || 0)} />
@@ -123,6 +133,46 @@ function TopItems({ data }: { data: any }) {
         <ul className="space-y-1.5">
           {items.map((item: any, index: number) => (
             <Row key={index} left={`${index + 1}. ${item.name}`} right={`${item.unitsSold} sold · ${money(item.revenue)}`} />
+          ))}
+        </ul>
+      )}
+    </Card>
+  )
+}
+
+function MenuItems({ data }: { data: any }) {
+  const items = Array.isArray(data?.items) ? data.items : []
+  return (
+    <Card>
+      <div className="mb-2 flex items-center justify-between">
+        <p className="text-[10px] font-accent uppercase tracking-wide text-text-secondary dark:text-white/40">Menu items</p>
+        <span className="text-[10px] font-accent text-text-secondary dark:text-white/50">
+          {Number(data?.total || items.length)} total
+        </span>
+      </div>
+      {items.length === 0 ? (
+        <p className="text-xs text-text-secondary dark:text-white/50">No items found.</p>
+      ) : (
+        <ul className="max-h-56 space-y-1.5 overflow-auto pr-1">
+          {items.map((item: any, index: number) => (
+            <Row
+              key={item.id || index}
+              left={
+                <span>
+                  <span className="font-medium">{item.name}</span>
+                  {item.category && (
+                    <span className="text-text-secondary dark:text-white/50"> · {item.category}</span>
+                  )}
+                </span>
+              }
+              right={
+                <span>
+                  {money(item.price)}
+                  {item.available === false && <span className="text-danger"> · 86</span>}
+                  {item.special === true && <span className="text-secondary"> · special</span>}
+                </span>
+              }
+            />
           ))}
         </ul>
       )}
@@ -246,6 +296,8 @@ export default function DataSummary({ tool, data }: { tool?: string | null; data
       return <SalesSummary data={data} />
     case 'get_top_items':
       return <TopItems data={data} />
+    case 'get_menu_items':
+      return <MenuItems data={data} />
     case 'get_low_stock':
       return <LowStock data={data} />
     case 'get_open_orders':

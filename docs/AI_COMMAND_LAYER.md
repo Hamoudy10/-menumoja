@@ -168,7 +168,7 @@ the client should fall back to typing.
 
 ---
 
-## 5. Tool catalog (Phase A — first 15)
+## 5. Tool catalog (16 tools)
 
 Read (no side effects) — roles: owner, manager (some also cashier/waiter/kitchen/super_admin):
 
@@ -176,6 +176,7 @@ Read (no side effects) — roles: owner, manager (some also cashier/waiter/kitch
 |---|---|
 | `get_sales_summary` | Revenue, paid orders, AOV, comparison to previous period. |
 | `get_top_items` | Best-selling items by quantity/revenue. |
+| `get_menu_items` | List menu items (name, price, availability, category); filter by category/availability/search. |
 | `get_low_stock` | Low/out-of-stock items with reorder levels. |
 | `get_table_status` | Live table status + active orders per table. |
 | `get_open_orders` | Active orders with table, status, waiter, elapsed minutes. |
@@ -286,6 +287,11 @@ Endpoints:
 No autopilot/auto-run was added. Replies follow the operator's language via the
 optional `language` field (`en`/`sw`).
 
+Phase D also added `get_menu_items` (list the full menu) and the presentation
+layer: safe markdown rendering plus structured result cards, with raw JSON moved
+behind a collapsed disclosure. The daily briefing uses a concise deterministic
+summary instead of an LLM answer.
+
 See **`docs/MULTI_STEP_WORKFLOWS.md`** for the full contract and safety
 invariants.
 
@@ -308,7 +314,7 @@ The LLM is used only once a day to write the narrative daily briefing.
 
 ## 10. Evals
 
-`backend/tests/evals/command-prompts.ts` contains **60+ messy prompts** in
+`backend/tests/evals/command-prompts.ts` contains **65+ messy prompts** in
 English, Kiswahili and Swanglish, including:
 
 - every tool covered at least once,
@@ -335,7 +341,7 @@ Run the command tests:
 cd backend && npx jest tests/ai-command.test.ts
 ```
 
-**Live result (2026-11-14):** ✅ all 60+ prompts pass. The first run exposed a
+**Live result (2026-11-14):** ✅ all 65+ prompts pass. The first run exposed a
 real write-vs-read miss ("move order … table 2 → table 8" chose
 `get_table_status`). Fixed by strengthening the planner's write-vs-read rule
 and the tool descriptions. Two under-specified prompts were corrected to expect

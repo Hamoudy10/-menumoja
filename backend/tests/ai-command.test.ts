@@ -62,9 +62,9 @@ beforeEach(() => {
 });
 
 describe('command registry', () => {
-  it('exposes exactly the first 15 tools with unique keys', () => {
-    expect(ALL_TOOLS).toHaveLength(15);
-    expect(new Set(ALL_TOOLS.map((t) => t.key)).size).toBe(15);
+  it('exposes the registered tools with unique keys', () => {
+    expect(ALL_TOOLS).toHaveLength(16);
+    expect(new Set(ALL_TOOLS.map((t) => t.key)).size).toBe(16);
     for (const tool of ALL_TOOLS) {
       expect(tool.inputSchema).toBeDefined();
       expect(tool.resolve).toBeInstanceOf(Function);
@@ -73,7 +73,7 @@ describe('command registry', () => {
   });
 
   it('filters tools by role (least privilege)', () => {
-    expect(toolsForRole('owner')).toHaveLength(15);
+    expect(toolsForRole('owner')).toHaveLength(16);
     expect(toolsForRole('kitchen').map((t) => t.key)).toEqual(['get_open_orders', 'update_order_status']);
     expect(toolsForRole('cashier').some((t) => t.key === 'set_item_price')).toBe(false);
     expect(toolsForRole('waiter').some((t) => t.key === 'transfer_table')).toBe(true);

@@ -271,6 +271,7 @@ export async function selectCommandPlan(
             '(6) Do not repeat the same tool call twice. ' +
             '(7) If the operator asks to change, move, transfer, assign, set, mark, restock, 86 or hide something, you MUST choose the corresponding WRITE tool — never a read-only tool. ' +
             '(8) Read-only tools are for questions only. Do not answer a change request with a read tool. ' +
+            '(9) For greetings or small talk, reply briefly and do not repeat earlier data unless the operator asks. ' +
             languageLine +
             (contextLines.length ? `\n${contextLines.join('\n')}` : ''),
         },

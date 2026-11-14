@@ -182,6 +182,93 @@ export const readTools: Tool[] = [
   },
 
   {
+    key: 'get_menu_items',
+    label: 'Menu items',
+    description: 'Read-only: list menu items with price and availability. Optionally filter by category, availability, or a search term. Use for "list all menu items", "show me the menu", "what dishes do we have?", "which items are unavailable?".',
+    kind: 'read',
+    roles: ['owner', 'manager', 'super_admin'],
+    inputSchema: z.object({
+      category: z.string().max(100).optional(),
+      available: z.boolean().optional(),
+      search: z.string().max(100).optional(),
+      limit: z.coerce.number().int().min(1).max(200).default(100),
+    }).strict(),
+    jsonSchema: {
+      type: 'object',
+      properties: {
+        category: { type: 'string', description: 'Optional category name' },
+        available: { type: 'boolean', description: 'Filter by availability' },
+        search: { type: 'string', description: 'Optional name/description search term' },
+        limit: { type: 'number', description: 'Maximum items (1-200, default 100)' },
+      },
+      additionalProperties: false,
+    },
+    resolve: async (_ctx, args) => ({
+      ok: true,
+      args,
+      preview: {
+        summary: `Menu items${args.category ? ` in ${String(args.category)}` : ''}${args.available === false ? ' (unavailable only)' : ''}`,
+      },
+    }),
+    summarize: (data) => {
+      const total = Number(data?.total || 0);
+      const shown = Array.isArray(data?.items) ? data.items.length : 0;
+      return `You have **${total}** menu item${total === 1 ? '' : 's'}${shown < total ? `; showing the first ${shown}.` : '.'}`;
+    },
+    run: async (ctx, args) => {
+      const where: any = { restaurantId: ctx.restaurantId };
+      if (args.available !== undefined) where.isAvailable = Boolean(args.available);
+      if (args.search) {
+        where.OR = [
+          { name: { contains: String(args.search), mode: 'insensitive' } },
+          { description: { contains: String(args.search), mode: 'insensitive' } },
+        ];
+      }
+      if (args.category) {
+        const categoryName = String(args.category);
+        const category = await prisma.menuCategory.findFirst({
+          where: { restaurantId: ctx.restaurantId, name: { equals: categoryName, mode: 'insensitive' } },
+          select: { id: true },
+        });
+        where.category = category
+          ? { id: category.id }
+          : { name: { contains: categoryName, mode: 'insensitive' } };
+      }
+
+      const [items, total] = await Promise.all([
+        prisma.menuItem.findMany({
+          where,
+          take: Number(args.limit || 100),
+          orderBy: [{ category: { sortOrder: 'asc' } }, { sortOrder: 'asc' }, { name: 'asc' }],
+          select: {
+            id: true,
+            name: true,
+            price: true,
+            isAvailable: true,
+            isTodaysSpecial: true,
+            category: { select: { name: true } },
+          },
+        }),
+        prisma.menuItem.count({ where }),
+      ]);
+
+      return {
+        data: {
+          total,
+          items: items.map((item) => ({
+            id: item.id,
+            name: item.name,
+            price: Number(item.price),
+            available: item.isAvailable,
+            special: item.isTodaysSpecial,
+            category: item.category?.name || null,
+          })),
+        },
+      };
+    },
+  },
+
+  {
     key: 'get_low_stock',
     label: 'Low stock / inventory risk',
     description: 'Get inventory items that are low or out of stock, with reorder levels. Use for "what stock is running low?" or "what should we order?".',

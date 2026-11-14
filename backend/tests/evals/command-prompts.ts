@@ -24,6 +24,7 @@ export interface CommandEvalCase {
 export const EXPECTED_TOOL_KEYS = [
   'get_sales_summary',
   'get_top_items',
+  'get_menu_items',
   'get_low_stock',
   'get_table_status',
   'get_open_orders',
@@ -51,6 +52,13 @@ export const COMMAND_EVAL_CASES: CommandEvalCase[] = [
   { text: 'Chakula gani kinauzwa zaidi?', expectedTool: 'get_top_items', language: 'sw' },
   { text: 'Top 5 dishes today', expectedTool: 'get_top_items', language: 'en' },
   { text: 'Nionyeshe top 10 items za mwezi huu', expectedTool: 'get_top_items', language: 'swanglish' },
+
+  // ── Menu listing ──
+  { text: 'Get me the list of all menu items', expectedTool: 'get_menu_items', language: 'en' },
+  { text: 'Show me the menu', expectedTool: 'get_menu_items', language: 'en' },
+  { text: 'What dishes do we have?', expectedTool: 'get_menu_items', language: 'en' },
+  { text: 'Which items are unavailable?', expectedTool: 'get_menu_items', language: 'en' },
+  { text: 'Nionyeshe menu yote', expectedTool: 'get_menu_items', language: 'sw' },
 
   // ── Low stock ──
   { text: 'What stock is running low?', expectedTool: 'get_low_stock', language: 'en' },

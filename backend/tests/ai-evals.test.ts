@@ -11,7 +11,7 @@ describe('AI command eval dataset', () => {
   });
 
   it('covers every registered tool key at least once', () => {
-    expect(EXPECTED_TOOL_KEYS).toHaveLength(15);
+    expect(EXPECTED_TOOL_KEYS).toHaveLength(16);
     const covered = new Set(
       COMMAND_EVAL_CASES.map((c) => c.expectedTool).filter((k): k is string => Boolean(k))
     );

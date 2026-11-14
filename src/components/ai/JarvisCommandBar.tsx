@@ -513,19 +513,25 @@ export default function JarvisCommandBar() {
       )
     }
 
+    // The daily briefing has a rich deterministic card; don't repeat the verbose
+    // model text above it.
+    const hideText = message.kind === 'answer' && message.toolUsed === 'get_daily_briefing'
+
     return (
       <div key={message.id} className="space-y-2">
-        <div
-          className={`max-w-[92%] rounded-2xl px-3.5 py-2.5 font-body text-sm ${
-            message.kind === 'error'
-              ? 'bg-red-50 text-red-600 dark:bg-red-900/20 dark:text-red-300'
-              : message.kind === 'refused'
-                ? 'bg-amber-50 text-amber-700 dark:bg-amber-900/20 dark:text-amber-300'
-                : 'border border-black/5 bg-white text-text-primary dark:border-white/10 dark:bg-primary-light dark:text-white'
-          }`}
-        >
-          {message.kind === 'answer' ? <MarkdownText text={message.text} /> : message.text}
-        </div>
+        {!hideText && (
+          <div
+            className={`max-w-[92%] rounded-2xl px-3.5 py-2.5 font-body text-sm ${
+              message.kind === 'error'
+                ? 'bg-red-50 text-red-600 dark:bg-red-900/20 dark:text-red-300'
+                : message.kind === 'refused'
+                  ? 'bg-amber-50 text-amber-700 dark:bg-amber-900/20 dark:text-amber-300'
+                  : 'border border-black/5 bg-white text-text-primary dark:border-white/10 dark:bg-primary-light dark:text-white'
+            }`}
+          >
+            {message.kind === 'answer' ? <MarkdownText text={message.text} /> : message.text}
+          </div>
+        )}
 
         {message.options && message.options.length > 0 && (
           <div className="flex flex-wrap gap-1.5">
