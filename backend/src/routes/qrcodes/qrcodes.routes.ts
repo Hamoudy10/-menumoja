@@ -106,6 +106,21 @@ router.use(enforceRestaurantScope);
 
 const FRONTEND_URL = process.env.FRONTEND_URL || 'https://menumoja.app';
 
+/**
+ * Ensure a QR destination carries its own id. Legacy rows created before scan
+ * attribution existed have no `qr` param; adding it at download time means a
+ * reprinted code is fully attributed without editing the row.
+ */
+function withQrParam(qrCode: { id: string; targetUrl: string }): string {
+  try {
+    const url = new URL(qrCode.targetUrl);
+    if (!url.searchParams.get('qr')) url.searchParams.set('qr', qrCode.id);
+    return url.toString();
+  } catch {
+    return qrCode.targetUrl;
+  }
+}
+
 // GET / - List all QR codes for restaurant
 router.get(
   '/',
@@ -491,7 +506,7 @@ router.get(
       throw new AppError(404, 'QR_NOT_FOUND', 'QR code not found', 'Msimbo wa QR haukupatikana');
     }
 
-    const qrBuffer = await QRCode.toBuffer(qrCode.targetUrl, {
+    const qrBuffer = await QRCode.toBuffer(withQrParam(qrCode), {
       type: 'png',
       width: 1200,
       margin: 4,
@@ -561,7 +576,7 @@ router.get(
       select: { name: true, address: true },
     });
 
-    const qrBuffer = await QRCode.toBuffer(qrCode.targetUrl, {
+    const qrBuffer = await QRCode.toBuffer(withQrParam(qrCode), {
       type: 'png',
       width: 400,
       margin: 2,
