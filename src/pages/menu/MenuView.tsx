@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback } from 'react'
 import { motion } from 'framer-motion'
-import { useParams, useNavigate } from 'react-router-dom'
+import { useParams, useNavigate, useSearchParams } from 'react-router-dom'
 import { ShoppingCart, Plus, Minus, ChefHat, MapPin, Star, Search, Loader2, CheckCircle, Megaphone, Gift, PartyPopper, Percent, Tag, RotateCw, TrendingUp, BadgePercent, Sparkles } from 'lucide-react'
 import { useStore } from '@/store/useStore'
 import { Badge } from '@/components/ui/Badge'
@@ -20,6 +20,10 @@ const PROMO_BADGE: Record<string, string> = {
 export default function MenuView() {
   const { restaurantSlug } = useParams()
   const navigate = useNavigate()
+  const [searchParams] = useSearchParams()
+  const qrCodeId = searchParams.get('qr') || undefined
+  const parsedTable = Number(searchParams.get('table'))
+  const tableNumber = Number.isInteger(parsedTable) && parsedTable > 0 ? parsedTable : undefined
   const { categories, cart, addToCart, updateCartQuantity, setLanguage } = useStore()
   const { applyTheme } = useTheme()
   const [activeCategory, setActiveCategory] = useState('')
@@ -42,7 +46,18 @@ export default function MenuView() {
     setLoading(true)
     setError('')
     try {
-      const data = await menuApi.getPublicMenu(restaurantSlug)
+      // One anonymous session per menu visitor. It is sent with the menu
+      // request (scan attribution) and with the order (scan → order funnel).
+      const sessionKey = `menuSession_${restaurantSlug}`
+      let sessionId = sessionStorage.getItem(sessionKey)
+      if (!sessionId) {
+        sessionId = crypto.randomUUID()
+        sessionStorage.setItem(sessionKey, sessionId)
+      }
+      if (qrCodeId) sessionStorage.setItem(`qrCode_${restaurantSlug}`, qrCodeId)
+      const scannedQr = qrCodeId || sessionStorage.getItem(`qrCode_${restaurantSlug}`) || undefined
+
+      const data = await menuApi.getPublicMenu(restaurantSlug, { qrCodeId: scannedQr, sessionId, tableNumber })
       const restaurant = data.restaurant || data
       const cats = (data.categories || []).map((cat: any) => ({
         id: cat.id,
@@ -58,9 +73,7 @@ export default function MenuView() {
 
       // personalized storefront sections (aggregate data for anonymous sessions)
       try {
-        const sessionKey = `menuSession_${restaurantSlug}`
-        if (!sessionStorage.getItem(sessionKey)) sessionStorage.setItem(sessionKey, crypto.randomUUID())
-        const personalized = await menuApi.getPersonalizedMenu(restaurantSlug, sessionStorage.getItem(sessionKey) || undefined)
+        const personalized = await menuApi.getPersonalizedMenu(restaurantSlug, sessionId)
         setSections({
           mostPopular: personalized?.mostPopular || [],
           bestValue: personalized?.bestValue || [],
@@ -88,7 +101,7 @@ export default function MenuView() {
     } finally {
       setLoading(false)
     }
-  }, [restaurantSlug, setLanguage, applyTheme])
+  }, [restaurantSlug, qrCodeId, tableNumber, setLanguage, applyTheme])
 
   useEffect(() => {
     if (!restaurantSlug) return
@@ -176,7 +189,7 @@ export default function MenuView() {
                 </button>
               )}
               <button
-                onClick={() => navigate(`/menu/${restaurantSlug}/cart${location.search}`)}
+                onClick={() => navigate(`/menu/${restaurantSlug}/cart${searchParams.toString() ? `?${searchParams.toString()}` : ''}`)}
                 className="relative w-10 h-10 rounded-xl bg-secondary/10 flex items-center justify-center"
             >
               <ShoppingCart className="w-5 h-5 text-secondary" />

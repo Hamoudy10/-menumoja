@@ -19,6 +19,96 @@ router.get('/plans', asyncHandler(async (_req, res) => {
   res.json({ success: true, data: await listPlans() });
 }));
 
+/**
+ * Record a QR scan without blocking the menu response.
+ *
+ * Runs *before* the public-menu cache lookup so cached responses still count
+ * scans (previously only the first request per cache window was recorded).
+ * Reloads from the same browser session within 30 minutes are not double
+ * counted, which keeps the scans metric close to real customer arrivals.
+ */
+async function trackQrScan(
+  req: any,
+  restaurantSlug: string,
+  device: { deviceType: string; browser: string }
+): Promise<void> {
+  const qrCodeId = req.headers['x-qr-code-id'] as string | undefined;
+  // Legacy QR codes printed without `?qr=` can still be attributed by table.
+  const tableNumber = Number(req.query?.table);
+  if (!qrCodeId && !(Number.isInteger(tableNumber) && tableNumber > 0)) return;
+
+  try {
+    const restaurant = await prisma.restaurant.findUnique({
+      where: { slug: restaurantSlug, isActive: true },
+      select: { id: true },
+    });
+    if (!restaurant) return;
+
+    const qrCode = qrCodeId
+      ? await prisma.qrCode.findFirst({
+          where: { id: qrCodeId, restaurantId: restaurant.id, isActive: true },
+          select: { id: true },
+        })
+      : await prisma.qrCode.findFirst({
+          where: { restaurantId: restaurant.id, tableNumber, isActive: true },
+          select: { id: true },
+        });
+    if (!qrCode) return;
+
+    const sessionId = (req.headers['x-session-id'] as string) || uuidv4();
+    const since = new Date(Date.now() - 30 * 60 * 1000);
+    const recent = await prisma.qrScan.findFirst({
+      where: { qrCodeId: qrCode.id, sessionId, scannedAt: { gte: since } },
+      select: { id: true },
+    });
+    if (recent) return;
+
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+
+    await prisma.$transaction([
+      prisma.qrCode.update({
+        where: { id: qrCode.id },
+        data: { scanCount: { increment: 1 } },
+      }),
+      prisma.qrScan.create({
+        data: {
+          qrCodeId: qrCode.id,
+          restaurantId: restaurant.id,
+          scannedAt: new Date(),
+          deviceType: device.deviceType,
+          browser: device.browser,
+          ipAddress: req.ip,
+          sessionId,
+          languageUsed: String(req.headers['accept-language'] || '').split(',')[0]?.trim() || null,
+        },
+      }),
+      prisma.analyticsDaily.upsert({
+        where: {
+          restaurantId_date: { restaurantId: restaurant.id, date: today },
+        },
+        create: {
+          restaurantId: restaurant.id,
+          date: today,
+          totalScans: 1,
+        },
+        update: {
+          totalScans: { increment: 1 },
+        },
+      }),
+    ]);
+
+    logger.debug('QR scan tracked', {
+      qrCodeId: qrCode.id,
+      restaurantId: restaurant.id,
+      deviceType: device.deviceType,
+      browser: device.browser,
+    });
+  } catch (err) {
+    logger.warn('Failed to track QR scan', { error: err, qrCodeId });
+  }
+}
+
 // GET /:restaurantSlug - Full menu for customer
 router.get(
   '/:restaurantSlug',
@@ -27,7 +117,6 @@ router.get(
     const restaurantSlug = String(req.params.restaurantSlug);
 
     const userAgent = req.headers['user-agent'] || '';
-    const acceptLanguage = req.headers['accept-language'] || '';
     let deviceType = 'desktop';
     let browser = 'unknown';
 
@@ -41,6 +130,9 @@ router.get(
     else if (/firefox/i.test(userAgent)) browser = 'firefox';
     else if (/safari/i.test(userAgent) && !/chrome/i.test(userAgent)) browser = 'safari';
     else if (/edge/i.test(userAgent)) browser = 'edge';
+
+    // Track the scan before the cache lookup so cached menus still count.
+    await trackQrScan(req, restaurantSlug, { deviceType, browser });
 
     const cached = await redis.get(`menu:public:${restaurantSlug}`);
     if (cached) {
@@ -75,65 +167,6 @@ router.get(
 
     if (restaurant.isSuspended) {
       throw new AppError(403, 'RESTAURANT_SUSPENDED', 'This restaurant is currently unavailable', 'Mgahawa huu haupatikani kwa sasa');
-    }
-
-    // Track QR scan if session header present
-    const qrCodeId = req.headers['x-qr-code-id'] as string;
-    if (qrCodeId) {
-      try {
-        const qrCode = await prisma.qrCode.findFirst({
-          where: { id: qrCodeId, restaurantId: restaurant.id },
-        });
-
-        if (qrCode) {
-          await prisma.qrCode.update({
-            where: { id: qrCode.id },
-            data: { scanCount: { increment: 1 } },
-          });
-
-          const sessionId = req.headers['x-session-id'] as string || uuidv4();
-
-          await prisma.qrScan.create({
-            data: {
-              qrCodeId: qrCode.id,
-              restaurantId: restaurant.id,
-              scannedAt: new Date(),
-              deviceType,
-              browser,
-              ipAddress: req.ip,
-              sessionId,
-              languageUsed: acceptLanguage.split(',')[0]?.trim() || null,
-            },
-          });
-
-          // Update daily analytics
-          const today = new Date();
-          today.setHours(0, 0, 0, 0);
-
-          await prisma.analyticsDaily.upsert({
-            where: {
-              restaurantId_date: { restaurantId: restaurant.id, date: today },
-            },
-            create: {
-              restaurantId: restaurant.id,
-              date: today,
-              totalScans: 1,
-            },
-            update: {
-              totalScans: { increment: 1 },
-            },
-          });
-
-          logger.debug('QR scan tracked', {
-            qrCodeId: qrCode.id,
-            restaurantId: restaurant.id,
-            deviceType,
-            browser,
-          });
-        }
-      } catch (err) {
-        logger.warn('Failed to track QR scan', { error: err, qrCodeId });
-      }
     }
 
     const activeCategories = restaurant.menuCategories.filter(

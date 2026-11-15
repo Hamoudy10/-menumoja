@@ -122,10 +122,13 @@ async function getReservation(restaurantId: string, id: string): Promise<any> {
   return reservation;
 }
 
-async function freeTable(reservation: any): Promise<void> {
+async function freeTable(reservation: any, includeOccupied = false): Promise<void> {
   if (!reservation.tableId) return;
   await prisma.restaurantTable.updateMany({
-    where: { id: reservation.tableId, status: 'RESERVED' },
+    where: {
+      id: reservation.tableId,
+      status: includeOccupied ? { in: ['RESERVED', 'OCCUPIED'] } : 'RESERVED',
+    },
     data: { status: 'FREE' },
   });
 }
@@ -146,12 +149,32 @@ export async function updateReservation(restaurantId: string, id: string, data: 
       throw new ConflictError(`Cannot transition ${reservation.status} → ${next}`, 'Mabadiliko hayaruhusiwi');
     }
     update.status = next;
-    if (next === 'CANCELLED' || next === 'NO_SHOW') await freeTable(reservation);
-    if (next === 'CHECKED_IN' && reservation.tableId) {
-      await prisma.restaurantTable.update({
-        where: { id: reservation.tableId },
-        data: { status: 'OCCUPIED' },
-      });
+    if (next === 'CANCELLED' || next === 'NO_SHOW') await freeTable(reservation, true);
+    if (next === 'COMPLETED') await freeTable(reservation, true);
+    if (next === 'CHECKED_IN') {
+      let tableId = reservation.tableId as string | null;
+      if (!tableId) {
+        // Reservation was created when no table was free — assign one now.
+        const candidate = await prisma.restaurantTable.findFirst({
+          where: {
+            restaurantId,
+            status: 'FREE',
+            OR: [{ capacity: null }, { capacity: { gte: reservation.partySize } }],
+          },
+          orderBy: { capacity: 'asc' },
+          select: { id: true },
+        });
+        if (candidate) {
+          tableId = candidate.id;
+          update.tableId = candidate.id;
+        }
+      }
+      if (tableId) {
+        await prisma.restaurantTable.update({
+          where: { id: tableId },
+          data: { status: 'OCCUPIED' },
+        });
+      }
     }
   }
 

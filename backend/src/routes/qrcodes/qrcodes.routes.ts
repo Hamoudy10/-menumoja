@@ -158,7 +158,8 @@ router.post(
       throw new AppError(404, 'RESTAURANT_NOT_FOUND', 'Restaurant not found', 'Mgahawa haukupatikana');
     }
 
-    const targetUrl = `${FRONTEND_URL}/menu/${restaurant.slug}?table=${tableNumber || 'general'}&source=${type || 'general'}`;
+    const qrCodeId = uuidv4();
+    const targetUrl = `${FRONTEND_URL}/menu/${restaurant.slug}?table=${tableNumber || 'general'}&source=${type || 'general'}&qr=${qrCodeId}`;
 
     const qrBuffer = await QRCode.toBuffer(targetUrl, {
       type: 'png',
@@ -180,6 +181,7 @@ router.post(
 
     const qrCode = await prisma.qrCode.create({
       data: {
+        id: qrCodeId,
         restaurantId,
         label,
         tableNumber: tableNumber || null,
@@ -261,7 +263,8 @@ router.post(
     for (let i = 0; i < numberOfTables; i++) {
       const tableNumber = startNumber + i;
 
-      const targetUrl = `${FRONTEND_URL}/menu/${restaurant.slug}?table=${tableNumber}&source=batch`;
+      const qrCodeId = uuidv4();
+      const targetUrl = `${FRONTEND_URL}/menu/${restaurant.slug}?table=${tableNumber}&source=batch&qr=${qrCodeId}`;
       const label = `Table ${tableNumber}`;
 
       const qrBuffer = await QRCode.toBuffer(targetUrl, {
@@ -280,6 +283,7 @@ router.post(
 
       const qrCode = await prisma.qrCode.create({
         data: {
+          id: qrCodeId,
           restaurantId,
           label,
           tableNumber,
@@ -398,7 +402,12 @@ router.put(
     if (label !== undefined) updateData.label = label;
     if (tableNumber !== undefined) {
       updateData.tableNumber = tableNumber;
-      updateData.targetUrl = qrCode.targetUrl.replace(/table=\d+/, `table=${tableNumber}`);
+      // Rebuild the destination so a changed table keeps the QR id (scan
+      // attribution) and legacy codes without `qr` gain one on next download.
+      const target = new URL(qrCode.targetUrl);
+      target.searchParams.set('table', String(tableNumber));
+      if (!target.searchParams.get('qr')) target.searchParams.set('qr', qrCode.id);
+      updateData.targetUrl = target.toString();
     }
 
     const updated = await prisma.qrCode.update({

@@ -96,13 +96,16 @@ export default function ReservationsPage() {
     } catch (err: any) { showErrorToast(err?.response?.data?.message || 'Action failed') }
   }
 
-  const seatFromWaitlist = async (entryId: string) => {
-    const freeTable = tables.find((t) => t.status === 'FREE' && (!t.capacity || t.capacity >= Number(waitForm.partySize) || true))
-    const candidate = freeTable || tables.find((t) => t.status === 'FREE')
+  const seatFromWaitlist = async (entry: { id: string; partySize: number }) => {
+    const partySize = Number(entry.partySize) || 1
+    // Prefer a table that actually fits the party, then fall back to any free table.
+    const candidate =
+      tables.find((t) => t.status === 'FREE' && (!t.capacity || t.capacity >= partySize)) ||
+      tables.find((t) => t.status === 'FREE')
     if (!candidate) { showErrorToast('No free table available'); return }
     if (!confirm(`Seat this party at ${candidate.label || `Table ${candidate.tableNumber}`}?`)) return
     try {
-      await reservationsApi.seatWaitlist(entryId, candidate.id)
+      await reservationsApi.seatWaitlist(entry.id, candidate.id)
       showSuccessToast('Party seated')
       load()
     } catch (err: any) { showErrorToast(err?.response?.data?.message || 'Seating failed') }
@@ -188,7 +191,7 @@ export default function ReservationsPage() {
                         </p>
                       </div>
                     </div>
-                    <Button size="sm" onClick={() => seatFromWaitlist(w.id)}><Armchair className="h-3 w-3" /> Seat</Button>
+                    <Button size="sm" onClick={() => seatFromWaitlist(w)}><Armchair className="h-3 w-3" /> Seat</Button>
                   </div>
                 ))}
               </div>

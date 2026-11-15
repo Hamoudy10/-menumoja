@@ -44,8 +44,19 @@ export const reorderCategories = (order: any[]) =>
 export const reorderItems = (data: any) =>
   api.put('/menu/items/reorder', data).then(unwrap)
 
-export const getPublicMenu = (slug: string) =>
-  api.get(`/menu/public/${slug}`).then(unwrap)
+export const getPublicMenu = (
+  slug: string,
+  opts?: { qrCodeId?: string; sessionId?: string; tableNumber?: number }
+) =>
+  api
+    .get(`/menu/public/${slug}`, {
+      params: opts?.tableNumber ? { table: opts.tableNumber } : undefined,
+      headers: {
+        ...(opts?.qrCodeId ? { 'x-qr-code-id': opts.qrCodeId } : {}),
+        ...(opts?.sessionId ? { 'x-session-id': opts.sessionId } : {}),
+      },
+    })
+    .then(unwrap)
 
 export const searchPublicMenu = (slug: string, query: string) =>
   api.get(`/menu/public/${slug}/search`, { params: { q: query } }).then(unwrap)

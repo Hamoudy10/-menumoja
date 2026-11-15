@@ -64,6 +64,60 @@ describe('POST /api/v1/orders/public/create', () => {
     expect(res.body.data.orderNumber).toBeDefined();
   });
 
+  it('links QR table orders to the table and scan', async () => {
+    const restaurant = await createTestRestaurant(uuidv4());
+    const category = await createTestCategory(restaurant.id);
+    const item = await createTestMenuItem(category.id, restaurant.id, { price: 500 });
+    const table = { id: uuidv4(), restaurantId: restaurant.id, tableNumber: 4, status: 'FREE' };
+    const qrCodeId = uuidv4();
+
+    (prisma.restaurant.findUnique as jest.Mock).mockResolvedValue(restaurant);
+    (prisma.menuItem.findMany as jest.Mock).mockResolvedValue([
+      { id: item.id, name: item.name, price: 500, preparationTimeMinutes: 15 },
+    ]);
+    (prisma.restaurantTable.findFirst as jest.Mock).mockResolvedValue(table);
+    (prisma.qrCode.findFirst as jest.Mock).mockResolvedValue({ id: qrCodeId });
+    (prisma.order.create as jest.Mock).mockResolvedValue({
+      id: uuidv4(),
+      orderNumber: 'ORD-QR-001',
+      restaurantId: restaurant.id,
+      sessionId: 'qr-session',
+      status: 'PENDING',
+      paymentStatus: 'UNPAID',
+      totalAmount: 605,
+      estimatedPrepMinutes: 15,
+      createdAt: new Date(),
+      items: [{ id: uuidv4(), itemName: item.name, quantity: 2, itemPrice: 500, subtotal: 1000 }],
+    });
+
+    await request(app)
+      .post('/api/v1/orders/public/create')
+      .send({
+        restaurantId: restaurant.id,
+        tableNumber: 4,
+        qrCodeId,
+        sessionId: 'qr-session',
+        items: [{ menuItemId: item.id, quantity: 2 }],
+      })
+      .expect(201);
+
+    expect(prisma.order.create).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: expect.objectContaining({
+          tableId: table.id,
+          tableNumber: 4,
+          qrCodeId,
+        }),
+      })
+    );
+    expect(prisma.restaurantTable.update).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: { id: table.id },
+        data: expect.objectContaining({ status: 'OCCUPIED' }),
+      })
+    );
+  });
+
   it('should fail with invalid item', async () => {
     const restaurant = await createTestRestaurant(uuidv4());
     const invalidItemId = uuidv4();

@@ -106,6 +106,11 @@ jest.mock('../src/config/database', () => {
       delete: jest.fn(),
       count: jest.fn(),
     },
+    tableSession: {
+      findFirst: jest.fn().mockResolvedValue(null),
+      create: jest.fn(),
+      updateMany: jest.fn(),
+    },
     order: {
       findFirst: jest.fn(),
       findUnique: jest.fn(),
@@ -384,6 +389,7 @@ jest.mock('../src/config/database', () => {
     },
     menuItemAnalytics: {
       findMany: jest.fn(),
+      upsert: jest.fn(),
     },
     promotion: {
       findMany: jest.fn().mockResolvedValue([]),
@@ -396,7 +402,7 @@ jest.mock('../src/config/database', () => {
       create: jest.fn().mockResolvedValue({ id: uuidv4() }),
     },
     $queryRaw: jest.fn().mockResolvedValue([]),
-    $transaction: jest.fn((fn: any) => fn(mockPrisma)),
+    $transaction: jest.fn((input: any) => (Array.isArray(input) ? Promise.all(input) : input(mockPrisma))),
   };
   return { prisma: mockPrisma };
 });

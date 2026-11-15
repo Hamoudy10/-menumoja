@@ -11,7 +11,8 @@ import { upsertCustomer } from '@/services/customer.service';
 import { sendTransactional } from '@/services/whatsapp.service';
 import { updateOrderStatusSchema } from '@/utils/validation';
 import { mpesaService } from '@/services';
-import { onTableSeated, freeTableIfLastOrder } from '@/services/table.service';
+import { onTableSeated, freeTableIfLastOrder, freeTableWhenFinished } from '@/services/table.service';
+import { recordOrderAnalytics } from '@/services/order-analytics.service';
 import { io } from '@/hooks/socket';
 import logger from '@/utils/logger';
 
@@ -84,6 +85,8 @@ const customerCreateOrderSchema = z.object({
   restaurantId: z.string().uuid('Invalid restaurant ID').optional(),
   restaurantSlug: z.string().optional(),
   tableId: z.string().uuid('Invalid table ID').optional(),
+  tableNumber: z.number().int().min(0).max(10000).nullable().optional(),
+  qrCodeId: z.string().uuid('Invalid QR code ID').optional(),
   sessionId: z.string().optional(),
   items: z.array(z.object({
     menuItemId: z.string().uuid('Invalid menu item ID'),
@@ -121,7 +124,7 @@ router.post('/public/create',
   optionalAuth,
   validate(customerCreateOrderSchema),
   asyncHandler(async (req, res) => {
-    let { restaurantId, restaurantSlug, tableId, tableNumber, sessionId, items, specialNotes, paymentMethod, customerName, customerPhone, website } = req.body;
+    let { restaurantId, restaurantSlug, tableId, tableNumber, qrCodeId, sessionId, items, specialNotes, paymentMethod, customerName, customerPhone, website } = req.body;
 
     if (website) {
       return res.status(201).json({
@@ -273,6 +276,15 @@ router.post('/public/create',
       }
     }
 
+    let linkedQrCodeId: string | null = null;
+    if (qrCodeId) {
+      const scannedQr = await prisma.qrCode.findFirst({
+        where: { id: qrCodeId, restaurantId },
+        select: { id: true },
+      });
+      linkedQrCodeId = scannedQr?.id || null;
+    }
+
     if (seatedTableId) {
       await onTableSeated(restaurantId, seatedTableId);
     }
@@ -290,8 +302,9 @@ router.post('/public/create',
         data: {
           orderNumber,
           restaurantId,
-          tableId: tableId || null,
+          tableId: seatedTableId || tableId || null,
           tableNumber: tableNumberValue,
+          qrCodeId: linkedQrCodeId,
           sessionId,
           status: 'PENDING',
           paymentStatus: 'UNPAID',
@@ -367,6 +380,8 @@ router.post('/public/create',
     }
 
     logger.info('Order created', { orderId: order.id, orderNumber, restaurantId });
+
+    await recordOrderAnalytics(restaurantId, order.items, Number(order.totalAmount));
 
     if (paymentMethod === 'mpesa') {
       try {
@@ -455,6 +470,21 @@ router.post('/',
 
     const { tableNumber, customerName, customerPhone, items, notes, paymentMethod } = req.body;
 
+    let seatedTableId: string | null = null;
+    if (tableNumber && tableNumber > 0) {
+      const table = await prisma.restaurantTable.findFirst({
+        where: { restaurantId, tableNumber },
+        select: { id: true },
+      });
+      if (table) {
+        seatedTableId = table.id;
+        await prisma.restaurantTable.update({
+          where: { id: table.id },
+          data: { status: 'OCCUPIED' },
+        });
+      }
+    }
+
     const { deviceId, clientTransactionId, existing } = await dedupeOrderByClientTxn(restaurantId, req.body);
     if (existing) {
       logger.info('Reusing device+transaction POS order', { orderId: existing.id, deviceId, clientTransactionId, restaurantId });
@@ -528,7 +558,7 @@ router.post('/',
         data: {
           orderNumber: generateOrderNumber(restaurantId),
           restaurantId,
-          tableId: null,
+          tableId: seatedTableId,
           tableNumber: tableNumber || null,
           sessionId: uuidv4(),
           status: 'PENDING',
@@ -585,6 +615,10 @@ router.post('/',
     }
 
     await recordOrderSynced(restaurantId, order, deviceId, clientTransactionId);
+
+    if (seatedTableId) await onTableSeated(restaurantId, seatedTableId);
+
+    await recordOrderAnalytics(restaurantId, order.items, Number(order.totalAmount));
 
     logger.info('POS order created', { orderId: order.id, orderNumber: order.orderNumber, restaurantId });
 
@@ -1159,8 +1193,11 @@ router.put('/:id/status',
         servedAt: true,
         cancelledAt: true,
         cancelledReason: true,
+        tableId: true,
       },
     });
+
+    await freeTableWhenFinished(restaurantId, updated);
 
     try {
       io.to(`restaurant:${restaurantId}`).emit('order:status-changed', {
@@ -1438,10 +1475,13 @@ function createOrderService() {
       };
     },
     updateOrderPayment: async (orderId: string, paymentData: { paymentId: string; status: string; mpesaReceipt?: string }) => {
-      const updateData: any = {
-        paymentStatus: paymentData.status === 'paid' ? 'PAID' : 'UNPAID',
-      };
-      await prisma.order.update({ where: { id: orderId }, data: updateData });
+      const paymentStatus = paymentData.status === 'paid' ? 'PAID' : 'UNPAID';
+      const updated = await prisma.order.update({
+        where: { id: orderId },
+        data: { paymentStatus },
+        select: { id: true, restaurantId: true, tableId: true, status: true, paymentStatus: true },
+      });
+      await freeTableWhenFinished(updated.restaurantId, updated);
     },
     updateOrderStatus: async (orderId: string, status: string) => {
       await prisma.order.update({ where: { id: orderId }, data: { status: status as any } });

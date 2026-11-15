@@ -13,6 +13,9 @@ export default function MenuCart() {
   const navigate = useNavigate()
   const [searchParams] = useSearchParams()
   const tableFromUrl = searchParams.get('table')
+  const tableNumber = tableFromUrl && /^\d+$/.test(tableFromUrl) ? parseInt(tableFromUrl, 10) : undefined
+  const qrCodeId = searchParams.get('qr') || sessionStorage.getItem(`qrCode_${restaurantSlug}`) || undefined
+  const sessionId = sessionStorage.getItem(`menuSession_${restaurantSlug}`) || undefined
   const [placing, setPlacing] = useState(false)
   const [showPaymentChoice, setShowPaymentChoice] = useState(false)
   const [showMpesaInput, setShowMpesaInput] = useState(false)
@@ -31,7 +34,7 @@ export default function MenuCart() {
     return () => { cancelled = true }
   }, [restaurantSlug, cart.map((c) => c.item.id).join(',')])
 
-  const isTakeaway = !tableFromUrl
+  const isTakeaway = !tableNumber
 
   const total = cart.reduce((s, i) => s + i.item.price * i.quantity, 0)
   const serviceCharge = Math.round(total * 0.05 * 100) / 100
@@ -51,7 +54,9 @@ export default function MenuCart() {
     try {
       const order = await placeOrder({
         restaurantSlug,
-        tableNumber: tableFromUrl ? parseInt(tableFromUrl) : 0,
+        ...(tableNumber ? { tableNumber } : {}),
+        ...(qrCodeId ? { qrCodeId } : {}),
+        ...(sessionId ? { sessionId } : {}),
         items: cart.map(c => ({
           menuItemId: c.item.id,
           name: c.item.name,
@@ -67,7 +72,7 @@ export default function MenuCart() {
       }, sessionStorage.getItem(cartKey) || undefined)
       sessionStorage.removeItem(cartKey)
       clearCart()
-      sessionStorage.setItem(`activeOrder_${restaurantSlug}`, JSON.stringify({ id: order.id, orderNumber: order.orderNumber, tableNumber: tableFromUrl ? parseInt(tableFromUrl) : 0, time: Date.now() }))
+      sessionStorage.setItem(`activeOrder_${restaurantSlug}`, JSON.stringify({ id: order.id, orderNumber: order.orderNumber, tableNumber: tableNumber || 0, time: Date.now() }))
       showSuccessToast('Order placed!')
       navigate(`/menu/${restaurantSlug}/order/${order.id}`)
     } catch {

@@ -167,6 +167,36 @@ describe('GET /api/v1/menu/public/:slug', () => {
     expect(res.body.data.categories.length).toBeGreaterThan(0);
   });
 
+  it('records a QR scan even when the menu response is cached', async () => {
+    const restaurant = await createTestRestaurant(uuidv4());
+    const qrCodeId = uuidv4();
+
+    (redis.get as jest.Mock).mockResolvedValue(
+      JSON.stringify({
+        restaurant: { id: restaurant.id, name: restaurant.name, slug: restaurant.slug },
+        categories: [],
+        promotions: [],
+      })
+    );
+    (prisma.restaurant.findUnique as jest.Mock).mockResolvedValue({ id: restaurant.id });
+    (prisma.qrCode.findFirst as jest.Mock).mockResolvedValue({ id: qrCodeId });
+    (prisma.qrScan.findFirst as jest.Mock).mockResolvedValue(null);
+
+    await request(app)
+      .get(`/api/v1/menu/public/${restaurant.slug}`)
+      .set('x-qr-code-id', qrCodeId)
+      .set('x-session-id', 'session-1')
+      .expect(200);
+
+    expect(prisma.qrScan.create).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: expect.objectContaining({ qrCodeId, restaurantId: restaurant.id, sessionId: 'session-1' }),
+      })
+    );
+    expect(prisma.qrCode.update).toHaveBeenCalled();
+    expect(prisma.analyticsDaily.upsert).toHaveBeenCalled();
+  });
+
   it('should return 404 for invalid slug', async () => {
     (redis.get as jest.Mock).mockResolvedValue(null);
     (prisma.restaurant.findUnique as jest.Mock).mockResolvedValue(null);
