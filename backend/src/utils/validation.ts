@@ -148,6 +148,7 @@ export const updateSettingsSchema = z
     tipPercentages: z.array(z.number()).optional(),
     serviceChargePercent: z.number().optional(),
     taxPercent: z.number().optional(),
+    aiAssistantEnabled: z.boolean().optional(),
     announcement: z.string().optional(),
     announcementActive: z.boolean().optional(),
     language: z.string().optional(),

@@ -595,6 +595,7 @@ model RestaurantSettings {
   tipPercentages       Int[]        @map("tip_percentages")
   serviceChargePercent Decimal     @default(0) @map("service_charge_percent") @db.Decimal(5, 2)
   taxPercent           Decimal      @default(0) @map("tax_percent") @db.Decimal(5, 2)
+  aiAssistantEnabled   Boolean      @default(true) @map("ai_assistant_enabled")
   mpesaShortcode       String?      @map("mpesa_shortcode")
   mpesaPasskey         String?      @map("mpesa_passkey")
   mpesaBusinessName    String?      @map("mpesa_business_name")

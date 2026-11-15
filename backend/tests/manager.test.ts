@@ -1,18 +1,13 @@
-import request from 'supertest';
 import { v4 as uuidv4 } from 'uuid';
 import {
-  setupTestApp,
   prisma,
   createTestOwner,
   createTestRestaurant,
   generateTestToken,
-  getAuthHeader,
   cleanupTestData,
 } from './helpers';
 import { detectIntent, getForecast } from '../src/services/manager.service';
 import { generateDailyBriefing, answerQuestion } from '../src/services/ai-manager.service';
-
-const app = setupTestApp();
 
 beforeEach(() => {
   cleanupTestData();
@@ -113,46 +108,5 @@ describe('FORECAST', () => {
     expect(forecast.days[0]).toHaveProperty('expected');
     expect(forecast.days[0]).toHaveProperty('confidence');
     expect(['High', 'Moderate', 'Low']).toContain(forecast.days[0].confidence);
-  });
-});
-
-describe('MANAGER API', () => {
-  it('answers via POST /ai/manager/ask', async () => {
-    const { restaurant, token } = await setupTenant();
-    (prisma.order.aggregate as jest.Mock)
-      .mockResolvedValueOnce({ _sum: { totalAmount: 1000 }, _count: { id: 5 } })
-      .mockResolvedValueOnce({ _sum: { totalAmount: 800 }, _count: { id: 4 } });
-    (prisma.orderItem.groupBy as jest.Mock).mockResolvedValue([]);
-    (prisma.menuItem.findMany as jest.Mock).mockResolvedValue([]);
-    (prisma.aiUsageLog.aggregate as jest.Mock).mockResolvedValue({ _sum: { totalTokens: 500 } });
-
-    const res = await request(app)
-      .post('/api/v1/ai/manager/ask')
-      .set(getAuthHeader(token))
-      .send({ message: 'How did sales go this month?' });
-
-    expect(res.status).toBe(200);
-    expect(res.body.data.toolUsed).toBe('sales');
-  });
-
-  it('returns the briefing via GET /ai/manager/briefing', async () => {
-    const { restaurant, token } = await setupTenant();
-    (prisma.order.aggregate as jest.Mock)
-      .mockResolvedValueOnce({ _sum: { totalAmount: 0 }, _count: { id: 0 } })
-      .mockResolvedValueOnce({ _sum: { totalAmount: 0 }, _count: { id: 0 } });
-    (prisma.orderItem.groupBy as jest.Mock).mockResolvedValue([]);
-    (prisma.recipe.findMany as jest.Mock).mockResolvedValue([]);
-    (prisma.menuItem.findMany as jest.Mock).mockResolvedValue([]);
-    (prisma.inventoryItem.findMany as jest.Mock).mockResolvedValue([]);
-    (prisma.stockMovement.groupBy as jest.Mock).mockResolvedValue([]);
-    (prisma.stockMovement.findMany as jest.Mock).mockResolvedValue([]);
-
-    const res = await request(app)
-      .get('/api/v1/ai/manager/briefing')
-      .set(getAuthHeader(token));
-
-    expect(res.status).toBe(200);
-    expect(res.body.data.insights).toBeDefined();
-    expect(res.body.data.date).toBeDefined();
   });
 });

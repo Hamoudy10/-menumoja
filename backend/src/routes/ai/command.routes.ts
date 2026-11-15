@@ -14,6 +14,7 @@ import {
   undoWorkflow,
   getWorkflow,
   getConversation,
+  assertAiAssistantEnabled,
 } from '@/ai/command.service';
 import { isTranscriptionConfigured, transcribeAudio } from '@/integrations/groq';
 import { isCommandRoleAllowed } from '@/ai/access';
@@ -193,6 +194,29 @@ router.get(
   })
 );
 
+// GET /ai/command/pending — global pending approvals for this restaurant.
+router.get(
+  '/command/pending',
+  enforceRestaurantScope,
+  asyncHandler(async (req: any, res: any) => {
+    const actions = await prisma.aiAction.findMany({
+      where: { restaurantId: req.restaurantId, status: 'PENDING' },
+      orderBy: { createdAt: 'desc' },
+      take: 20,
+      select: {
+        id: true,
+        tool: true,
+        label: true,
+        summary: true,
+        args: true,
+        createdAt: true,
+        conversationId: true,
+      },
+    });
+    res.json({ success: true, data: actions });
+  })
+);
+
 // ── Feedback (E3) ──
 
 const feedbackSchema = z.object({
@@ -283,6 +307,7 @@ router.post(
   aiChatLimiter,
   uploadAudio,
   asyncHandler(async (req: any, res: any) => {
+    await assertAiAssistantEnabled(req.restaurantId);
     if (!isTranscriptionConfigured()) {
       throw new AppError(
         503,

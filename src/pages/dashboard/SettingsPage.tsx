@@ -4,7 +4,7 @@ import {
   User, Palette, QrCode, Users, Bell, CreditCard, Globe, Crown, Trash2, Edit3,
   Plus, X, Shield, Moon, Sun, Save, Loader2, CheckCircle2, Download,
   Image, Palette as PaletteIcon, Type, Smartphone, Banknote,
-  Phone, ArrowLeftRight, Dices, Sparkles,
+  Phone, ArrowLeftRight, Dices, Sparkles, Bot,
 } from 'lucide-react'
 import { useStore } from '@/store/useStore'
 import { useTranslation } from 'react-i18next'
@@ -30,6 +30,7 @@ const settingsSections = [
   { id: 'notifications', labelKey: 'settings.notifications', icon: Bell },
   { id: 'payments', labelKey: 'settings.paymentSettings', icon: CreditCard },
   { id: 'language', labelKey: 'settings.language', icon: Globe },
+  { id: 'assistant', labelKey: 'AI Assistant', icon: Bot },
   { id: 'aiUsage', labelKey: 'AI Usage', icon: Sparkles },
   { id: 'subscription', labelKey: 'settings.subscription', icon: Crown },
   { id: 'delete', labelKey: 'settings.deleteAccount', icon: Trash2 },
@@ -97,6 +98,7 @@ export default function SettingsPage() {
   const [staffSaving, setStaffSaving] = useState(false)
   const [loaded, setLoaded] = useState(false)
   const [subscription, setSubscription] = useState<any>(null)
+  const [aiAssistantEnabled, setAiAssistantEnabled] = useState(true)
   const [billing, setBilling] = useState<billingApi.BillingOverview | null>(null)
   const [billingLoading, setBillingLoading] = useState(false)
   const [payInvoice, setPayInvoice] = useState<billingApi.BillingInvoice | null>(null)
@@ -207,6 +209,7 @@ export default function SettingsPage() {
       })
       setFontStyle(restaurant.fontStyle || 'modern')
       const s = restaurant.settings as any
+      setAiAssistantEnabled(s?.aiAssistantEnabled !== false)
       // The passkey is write-only from the client's perspective: the API
       // returns `mpesaPasskeySet` instead of the secret itself.
       setMpesaPasskeySet(Boolean(s?.mpesaPasskeySet))
@@ -328,6 +331,22 @@ export default function SettingsPage() {
       }
       showSuccessToast('Payment settings updated')
     } catch { showErrorToast('Failed to save payment settings') } finally { setSaving(false) }
+  }
+
+  const handleSetAssistant = async (next: boolean) => {
+    setAiAssistantEnabled(next)
+    try {
+      await restaurantApi.updateSettings({ aiAssistantEnabled: next })
+      useStore.setState((state: any) => ({
+        restaurant: state.restaurant
+          ? { ...state.restaurant, settings: { ...(state.restaurant.settings || {}), aiAssistantEnabled: next } }
+          : state.restaurant,
+      }))
+      showSuccessToast(next ? 'AI assistant enabled' : 'AI assistant disabled')
+    } catch {
+      setAiAssistantEnabled(!next)
+      showErrorToast('Failed to update the AI assistant setting')
+    }
   }
 
   const handleAddStaff = async () => {
@@ -1100,6 +1119,28 @@ export default function SettingsPage() {
               </button>
             ))}
             <Button onClick={handleSaveLanguage} loading={saving}><Save className="h-4 w-4" /> {t('language.saveLanguage')}</Button>
+          </div>
+        )
+
+      case 'assistant':
+        return (
+          <div className="space-y-4">
+            <div className="rounded-2xl border border-gray-100 p-5 dark:border-white/10">
+              <div className="flex items-start justify-between gap-4">
+                <div>
+                  <h3 className="font-heading text-lg font-bold text-text-primary dark:text-white">
+                    {restaurant?.name ? `${restaurant.name} AI` : 'MenuMoja AI'}
+                  </h3>
+                  <p className="mt-1 font-body text-sm text-text-secondary dark:text-white/50">
+                    Show the floating AI assistant on the dashboard. It answers only from your real data and always asks before making changes.
+                  </p>
+                </div>
+                <Toggle checked={aiAssistantEnabled} onChange={handleSetAssistant} />
+              </div>
+              <p className="mt-4 font-body text-xs text-text-secondary dark:text-white/40">
+                When off, the assistant and its API are disabled for this restaurant. You can turn it back on anytime.
+              </p>
+            </div>
           </div>
         )
 

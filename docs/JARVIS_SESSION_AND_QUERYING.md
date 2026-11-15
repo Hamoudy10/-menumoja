@@ -114,3 +114,21 @@ would be a security regression.
 
 Feedback (👍/👎) is stored and reviewable by super-admins; use it to find the
 gaps that deserve a new tool.
+
+---
+
+## 5. Naming, opt-out, approvals, and drag (2026-11-15)
+
+- The assistant is named **`<Restaurant name> AI`** (e.g. “Amorino Restaurant
+  AI”). The floating pill shows “AI”; the panel header/welcome show the full
+  name.
+- **Opt-out:** Settings → AI Assistant toggles
+  `RestaurantSettings.aiAssistantEnabled`. When off, the panel is hidden and
+  command/transcription APIs return 403 `AI_ASSISTANT_DISABLED`.
+- **Global pending approvals:** the panel header lists all `PENDING` AI actions
+  for the restaurant, with Confirm/Cancel. This replaces the old AI Manager
+  page’s pending-action panel.
+- **Draggable:** the panel can be dragged by its header and stays within the
+  viewport.
+- The old AI Manager tab/page/route and its backend `/ai/manager/*` routes were
+  removed. See `docs/DASHBOARD_IA.md` for the 8-tab dashboard structure.

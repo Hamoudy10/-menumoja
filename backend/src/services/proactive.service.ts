@@ -10,7 +10,7 @@ import { generateDailyBriefing } from './ai-manager.service';
  * NO LLM runs here. Every detector is a plain, tenant-scoped query. Alerts are
  * persisted as `Notification` rows (so they survive refresh) and emitted over
  * Socket.io. Each alert may carry pre-wired actions that the admin dashboard
- * turns into buttons ("Open inventory", "Ask Jarvis", "Open orders").
+ * turns into buttons ("Open inventory", "Ask AI", "Open orders").
  *
  * Deduplication is time-window based (no schema change): if an alert of the
  * same type was created within the window, it is not repeated.
@@ -108,7 +108,7 @@ export async function detectLowStock(restaurant: ProactiveRestaurant, now = new 
       kind: 'low_stock',
       items: low.slice(0, 10).map((item) => ({ name: item.name, stock: item.stock, unit: item.unit, reorderLevel: item.reorderLevel })),
       actions: [
-        { kind: 'command', label: 'Review with Jarvis', text: 'Show me what stock is low' },
+        { kind: 'command', label: 'Review with AI', text: 'Show me what stock is low' },
         { kind: 'navigate', label: 'Open inventory', to: '/dashboard/inventory' },
       ] satisfies NudgeAction[],
     }
@@ -152,7 +152,7 @@ export async function detectWaitingOrders(restaurant: ProactiveRestaurant, now =
       })),
       actions: [
         { kind: 'navigate', label: 'Open orders', to: '/dashboard/orders' },
-        { kind: 'command', label: 'Ask Jarvis', text: 'Show open orders' },
+        { kind: 'command', label: 'Ask AI', text: 'Show open orders' },
       ] satisfies NudgeAction[],
     }
   );

@@ -49,6 +49,7 @@ function prime() {
   (prisma.aiConversation.update as jest.Mock).mockResolvedValue({});
   (prisma.aiAction.update as jest.Mock).mockResolvedValue({});
   (prisma.auditLog.create as jest.Mock).mockResolvedValue({ id: 'audit-1' });
+  (prisma.restaurantSettings.findUnique as jest.Mock).mockResolvedValue({ aiAssistantEnabled: true });
   (openai.selectCommandTool as jest.Mock).mockReset();
   (openai.selectCommandPlan as jest.Mock).mockReset();
   (openai.generateManagerAnswer as jest.Mock).mockReset();
@@ -211,6 +212,13 @@ describe('handleCommand — reads', () => {
       expect(result.data.results[0].source).toBe('docs/MPESA_INTEGRATION.md');
     }
     expect(openai.generateKnowledgeAnswer).toHaveBeenCalled();
+  });
+
+  it('blocks commands when the assistant is disabled', async () => {
+    (prisma.restaurantSettings.findUnique as jest.Mock).mockResolvedValue({ aiAssistantEnabled: false });
+
+    await expect(handleCommand(ctx, { text: 'show sales' })).rejects.toThrow();
+    expect(openai.selectCommandPlan).not.toHaveBeenCalled();
   });
 });
 
@@ -563,6 +571,22 @@ describe('command routes — security', () => {
     expect(res.status).toBe(200);
     expect(res.body.data.kind).toBe('answer');
     expect(res.body.data.toolUsed).toBe('get_low_stock');
+  });
+
+  it('lists pending approvals for the restaurant', async () => {
+    const owner = await createTestOwner({ id: OWNER_ID });
+    const token = generateTestToken(owner.id, 'owner', RESTAURANT_ID);
+    (prisma.aiAction.findMany as jest.Mock).mockResolvedValue([
+      { id: 'a-1', tool: 'set_item_price', label: 'Price', summary: 'Change price', args: {}, createdAt: new Date(), conversationId: null },
+    ]);
+
+    const res = await request(app)
+      .get('/api/v1/ai/command/pending')
+      .set(getAuthHeader(token));
+
+    expect(res.status).toBe(200);
+    expect(res.body.data).toHaveLength(1);
+    expect(res.body.data[0].tool).toBe('set_item_price');
   });
 
   it('records command feedback for an owner (201)', async () => {

@@ -209,7 +209,7 @@ router.put(
       'welcomeMessage', 'welcomeMessageSw', 'announcement', 'announcementActive',
       'languageEnglish', 'languageSwahili', 'languageArabic', 'showPrices',
       'allowOrdering', 'allowCashPayment', 'allowMpesaPayment', 'tipEnabled',
-      'tipPercentages', 'serviceChargePercent', 'taxPercent',
+      'tipPercentages', 'serviceChargePercent', 'taxPercent', 'aiAssistantEnabled',
       'mpesaShortcode', 'mpesaPasskey', 'mpesaBusinessName',
     ];
 

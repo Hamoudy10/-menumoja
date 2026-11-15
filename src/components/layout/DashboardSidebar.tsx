@@ -1,29 +1,19 @@
 import { NavLink } from 'react-router-dom'
 import {
-  LayoutDashboard, UtensilsCrossed, ShoppingCart, CreditCard,
-  BarChart3, Camera, Settings, HelpCircle, ChefHat, X, Table2, Megaphone, Package, PieChart, Users, Gift, MessageCircle, Bot, CalendarDays,
+  LayoutDashboard, LayoutGrid, UtensilsCrossed, Package,
+  Users, CreditCard, BarChart3, Settings, ChefHat, X,
 } from 'lucide-react'
 import { useStore } from '@/store/useStore'
 
 const menuItems = [
   { path: '/dashboard', label: 'Overview', icon: LayoutDashboard, end: true },
-  { path: '/dashboard/tables', label: 'Tables', icon: Table2 },
+  { path: '/dashboard/operations', label: 'Operations', icon: LayoutGrid },
   { path: '/dashboard/menu', label: 'Menu', icon: UtensilsCrossed },
-  { path: '/dashboard/promotions', label: 'Promotions', icon: Megaphone },
-  { path: '/dashboard/orders', label: 'Orders', icon: ShoppingCart },
-  { path: '/dashboard/payments', label: 'Payments', icon: CreditCard },
-  { path: '/dashboard/analytics', label: 'Analytics', icon: BarChart3 },
-  { path: '/dashboard/inventory', label: 'Inventory', icon: Package },
-  { path: '/dashboard/recipes', label: 'Recipes & Costing', icon: ChefHat },
-  { path: '/dashboard/profitability', label: 'Profitability', icon: PieChart },
+  { path: '/dashboard/inventory', label: 'Inventory & Costs', icon: Package },
   { path: '/dashboard/customers', label: 'Customers', icon: Users },
-  { path: '/dashboard/loyalty', label: 'Loyalty', icon: Gift },
-  { path: '/dashboard/whatsapp', label: 'WhatsApp', icon: MessageCircle },
-  { path: '/dashboard/ai-manager', label: 'AI Manager', icon: Bot },
-  { path: '/dashboard/reservations', label: 'Reservations', icon: CalendarDays },
-  { path: '/dashboard/surveillance', label: 'Surveillance', icon: Camera },
+  { path: '/dashboard/finance', label: 'Finance', icon: CreditCard },
+  { path: '/dashboard/insights', label: 'Insights', icon: BarChart3 },
   { path: '/dashboard/settings', label: 'Settings', icon: Settings },
-  { path: '/dashboard/help', label: 'Help', icon: HelpCircle },
 ]
 
 interface DashboardSidebarProps {

@@ -1,5 +1,5 @@
 import { Suspense, lazy, useEffect } from 'react'
-import { Routes, Route, useLocation } from 'react-router-dom'
+import { Routes, Route, useLocation, Navigate } from 'react-router-dom'
 import { useStore } from '@/store/useStore'
 import { AnimatePresence, motion } from 'framer-motion'
 import { Toaster } from 'react-hot-toast'
@@ -30,23 +30,14 @@ const OnboardingAiSetup = lazy(() => import('@/pages/onboarding/OnboardingAiSetu
 const OnboardingQR = lazy(() => import('@/pages/onboarding/OnboardingQR'))
 
 const DashboardHome = lazy(() => import('@/pages/dashboard/DashboardHome'))
-const MenuManager = lazy(() => import('@/pages/dashboard/MenuManager'))
-const PromotionsPage = lazy(() => import('@/pages/dashboard/PromotionsPage'))
-const TablesPage = lazy(() => import('@/pages/dashboard/TablesPage'))
-const OrdersPage = lazy(() => import('@/pages/dashboard/OrdersPage'))
 const PaymentsPage = lazy(() => import('@/pages/dashboard/PaymentsPage'))
-const AnalyticsPage = lazy(() => import('@/pages/dashboard/AnalyticsPage'))
-const SurveillancePage = lazy(() => import('@/pages/dashboard/SurveillancePage'))
 const SettingsPage = lazy(() => import('@/pages/dashboard/SettingsPage'))
 const HelpPage = lazy(() => import('@/pages/dashboard/HelpPage'))
-const InventoryPage = lazy(() => import('@/pages/dashboard/InventoryPage'))
-const RecipesPage = lazy(() => import('@/pages/dashboard/RecipesPage'))
-const ProfitabilityPage = lazy(() => import('@/pages/dashboard/ProfitabilityPage'))
-const CustomersPage = lazy(() => import('@/pages/dashboard/CustomersPage'))
-const LoyaltyPage = lazy(() => import('@/pages/dashboard/LoyaltyPage'))
-const WhatsAppPage = lazy(() => import('@/pages/dashboard/WhatsAppPage'))
-const AIManagerPage = lazy(() => import('@/pages/dashboard/AIManagerPage'))
-const ReservationsPage = lazy(() => import('@/pages/dashboard/ReservationsPage'))
+const OperationsHub = lazy(() => import('@/pages/dashboard/hubs/OperationsHub'))
+const MenuHub = lazy(() => import('@/pages/dashboard/hubs/MenuHub'))
+const InventoryHub = lazy(() => import('@/pages/dashboard/hubs/InventoryHub'))
+const CustomersHub = lazy(() => import('@/pages/dashboard/hubs/CustomersHub'))
+const InsightsHub = lazy(() => import('@/pages/dashboard/hubs/InsightsHub'))
 const StaffLoginPage = lazy(() => import('@/pages/StaffLoginPage'))
 const KitchenDisplay = lazy(() => import('@/pages/dashboard/KitchenDisplay'))
 const CashierDashboard = lazy(() => import('@/pages/dashboard/CashierDashboard'))
@@ -132,23 +123,28 @@ function AppRoutes() {
             </ProtectedRoute>
           }>
             <Route index element={<PageTransition><DashboardHome /></PageTransition>} />
-            <Route path="tables" element={<PageTransition><TablesPage /></PageTransition>} />
-            <Route path="menu" element={<PageTransition><MenuManager /></PageTransition>} />
-            <Route path="promotions" element={<PageTransition><PromotionsPage /></PageTransition>} />
-            <Route path="orders" element={<PageTransition><OrdersPage /></PageTransition>} />
-            <Route path="payments" element={<PageTransition><PaymentsPage /></PageTransition>} />
-            <Route path="analytics" element={<PageTransition><AnalyticsPage /></PageTransition>} />
-            <Route path="surveillance" element={<PageTransition><SurveillancePage /></PageTransition>} />
-            <Route path="inventory" element={<PageTransition><InventoryPage /></PageTransition>} />
-            <Route path="recipes" element={<PageTransition><RecipesPage /></PageTransition>} />
-            <Route path="profitability" element={<PageTransition><ProfitabilityPage /></PageTransition>} />
-            <Route path="customers" element={<PageTransition><CustomersPage /></PageTransition>} />
-            <Route path="loyalty" element={<PageTransition><LoyaltyPage /></PageTransition>} />
-            <Route path="whatsapp" element={<PageTransition><WhatsAppPage /></PageTransition>} />
-            <Route path="ai-manager" element={<PageTransition><AIManagerPage /></PageTransition>} />
-            <Route path="reservations" element={<PageTransition><ReservationsPage /></PageTransition>} />
+            <Route path="operations" element={<PageTransition><OperationsHub /></PageTransition>} />
+            <Route path="menu" element={<PageTransition><MenuHub /></PageTransition>} />
+            <Route path="inventory" element={<PageTransition><InventoryHub /></PageTransition>} />
+            <Route path="customers" element={<PageTransition><CustomersHub /></PageTransition>} />
+            <Route path="finance" element={<PageTransition><PaymentsPage /></PageTransition>} />
+            <Route path="insights" element={<PageTransition><InsightsHub /></PageTransition>} />
             <Route path="settings" element={<PageTransition><SettingsPage /></PageTransition>} />
             <Route path="help" element={<PageTransition><HelpPage /></PageTransition>} />
+
+            {/* Legacy deep links → consolidated hubs */}
+            <Route path="orders" element={<Navigate to="/dashboard/operations?tab=orders" replace />} />
+            <Route path="tables" element={<Navigate to="/dashboard/operations?tab=tables" replace />} />
+            <Route path="reservations" element={<Navigate to="/dashboard/operations?tab=reservations" replace />} />
+            <Route path="surveillance" element={<Navigate to="/dashboard/operations?tab=cameras" replace />} />
+            <Route path="promotions" element={<Navigate to="/dashboard/menu?tab=promotions" replace />} />
+            <Route path="recipes" element={<Navigate to="/dashboard/inventory?tab=recipes" replace />} />
+            <Route path="loyalty" element={<Navigate to="/dashboard/customers?tab=loyalty" replace />} />
+            <Route path="whatsapp" element={<Navigate to="/dashboard/customers?tab=campaigns" replace />} />
+            <Route path="analytics" element={<Navigate to="/dashboard/insights?tab=analytics" replace />} />
+            <Route path="profitability" element={<Navigate to="/dashboard/insights?tab=profitability" replace />} />
+            <Route path="payments" element={<Navigate to="/dashboard/finance" replace />} />
+            <Route path="ai-manager" element={<Navigate to="/dashboard" replace />} />
           </Route>
 
           <Route path="/admin" element={

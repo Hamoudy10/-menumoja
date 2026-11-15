@@ -4,7 +4,6 @@ import { prisma } from '@/config/database';
 import { authenticate, enforceRestaurantScope, validate, validateParams, aiChatLimiter, asyncHandler } from '@/middleware';
 import { AppError, NotFoundError } from '@/utils/errors';
 import { getUsageSummary } from '@/services/ai-usage.service';
-import { confirmAction, rejectAction, listActions } from '@/services/ai-action.service';
 import { generateDescriptionSchema, generateImageSchema } from '@/utils/validation';
 import { aiService } from '@/services';
 import * as openai from '@/integrations/openai';
@@ -576,73 +575,6 @@ router.get('/usage',
   })
 );
 
-const managerAskSchema = z.object({
-  message: z.string().min(1).max(1000),
-}).strict();
-
-// POST /manager/ask - grounded AI Restaurant Manager answer
-router.post('/manager/ask',
-  authenticate,
-  enforceRestaurantScope,
-  validate(managerAskSchema),
-  asyncHandler(async (req: any, res: any) => {
-    const restaurantId = (req as any).restaurantId;
-    const { answerQuestion } = await import('@/services/ai-manager.service');
-    const result = await answerQuestion(restaurantId, req.body.message);
-    res.json({ success: true, data: result });
-  })
-);
-
-// GET /manager/briefing?date=YYYY-MM-DD - deterministic daily briefing
-router.get('/manager/briefing',
-  authenticate,
-  enforceRestaurantScope,
-  asyncHandler(async (req: any, res: any) => {
-    const restaurantId = (req as any).restaurantId;
-    const { generateDailyBriefing } = await import('@/services/ai-manager.service');
-    const date = req.query.date ? new Date(String(req.query.date)) : new Date();
-    const briefing = await generateDailyBriefing(restaurantId, date);
-    res.json({ success: true, data: briefing });
-  })
-);
-
-const actionIdParamSchema = z.object({ id: z.string().uuid('Invalid action ID') }).strict();
-
-// POST /manager/actions/:id/confirm - approve + execute a proposed AI action
-router.post('/manager/actions/:id/confirm',
-  authenticate,
-  enforceRestaurantScope,
-  validateParams(actionIdParamSchema),
-  asyncHandler(async (req: any, res: any) => {
-    const restaurantId = (req as any).restaurantId;
-    const result = await confirmAction(restaurantId, String(req.params.id), { userId: req.user!.userId, role: req.user!.role });
-    res.json({ success: true, data: result });
-  })
-);
-
-// POST /manager/actions/:id/reject - decline a proposed AI action
-router.post('/manager/actions/:id/reject',
-  authenticate,
-  enforceRestaurantScope,
-  validateParams(actionIdParamSchema),
-  asyncHandler(async (req: any, res: any) => {
-    const restaurantId = (req as any).restaurantId;
-    await rejectAction(restaurantId, String(req.params.id), { userId: req.user!.userId, role: req.user!.role });
-    res.json({ success: true, data: { message: 'Action rejected.' } });
-  })
-);
-
-// GET /manager/actions?status=PENDING|EXECUTED|REJECTED|FAILED|all - audit/list AI actions
-router.get('/manager/actions',
-  authenticate,
-  enforceRestaurantScope,
-  asyncHandler(async (req: any, res: any) => {
-    const restaurantId = (req as any).restaurantId;
-    const status = ['PENDING', 'EXECUTED', 'REJECTED', 'FAILED', 'all'].includes(String(req.query.status)) ? String(req.query.status) as any : 'all';
-    const actions = await listActions(restaurantId, status);
-    res.json({ success: true, data: actions });
-  })
-);
 
 // AI Command ("Jarvis") — unified read/write tool layer (Phase A).
 router.use('/', commandRoutes);

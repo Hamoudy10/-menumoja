@@ -90,6 +90,19 @@ export const sendFeedback = (data: {
 export const getConversation = (id: string) =>
   api.get(`/ai/command/conversations/${id}`).then(unwrap)
 
+export interface PendingAction {
+  id: string
+  tool: string
+  label: string
+  summary: string
+  args: Record<string, unknown>
+  createdAt?: string
+  conversationId?: string | null
+}
+
+export const listPendingActions = (): Promise<PendingAction[]> =>
+  api.get('/ai/command/pending').then(unwrap)
+
 export const transcribeAudio = (form: FormData) =>
   api
     .post('/ai/command/transcribe', form, { headers: { 'Content-Type': 'multipart/form-data' } })

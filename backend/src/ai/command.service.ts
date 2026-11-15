@@ -112,6 +112,26 @@ function assertCommandAccess(ctx: ToolContext): void {
   }
 }
 
+/**
+ * Restaurants can opt out of the AI assistant. When disabled, new commands and
+ * voice transcription are blocked (existing pending actions can still be
+ * resolved by an admin via the API if needed).
+ */
+export async function assertAiAssistantEnabled(restaurantId: string): Promise<void> {
+  const settings = await prisma.restaurantSettings.findUnique({
+    where: { restaurantId },
+    select: { aiAssistantEnabled: true },
+  });
+  if (settings && settings.aiAssistantEnabled === false) {
+    throw new AppError(
+      403,
+      'AI_ASSISTANT_DISABLED',
+      'The AI assistant is disabled for this restaurant.',
+      'Msaidizi wa AI amezimwa kwa mgahawa huu.'
+    );
+  }
+}
+
 function helpText(): string {
   return 'I can help with sales, top items, stock, tables, open orders, staff, profitability, the daily briefing, and actions like marking an item unavailable, changing a price, restocking, updating an order, assigning a waiter or transferring a table. What do you need?';
 }
@@ -423,6 +443,7 @@ async function buildReadAnswer(
 export async function handleCommand(ctx: ToolContext, input: CommandInput): Promise<CommandResponse> {
   assertRestaurantContext(ctx);
   assertCommandAccess(ctx);
+  await assertAiAssistantEnabled(ctx.restaurantId);
   const text = String(input.text || '').trim();
   if (!text) throw AppError.validation('Command text is required', 'Amri inahitajika');
 

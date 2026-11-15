@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useCallback, useState } from 'react'
 import { motion } from 'framer-motion'
-import { Store, ShoppingCart, TrendingUp, Users, DollarSign, Clock, Bell, ArrowRight, UtensilsCrossed, CreditCard, AlertTriangle } from 'lucide-react'
+import { Store, ShoppingCart, TrendingUp, Users, DollarSign, Clock, Bell, ArrowRight, UtensilsCrossed, CreditCard, AlertTriangle, Sparkles } from 'lucide-react'
 import { useStore } from '@/store/useStore'
 import { useNavigate } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
@@ -73,6 +73,17 @@ export default function DashboardHome() {
           <p className="text-sm text-text-secondary dark:text-white/50">Here's what's happening at {restaurant?.name || 'your restaurant'} today.</p>
         </div>
         <div className="flex items-center gap-2">
+          {(restaurant?.settings as any)?.aiAssistantEnabled !== false && (
+            <button
+              onClick={() =>
+                window.dispatchEvent(new CustomEvent('jarvis:command', { detail: { text: 'Daily briefing' } }))
+              }
+              className="flex items-center gap-2 rounded-xl bg-secondary/10 px-3 py-2 font-accent text-xs font-semibold text-secondary hover:bg-secondary/20"
+              title="Ask the AI for the daily briefing"
+            >
+              <Sparkles className="h-4 w-4" /> Ask AI
+            </button>
+          )}
           <RefreshButton refreshing={refreshing} onClick={() => refreshData()} />
           <div className="relative">
             <Bell className="h-5 w-5 text-text-secondary" />

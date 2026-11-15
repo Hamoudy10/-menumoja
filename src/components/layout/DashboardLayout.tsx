@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react'
 import { Outlet, useNavigate } from 'react-router-dom'
 import { motion, AnimatePresence } from 'framer-motion'
-import { Menu, LogOut, User, ChevronDown, ShoppingCart, CreditCard, ChefHat } from 'lucide-react'
+import { Menu, LogOut, User, ChevronDown, ShoppingCart, CreditCard, ChefHat, HelpCircle } from 'lucide-react'
 import { useStore } from '@/store/useStore'
 import { useTranslation } from 'react-i18next'
 import toast from 'react-hot-toast'
@@ -122,6 +122,13 @@ export default function DashboardLayout() {
             <div className="flex-1" />
 
             <div className="flex items-center gap-3">
+              <button
+                onClick={() => navigate('/dashboard/help')}
+                className="flex h-9 w-9 items-center justify-center rounded-xl bg-black/5 dark:bg-white/10 hover:bg-black/10 dark:hover:bg-white/20 transition-colors"
+                title="Help"
+              >
+                <HelpCircle className="h-4 w-4 text-text-secondary dark:text-white/60" />
+              </button>
               <NotificationBell />
 
               <div className="flex items-center gap-2 rounded-xl bg-black/5 dark:bg-white/10 px-3 py-1.5">
@@ -160,8 +167,9 @@ export default function DashboardLayout() {
           </main>
         </div>
 
-        {/* Admin-only AI command bar (Phase B). Staff dashboards do not render it. */}
-        <JarvisCommandBar />
+        {/* Admin-only AI command bar. Staff dashboards do not render it, and
+            the owner can disable it in Settings → AI Assistant. */}
+        {(restaurant?.settings as any)?.aiAssistantEnabled !== false && <JarvisCommandBar />}
       </div>
   )
 }

@@ -1,10 +1,10 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { useLocation } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
-import { AnimatePresence, motion } from 'framer-motion'
+import { AnimatePresence, motion, useDragControls } from 'framer-motion'
 import {
   Sparkles, X, Send, Mic, Loader2, Check, XCircle, Undo2, ShieldAlert, Bot, ListChecks,
-  ThumbsUp, ThumbsDown, RotateCcw,
+  ThumbsUp, ThumbsDown, RotateCcw, Inbox, RefreshCw,
 } from 'lucide-react'
 import * as commandApi from '@/api/command'
 import { showErrorToast, showInfoToast } from '@/components/ui/Toast'
@@ -58,6 +58,12 @@ export default function JarvisCommandBar() {
     reset,
   } = useJarvisStore()
   const replyLanguage: 'en' | 'sw' = String(i18n.language || '').startsWith('sw') ? 'sw' : 'en'
+  const aiName = restaurant?.name ? `${restaurant.name} AI` : 'MenuMoja AI'
+  const dragControls = useDragControls()
+  const constraintsRef = useRef<HTMLDivElement>(null)
+  const [pendingActions, setPendingActions] = useState<commandApi.PendingAction[]>([])
+  const [showPending, setShowPending] = useState(false)
+  const [pendingBusy, setPendingBusy] = useState<string | null>(null)
   const [input, setInput] = useState('')
   const [sending, setSending] = useState(false)
   const [recording, setRecording] = useState(false)
@@ -80,6 +86,41 @@ export default function JarvisCommandBar() {
   const patch = useCallback((id: string, updates: Partial<ChatMessage>) => {
     setMessages((prev) => prev.map((m) => (m.id === id ? { ...m, ...updates } : m)))
   }, [setMessages])
+
+  const loadPending = useCallback(async () => {
+    try {
+      setPendingActions(await commandApi.listPendingActions())
+    } catch {
+      /* pending list is non-fatal */
+    }
+  }, [])
+
+  const confirmPending = async (action: commandApi.PendingAction) => {
+    setPendingBusy(action.id)
+    try {
+      const result: any = await commandApi.confirmAction(action.id)
+      setPendingActions((prev) => prev.filter((item) => item.id !== action.id))
+      push({ id: uid(), role: 'assistant', kind: 'answer', text: result?.message || action.summary })
+      showInfoToast('Action applied')
+    } catch (error: any) {
+      showErrorToast(errorMessage(error, 'Could not apply this action'))
+    } finally {
+      setPendingBusy(null)
+    }
+  }
+
+  const rejectPending = async (action: commandApi.PendingAction) => {
+    setPendingBusy(action.id)
+    try {
+      await commandApi.rejectAction(action.id)
+      setPendingActions((prev) => prev.filter((item) => item.id !== action.id))
+      push({ id: uid(), role: 'assistant', kind: 'answer', text: 'Action rejected — nothing was changed.' })
+    } catch (error: any) {
+      showErrorToast(errorMessage(error, 'Could not reject this action'))
+    } finally {
+      setPendingBusy(null)
+    }
+  }
 
   // Scope the persisted chat to the current restaurant. Never show one
   // account's conversation to another after a restaurant/account change.
@@ -121,6 +162,10 @@ export default function JarvisCommandBar() {
       cancelled = true
     }
   }, [conversationId, messages.length, setMessages])
+
+  useEffect(() => {
+    if (open) void loadPending()
+  }, [open, loadPending])
 
   // ⌘/Ctrl+K toggles, Escape closes
   useEffect(() => {
@@ -646,33 +691,60 @@ export default function JarvisCommandBar() {
         whileTap={{ scale: 0.96 }}
         onClick={() => setOpen((value) => !value)}
         className="fixed bottom-5 right-5 z-40 flex items-center gap-2 rounded-full bg-secondary px-4 py-3 font-accent text-sm font-semibold text-white shadow-warm hover:bg-secondary-dark"
-        title="Ask Jarvis (Ctrl/Cmd+K)"
+        title={`Ask ${aiName} (Ctrl/Cmd+K)`}
       >
         <Sparkles className="h-4 w-4" />
-        <span className="hidden sm:inline">Jarvis</span>
+        <span className="hidden sm:inline">AI</span>
       </motion.button>
 
-      <AnimatePresence>
-        {open && (
-          <motion.div
-            initial={{ opacity: 0, y: 24, scale: 0.98 }}
-            animate={{ opacity: 1, y: 0, scale: 1 }}
-            exit={{ opacity: 0, y: 24, scale: 0.98 }}
-            transition={{ type: 'spring', damping: 26, stiffness: 300 }}
-            className="fixed bottom-5 right-5 z-50 flex h-[min(640px,78vh)] w-[min(400px,calc(100vw-2rem))] flex-col overflow-hidden rounded-3xl border border-black/10 bg-white shadow-2xl dark:border-white/10 dark:bg-primary-light"
-          >
+      <div ref={constraintsRef} className="pointer-events-none fixed inset-0 z-40">
+        <AnimatePresence>
+          {open && (
+            <motion.div
+              drag
+              dragListener={false}
+              dragControls={dragControls}
+              dragMomentum={false}
+              dragConstraints={constraintsRef}
+              dragElastic={0.05}
+              initial={{ opacity: 0, scale: 0.98 }}
+              animate={{ opacity: 1, scale: 1 }}
+              exit={{ opacity: 0, scale: 0.98 }}
+              transition={{ type: 'spring', damping: 26, stiffness: 300 }}
+              className="pointer-events-auto absolute bottom-5 right-5 z-50 flex h-[min(640px,78vh)] w-[min(400px,calc(100vw-2rem))] flex-col overflow-hidden rounded-3xl border border-black/10 bg-white shadow-2xl dark:border-white/10 dark:bg-primary-light"
+            >
             {/* Header */}
             <div className="flex items-center justify-between bg-gradient-to-r from-primary to-primary-light px-4 py-3 text-white">
-              <div className="flex items-center gap-2.5">
+              <div
+                className="flex cursor-grab touch-none items-center gap-2.5 active:cursor-grabbing"
+                onPointerDown={(event) => dragControls.start(event)}
+                title="Drag to move"
+              >
                 <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-white/10">
                   <Bot className="h-5 w-5 text-accent" />
                 </div>
                 <div>
-                  <p className="font-heading text-sm font-bold leading-tight">Menu Moja Jarvis</p>
+                  <p className="font-heading text-sm font-bold leading-tight">{aiName}</p>
                   <p className="font-accent text-[10px] text-white/50">Admin assistant · confirms before changes</p>
                 </div>
               </div>
               <div className="flex items-center gap-1">
+                <button
+                  onClick={() => {
+                    setShowPending((value) => !value)
+                    void loadPending()
+                  }}
+                  className="relative flex h-8 w-8 items-center justify-center rounded-xl text-white/60 hover:bg-white/10 hover:text-white"
+                  title="Pending approvals"
+                  aria-label="Pending approvals"
+                >
+                  <Inbox className="h-4 w-4" />
+                  {pendingActions.length > 0 && (
+                    <span className="absolute -right-0.5 -top-0.5 flex h-4 min-w-4 items-center justify-center rounded-full bg-accent px-1 text-[9px] font-bold text-primary">
+                      {pendingActions.length > 9 ? '9+' : pendingActions.length}
+                    </span>
+                  )}
+                </button>
                 <button
                   onClick={() => {
                     reset()
@@ -687,7 +759,7 @@ export default function JarvisCommandBar() {
                 <button
                   onClick={() => setOpen(false)}
                   className="flex h-8 w-8 items-center justify-center rounded-xl text-white/60 hover:bg-white/10 hover:text-white"
-                  aria-label="Close Jarvis"
+                  aria-label={`Close ${aiName}`}
                 >
                   <X className="h-4 w-4" />
                 </button>
@@ -696,10 +768,56 @@ export default function JarvisCommandBar() {
 
             {/* Messages */}
             <div ref={scrollRef} className="flex-1 space-y-3 overflow-y-auto bg-background-light p-4 dark:bg-background-dark">
+              {showPending && (
+                <div className="rounded-2xl border border-secondary/30 bg-secondary/5 p-3">
+                  <div className="flex items-center justify-between">
+                    <p className="text-[10px] font-accent font-semibold uppercase tracking-wide text-secondary">
+                      Pending approvals
+                    </p>
+                    <button
+                      onClick={() => void loadPending()}
+                      className="text-text-secondary hover:text-secondary"
+                      title="Refresh"
+                      aria-label="Refresh pending approvals"
+                    >
+                      <RefreshCw className="h-3.5 w-3.5" />
+                    </button>
+                  </div>
+                  {pendingActions.length === 0 ? (
+                    <p className="mt-2 text-xs text-text-secondary dark:text-white/50">No pending approvals.</p>
+                  ) : (
+                    <ul className="mt-2 space-y-2">
+                      {pendingActions.map((action) => (
+                        <li key={action.id} className="rounded-xl bg-white p-2.5 dark:bg-primary-light">
+                          <p className="text-xs font-medium text-text-primary dark:text-white/90">{action.summary}</p>
+                          <p className="mt-0.5 text-[10px] text-text-secondary dark:text-white/40">{action.label}</p>
+                          <div className="mt-1.5 flex gap-2">
+                            <button
+                              onClick={() => void confirmPending(action)}
+                              disabled={pendingBusy === action.id}
+                              className="rounded-lg bg-success/15 px-2.5 py-1 text-[10px] font-accent font-semibold text-success hover:bg-success/25 disabled:opacity-50"
+                            >
+                              Confirm
+                            </button>
+                            <button
+                              onClick={() => void rejectPending(action)}
+                              disabled={pendingBusy === action.id}
+                              className="rounded-lg bg-black/5 px-2.5 py-1 text-[10px] font-accent font-medium text-text-secondary hover:bg-black/10 dark:bg-white/10 dark:text-white/70 dark:hover:bg-white/20 disabled:opacity-50"
+                            >
+                              Cancel
+                            </button>
+                          </div>
+                        </li>
+                      ))}
+                    </ul>
+                  )}
+                </div>
+              )}
+
               {messages.length === 0 && (
                 <div className="space-y-3">
                   <div className="max-w-[92%] rounded-2xl border border-black/5 bg-white px-3.5 py-2.5 font-body text-sm text-text-primary dark:border-white/10 dark:bg-primary-light dark:text-white">
-                    I'm Jarvis. Ask about sales, stock, tables or orders — or tell me to update the menu.
+                    I'm {aiName}. Ask about sales, stock, tables or orders — or tell me to update the menu.
                     I'll always ask before I change anything.
                   </div>
                   <div className="flex flex-wrap gap-1.5">
@@ -768,7 +886,7 @@ export default function JarvisCommandBar() {
                   ref={inputRef}
                   value={input}
                   onChange={(event) => setInput(event.target.value)}
-                  placeholder={recording ? 'Listening…' : 'Ask Jarvis…'}
+                  placeholder={recording ? 'Listening…' : 'Ask anything…'}
                   maxLength={1000}
                   disabled={sending || transcribing}
                   className="min-w-0 flex-1 rounded-xl border border-black/10 bg-background-light px-3 py-2.5 font-body text-sm text-text-primary outline-none focus:border-secondary disabled:opacity-60 dark:border-white/10 dark:bg-background-dark dark:text-white"
@@ -801,9 +919,10 @@ export default function JarvisCommandBar() {
                 </button>
               </form>
             </div>
-          </motion.div>
-        )}
-      </AnimatePresence>
+            </motion.div>
+          )}
+        </AnimatePresence>
+      </div>
     </>
   )
 }
