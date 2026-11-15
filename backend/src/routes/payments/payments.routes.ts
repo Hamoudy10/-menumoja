@@ -11,6 +11,7 @@ import { mpesaService } from '@/services';
 import { createReceiptForPayment, getReceiptById } from '@/services/receipt.service';
 import { computeReconciliation, runReconciliation, listReconciliations } from '@/services/reconciliation.service';
 import { upsertCustomer, recordCustomerSpend } from '@/services/customer.service';
+import { normalizeKenyanPhone } from '@/utils/phone';
 import { processPayment as processLoyaltyPayment } from '@/services/loyalty.service';
 import { sendTransactional, recordCampaignConversion } from '@/services/whatsapp.service';
 import { freeTableWhenFinished } from '@/services/table.service';
@@ -180,14 +181,9 @@ router.post('/mpesa/initiate',
       );
     }
 
-    let formattedPhone = phone;
-    if (formattedPhone.startsWith('0')) {
-      formattedPhone = '254' + formattedPhone.substring(1);
-    } else if (formattedPhone.startsWith('+')) {
-      formattedPhone = formattedPhone.substring(1);
-    }
-
-    if (!/^254[17]\d{8}$/.test(formattedPhone)) {
+    // Canonical MSISDN so the CRM row, STK push and receipts all agree.
+    const formattedPhone = normalizeKenyanPhone(phone);
+    if (!formattedPhone) {
       throw new ValidationError(
         'Phone must be a valid Safaricom number (e.g., 2547XXXXXXXX or 2541XXXXXXXX)',
         'Nambari ya simu lazima iwe halali ya Safaricom (mfano 2547XXXXXXXX au 2541XXXXXXXX)'
@@ -531,10 +527,12 @@ router.post('/cash/record',
           phone: order.customerPhone,
           name: order.customerName || undefined,
           source: 'POS',
-        });
+        }, { countVisit: false });
         await recordCustomerSpend(restaurantId, order.customerPhone, Number(payment.amount));
         await processLoyaltyPayment(restaurantId, order.customerPhone, orderId);
-        await recordCampaignConversion(restaurantId, customer.id, orderId, Number(payment.amount));
+        if (customer) {
+          await recordCampaignConversion(restaurantId, customer.id, orderId, Number(payment.amount));
+        }
         await sendTransactional(restaurantId, 'payment_receipt', order.customerPhone, {
           amount: Number(payment.amount),
           orderNumber: order.orderNumber,
@@ -1218,10 +1216,12 @@ router.post('/card/record',
           phone: order.customerPhone,
           name: order.customerName || undefined,
           source: 'POS',
-        });
+        }, { countVisit: false });
         await recordCustomerSpend(restaurantId, order.customerPhone, Number(payment.amount));
         await processLoyaltyPayment(restaurantId, order.customerPhone, orderId);
-        await recordCampaignConversion(restaurantId, customer.id, orderId, Number(payment.amount));
+        if (customer) {
+          await recordCampaignConversion(restaurantId, customer.id, orderId, Number(payment.amount));
+        }
         await sendTransactional(restaurantId, 'payment_receipt', order.customerPhone, {
           amount: Number(payment.amount),
           orderNumber: order.orderNumber,
@@ -1436,7 +1436,7 @@ function createOrderService() {
         include: {
           restaurant: { select: { name: true } },
           items: { select: { itemName: true, quantity: true, itemPrice: true } },
-          payments: { take: 1, select: { id: true } },
+          payments: { where: { status: 'PAID' }, take: 1, select: { id: true, amount: true } },
         },
       });
       if (!order) return null;
@@ -1446,11 +1446,13 @@ function createOrderService() {
         amount: Number(order.totalAmount),
         customerPhone: order.customerPhone || '',
         restaurantId: order.restaurantId,
-        status: order.paymentStatus,
+        status: order.status,
+        paymentStatus: order.paymentStatus,
         items: order.items.map((i) => ({ name: i.itemName, quantity: i.quantity, price: Number(i.itemPrice) })),
         totalAmount: Number(order.totalAmount),
         restaurantName: order.restaurant.name,
         paymentId: order.payments[0]?.id,
+        paidAmount: order.payments[0] ? Number(order.payments[0].amount) : undefined,
       };
     },
     updateOrderPayment: async (orderId: string, paymentData: { paymentId: string; status: string; mpesaReceipt?: string }) => {
@@ -1468,6 +1470,12 @@ function createOrderService() {
         where: { id: orderId },
         data: { status: status as any },
       });
+    },
+    markOrderRefunded: async (orderId: string) => {
+      await prisma.order.update({ where: { id: orderId }, data: { paymentStatus: 'REFUNDED' } });
+    },
+    markPaymentFailed: async (orderId: string) => {
+      await prisma.order.update({ where: { id: orderId }, data: { paymentStatus: 'UNPAID' } });
     },
     getCustomerPhone: async (orderId: string) => {
       const order = await prisma.order.findUnique({ where: { id: orderId }, select: { customerPhone: true } });
@@ -1539,6 +1547,16 @@ function createPaymentService(idempotencyKey?: string | null) {
       await prisma.payment.updateMany({
         where: { mpesaCheckoutRequestId: checkoutRequestId },
         data: updateData,
+      });
+    },
+    markPaymentRefunded: async (paymentId: string, conversationId: string) => {
+      await prisma.payment.update({
+        where: { id: paymentId },
+        data: {
+          status: 'REFUNDED',
+          refundConversationId: conversationId,
+          refundedAt: new Date(),
+        },
       });
     },
     getPaymentByCheckoutRequestId: async (checkoutRequestId: string) => {

@@ -1,6 +1,7 @@
 import { prisma } from '@/config/database';
 import { NotFoundError, ConflictError, AppError } from '@/utils/errors';
 import { upsertCustomer } from './customer.service';
+import { normalizeKenyanPhone } from '@/utils/phone';
 import { sendTransactional } from './whatsapp.service';
 import logger from '@/utils/logger';
 
@@ -37,13 +38,15 @@ export async function createReservation(
     throw AppError.validation('Reservation time must be in the future', 'Muda wa kuhifadhi lazima uwe wa baadaye');
   }
 
+  const customerPhone = normalizeKenyanPhone(data.customerPhone) || data.customerPhone.trim();
+
   let customer = null;
   try {
     customer = await upsertCustomer(restaurantId, {
-      phone: data.customerPhone,
+      phone: customerPhone,
       name: data.customerName,
       source: (data.source as any) || 'MANUAL',
-    });
+    }, { countVisit: false });
   } catch (error) {
     logger.warn('Customer upsert failed during reservation', { error: (error as Error).message, restaurantId });
   }
@@ -73,7 +76,7 @@ export async function createReservation(
       restaurantId,
       customerId: customer?.id || null,
       customerName: data.customerName.trim(),
-      customerPhone: data.customerPhone.trim(),
+      customerPhone,
       partySize: data.partySize,
       reservedAt,
       tableId,
@@ -85,7 +88,7 @@ export async function createReservation(
 
   // consent-gated WhatsApp confirmation
   try {
-    await sendTransactional(restaurantId, 'reservation_confirm', data.customerPhone, {
+    await sendTransactional(restaurantId, 'reservation_confirm', customerPhone, {
       customerName: data.customerName.trim(),
       reservedAt: reservedAt.toLocaleString('en-KE', { hour12: true }),
       partySize: data.partySize,
@@ -189,7 +192,22 @@ export async function updateReservation(restaurantId: string, id: string, data: 
     update.tableId = table.id;
   }
 
-  return prisma.reservation.update({ where: { id }, data: update, include: { table: { select: { id: true, label: true, tableNumber: true } } } });
+  const updated = await prisma.reservation.update({ where: { id }, data: update, include: { table: { select: { id: true, label: true, tableNumber: true } } } });
+
+  // A check-in is a real visit; bookings themselves only touch lastVisit.
+  if (update.status === 'CHECKED_IN' && reservation.status !== 'CHECKED_IN') {
+    try {
+      await upsertCustomer(restaurantId, {
+        phone: updated.customerPhone || reservation.customerPhone,
+        name: updated.customerName || reservation.customerName,
+        source: 'MANUAL',
+      }, { countVisit: true });
+    } catch (error) {
+      logger.warn('Customer visit update failed during check-in', { error: (error as Error).message, restaurantId, reservationId: id });
+    }
+  }
+
+  return updated;
 }
 
 export async function checkInReservation(restaurantId: string, id: string): Promise<any> {
@@ -221,9 +239,11 @@ export async function addToWaitlist(
   });
   const position = (last?.position || 0) + 1;
 
+  const customerPhone = normalizeKenyanPhone(data.customerPhone) || data.customerPhone.trim();
+
   let customer = null;
   try {
-    customer = await upsertCustomer(restaurantId, { phone: data.customerPhone, name: data.customerName, source: 'QR' });
+    customer = await upsertCustomer(restaurantId, { phone: customerPhone, name: data.customerName, source: 'QR' }, { countVisit: false });
   } catch (error) {
     logger.warn('Customer upsert failed during waitlist', { error: (error as Error).message, restaurantId });
   }
@@ -233,7 +253,7 @@ export async function addToWaitlist(
       restaurantId,
       customerId: customer?.id || null,
       customerName: data.customerName.trim(),
-      customerPhone: data.customerPhone.trim(),
+      customerPhone,
       partySize: data.partySize,
       position,
       estimatedWaitMinutes: position * WAIT_PER_PARTY_MINUTES,
@@ -259,10 +279,23 @@ export async function seatFromWaitlist(restaurantId: string, entryId: string, ta
 
   await prisma.restaurantTable.update({ where: { id: table.id }, data: { status: 'OCCUPIED' } });
 
-  return prisma.waitlistEntry.update({
+  const seated = await prisma.waitlistEntry.update({
     where: { id: entry.id },
     data: { status: 'SEATED', seatedTableId: table.id, seatedAt: new Date() },
   });
+
+  // Seating is a real visit (adding to the waitlist is not).
+  try {
+    await upsertCustomer(restaurantId, {
+      phone: seated.customerPhone || entry.customerPhone,
+      name: seated.customerName || entry.customerName,
+      source: 'QR',
+    }, { countVisit: true });
+  } catch (error) {
+    logger.warn('Customer visit update failed during waitlist seating', { error: (error as Error).message, restaurantId, entryId });
+  }
+
+  return seated;
 }
 
 export async function cancelWaitlist(restaurantId: string, entryId: string): Promise<any> {

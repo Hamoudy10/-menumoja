@@ -37,19 +37,22 @@ const updateCustomerSchema = z.object({
 // GET /customers - list with search + segment filter
 router.get('/', validateQuery(customerListQuerySchema), asyncHandler(async (req, res) => {
   const restaurantId = (req as any).restaurantId;
-  const { search, segment, page, perPage } = req.query as any;
+  const { search, segment, page: pageRaw, perPage: perPageRaw } = req.query as any;
+
+  const page = Math.max(1, Number(pageRaw) || 1);
+  const perPage = Math.min(100, Math.max(1, Number(perPageRaw) || 20));
 
   const result = await listCustomers(restaurantId, {
     search: search || undefined,
     segment: segment || undefined,
-    page: Math.max(1, Number(page) || 1),
-    perPage: Math.min(100, Math.max(1, Number(perPage) || 20)),
+    page,
+    perPage,
   });
 
   res.json({
     success: true,
     data: result.customers,
-    meta: buildPaginationMeta(result.total, Number(page) || 1, Number(perPage) || 20),
+    meta: buildPaginationMeta(result.total, page, perPage),
     segments: result.segments,
   });
 }));

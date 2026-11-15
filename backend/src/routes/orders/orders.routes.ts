@@ -7,7 +7,8 @@ import { AppError, NotFoundError, ValidationError } from '@/utils/errors';
 import { generateOrderNumber, calculateTotals, buildPaginationMeta } from '@/utils/helpers';
 import { getIdempotencyKey, findIdempotentOrder, recordIdempotency, isUniqueViolation } from '@/utils/idempotency';
 import { findOrderByClientTxn, recordMutation, markApplied } from '@/services/sync.service';
-import { upsertCustomer } from '@/services/customer.service';
+import { upsertCustomer, reverseCustomerSpend } from '@/services/customer.service';
+import { normalizeKenyanPhone } from '@/utils/phone';
 import { sendTransactional } from '@/services/whatsapp.service';
 import { updateOrderStatusSchema } from '@/utils/validation';
 import { mpesaService } from '@/services';
@@ -125,6 +126,12 @@ router.post('/public/create',
   validate(customerCreateOrderSchema),
   asyncHandler(async (req, res) => {
     let { restaurantId, restaurantSlug, tableId, tableNumber, qrCodeId, sessionId, items, specialNotes, paymentMethod, customerName, customerPhone, website } = req.body;
+
+    // Canonical Kenyan phone so CRM identity, loyalty and exports match across
+    // QR, POS, reservation and M-Pesa flows.
+    const normalizedCustomerPhone = customerPhone ? normalizeKenyanPhone(customerPhone) : null;
+    if (customerPhone && normalizedCustomerPhone) customerPhone = normalizedCustomerPhone;
+    else if (customerPhone) customerPhone = String(customerPhone).trim();
 
     if (website) {
       return res.status(201).json({
@@ -369,7 +376,7 @@ router.post('/public/create',
           phone: customerPhone,
           name: customerName || undefined,
           source: 'QR',
-        });
+        }, { countVisit: true });
         await sendTransactional(restaurantId, 'order_confirm', customerPhone, {
           orderNumber,
           prepMinutes: estimatedPrepMinutes,
@@ -468,7 +475,10 @@ router.post('/',
       }
     }
 
-    const { tableNumber, customerName, customerPhone, items, notes, paymentMethod } = req.body;
+    const { tableNumber, customerName, items, notes, paymentMethod } = req.body;
+    const customerPhone = req.body.customerPhone
+      ? (normalizeKenyanPhone(req.body.customerPhone) || String(req.body.customerPhone).trim())
+      : null;
 
     let seatedTableId: string | null = null;
     if (tableNumber && tableNumber > 0) {
@@ -617,6 +627,20 @@ router.post('/',
     await recordOrderSynced(restaurantId, order, deviceId, clientTransactionId);
 
     if (seatedTableId) await onTableSeated(restaurantId, seatedTableId);
+
+    // Customer identity at order time (not at payment time) so walk-ins show
+    // up in the CRM immediately and visits are counted once per day.
+    if (customerPhone) {
+      try {
+        await upsertCustomer(restaurantId, {
+          phone: customerPhone,
+          name: customerName || undefined,
+          source: 'POS',
+        }, { countVisit: true });
+      } catch (customerError) {
+        logger.error('Customer upsert failed (POS order create)', { error: customerError, restaurantId });
+      }
+    }
 
     await recordOrderAnalytics(restaurantId, order.items, Number(order.totalAmount));
 
@@ -1123,8 +1147,8 @@ router.put('/:id/status',
       where: { id, restaurantId },
       include: {
         payments: {
-          where: { status: 'PAID', paymentMethod: 'MPESA' },
-          take: 1,
+          where: { status: 'PAID' },
+          select: { id: true, paymentMethod: true, amount: true },
         },
       },
     });
@@ -1165,18 +1189,34 @@ router.put('/:id/status',
     }
 
     if (newStatus === 'CANCELLED' && order.payments.length > 0) {
-      const mpesaPayment = order.payments[0];
-      try {
-        await mpesaService.initiateRefund(
-          order.id,
-          Number(order.totalAmount),
-          order.customerPhone || '',
-          createOrderService(),
-          createPaymentService()
-        );
-        logger.info('Refund initiated for cancelled order', { orderId: order.id });
-      } catch (refundError) {
-        logger.error('Failed to initiate refund', { error: refundError, orderId: order.id });
+      const paidTotal = order.payments.reduce((sum, payment) => sum + Number(payment.amount || 0), 0);
+      const hasMpesaPayment = order.payments.some((payment) => payment.paymentMethod === 'MPESA');
+      let refundInitiated = !hasMpesaPayment;
+
+      if (hasMpesaPayment) {
+        try {
+          await mpesaService.initiateRefund(
+            order.id,
+            paidTotal,
+            order.customerPhone || '',
+            createOrderService(),
+            createPaymentService()
+          );
+          refundInitiated = true;
+          logger.info('Refund initiated for cancelled order', { orderId: order.id });
+        } catch (refundError) {
+          logger.error('Failed to initiate refund', { error: refundError, orderId: order.id });
+        }
+      }
+
+      // Spend follows the money: reverse once the refund is initiated (M-Pesa)
+      // or immediately for cash/card cancellations handled at the counter.
+      if (refundInitiated && order.customerPhone) {
+        try {
+          await reverseCustomerSpend(restaurantId, order.customerPhone, paidTotal);
+        } catch (spendError) {
+          logger.error('Failed to reverse customer spend on cancel', { error: spendError, orderId: order.id });
+        }
       }
     }
 
@@ -1382,7 +1422,7 @@ router.delete('/:id',
       include: {
         payments: {
           where: { status: 'PAID' },
-          take: 1,
+          select: { id: true, paymentMethod: true, amount: true },
         },
       },
     });
@@ -1405,16 +1445,31 @@ router.delete('/:id',
     };
 
     if (order.payments.length > 0) {
-      try {
-        await mpesaService.initiateRefund(
-          order.id,
-          Number(order.totalAmount),
-          order.customerPhone || '',
-          createOrderService(),
-          createPaymentService()
-        );
-      } catch (refundError) {
-        logger.error('Failed to initiate refund on cancel', { error: refundError, orderId: order.id });
+      const paidTotal = order.payments.reduce((sum, payment) => sum + Number(payment.amount || 0), 0);
+      const hasMpesaPayment = order.payments.some((payment) => payment.paymentMethod === 'MPESA');
+      let refundInitiated = !hasMpesaPayment;
+
+      if (hasMpesaPayment) {
+        try {
+          await mpesaService.initiateRefund(
+            order.id,
+            paidTotal,
+            order.customerPhone || '',
+            createOrderService(),
+            createPaymentService()
+          );
+          refundInitiated = true;
+        } catch (refundError) {
+          logger.error('Failed to initiate refund on cancel', { error: refundError, orderId: order.id });
+        }
+      }
+
+      if (refundInitiated && order.customerPhone) {
+        try {
+          await reverseCustomerSpend(restaurantId, order.customerPhone, paidTotal);
+        } catch (spendError) {
+          logger.error('Failed to reverse customer spend on cancel', { error: spendError, orderId: order.id });
+        }
       }
     }
 
@@ -1457,7 +1512,7 @@ function createOrderService() {
         include: {
           restaurant: { select: { name: true } },
           items: { select: { itemName: true, quantity: true, itemPrice: true } },
-          payments: { take: 1, select: { id: true } },
+          payments: { where: { status: 'PAID' }, take: 1, select: { id: true, amount: true } },
         },
       });
       if (!order) return null;
@@ -1468,10 +1523,12 @@ function createOrderService() {
         customerPhone: order.customerPhone || '',
         restaurantId: order.restaurantId,
         status: order.status,
+        paymentStatus: order.paymentStatus,
         items: order.items.map((i) => ({ name: i.itemName, quantity: i.quantity, price: Number(i.itemPrice) })),
         totalAmount: Number(order.totalAmount),
         restaurantName: order.restaurant.name,
         paymentId: order.payments[0]?.id,
+        paidAmount: order.payments[0] ? Number(order.payments[0].amount) : undefined,
       };
     },
     updateOrderPayment: async (orderId: string, paymentData: { paymentId: string; status: string; mpesaReceipt?: string }) => {
@@ -1485,6 +1542,12 @@ function createOrderService() {
     },
     updateOrderStatus: async (orderId: string, status: string) => {
       await prisma.order.update({ where: { id: orderId }, data: { status: status as any } });
+    },
+    markOrderRefunded: async (orderId: string) => {
+      await prisma.order.update({ where: { id: orderId }, data: { paymentStatus: 'REFUNDED' } });
+    },
+    markPaymentFailed: async (orderId: string) => {
+      await prisma.order.update({ where: { id: orderId }, data: { paymentStatus: 'UNPAID' } });
     },
     getCustomerPhone: async (orderId: string) => {
       const order = await prisma.order.findUnique({ where: { id: orderId }, select: { customerPhone: true } });
@@ -1553,6 +1616,16 @@ function createPaymentService() {
           ...(data.amount ? { amount: data.amount } : {}),
           ...(data.resultCode !== undefined ? { notes: `ResultCode: ${data.resultCode}` } : {}),
           ...(data.transactionDate ? { processedAt: new Date(data.transactionDate) } : {}),
+        },
+      });
+    },
+    markPaymentRefunded: async (paymentId: string, conversationId: string) => {
+      await prisma.payment.update({
+        where: { id: paymentId },
+        data: {
+          status: 'REFUNDED',
+          refundConversationId: conversationId,
+          refundedAt: new Date(),
         },
       });
     },

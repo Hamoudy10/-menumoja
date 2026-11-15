@@ -12,6 +12,8 @@ interface OrderService {
   getOrderById: (orderId: string) => Promise<OrderRecord | null>;
   updateOrderPayment: (orderId: string, paymentData: { paymentId: string; status: string; mpesaReceipt?: string }) => Promise<void>;
   updateOrderStatus: (orderId: string, status: string) => Promise<void>;
+  markOrderRefunded: (orderId: string) => Promise<void>;
+  markPaymentFailed: (orderId: string) => Promise<void>;
   getCustomerPhone: (orderId: string) => Promise<string>;
   getRestaurantName: (orderId: string) => Promise<string>;
   getOwnerPhone: (orderId: string) => Promise<string>;
@@ -27,6 +29,7 @@ interface PaymentService {
     status: string;
   }) => Promise<PaymentRecord>;
   updatePayment: (checkoutRequestId: string, data: Record<string, any>) => Promise<void>;
+  markPaymentRefunded: (paymentId: string, conversationId: string) => Promise<void>;
   getPaymentByCheckoutRequestId: (checkoutRequestId: string) => Promise<PaymentRecord | null>;
   getPendingPaymentsOlderThan: (minutes: number) => Promise<Array<PaymentRecord>>;
 }
@@ -44,10 +47,12 @@ interface OrderRecord {
   customerEmail?: string;
   restaurantId: string;
   status: string;
+  paymentStatus: string;
   items: Array<{ name: string; quantity: number; price: number }>;
   totalAmount: number;
   restaurantName?: string;
   paymentId?: string;
+  paidAmount?: number;
 }
 
 interface PaymentRecord {
@@ -105,11 +110,11 @@ export async function initiatePayment(
     throw new AppError(404, 'ORDER_NOT_FOUND', 'Order not found', 'Agizo halikupatikana');
   }
 
-  if (order.status === 'paid' || order.status === 'completed') {
+  if (order.paymentStatus === 'PAID' || order.paymentStatus === 'REFUNDED') {
     throw AppError.validation('Order is already paid', 'Agizo tayari limelipwa');
   }
 
-  if (order.status === 'cancelled') {
+  if (order.status === 'CANCELLED') {
     throw AppError.validation('Order is cancelled', 'Agizo limeghairiwa');
   }
 
@@ -234,7 +239,7 @@ export async function handleCallback(
 
     await updateAttemptStatus(checkoutRequestId, attemptStatus, String(resultCode ?? ''), resultDesc || 'Payment failed');
 
-    await orders.updateOrderStatus(payment.orderId, 'payment_failed');
+    await orders.markPaymentFailed(payment.orderId);
     await mpesa.markIdempotencyComplete(checkoutRequestId);
 
     try {
@@ -308,10 +313,12 @@ export async function handleCallback(
     const customerPhone = validCallback.phone || order.customerPhone || payment.phone;
     if (customerPhone) {
       try {
-        const customer = await upsertCustomer(order.restaurantId, { phone: customerPhone, source: 'QR' });
+        const customer = await upsertCustomer(order.restaurantId, { phone: customerPhone, source: 'QR' }, { countVisit: false });
         await recordCustomerSpend(order.restaurantId, customerPhone, Number(validCallback.amount || order.amount));
         await processLoyaltyPayment(order.restaurantId, customerPhone, order.id);
-        await recordCampaignConversion(order.restaurantId, customer.id, order.id, Number(validCallback.amount || order.amount));
+        if (customer) {
+          await recordCampaignConversion(order.restaurantId, customer.id, order.id, Number(validCallback.amount || order.amount));
+        }
         await sendTransactional(order.restaurantId, 'payment_receipt', customerPhone, {
           amount: Number(validCallback.amount || order.amount),
           orderNumber: order.orderNumber,
@@ -432,7 +439,7 @@ export async function handlePaymentFailure(
   orders: OrderService
 ): Promise<void> {
   try {
-    await orders.updateOrderStatus(orderId, 'payment_failed');
+    await orders.markPaymentFailed(orderId);
 
     const customerPhone = await orders.getCustomerPhone(orderId);
     if (customerPhone) {
@@ -460,25 +467,30 @@ export async function initiateRefund(
     throw new AppError(404, 'ORDER_NOT_FOUND', 'Order not found', 'Agizo halikupatikana');
   }
 
-  if (order.status !== 'paid') {
+  if (order.paymentStatus !== 'PAID') {
     throw AppError.validation('Order is not paid', 'Agizo halijalipwa');
   }
 
+  if (!order.paymentId) {
+    throw AppError.validation('Payment record not found for refund', 'Rekodi ya malipo haikupatikana');
+  }
+
+  const refundAmount = Math.min(amount, order.paidAmount ?? amount);
+  if (!Number.isFinite(refundAmount) || refundAmount <= 0) {
+    throw AppError.validation('Invalid refund amount', 'Kiasi batili cha kurejesha');
+  }
+
   const result = await mpesa.initiateB2CPayment(
-    phone,
-    amount,
+    phone || order.customerPhone,
+    refundAmount,
     `Refund for order ${order.orderNumber}`,
     'Refund'
   );
 
-  await payments.updatePayment(order.paymentId || '', {
-    status: 'refunded',
-    refundConversationId: result.ConversationID,
-  });
+  await payments.markPaymentRefunded(order.paymentId, result.ConversationID);
+  await orders.markOrderRefunded(orderId);
 
-  await orders.updateOrderStatus(orderId, 'refunded');
-
-  logger.info('Refund initiated', { orderId, amount, conversationId: result.ConversationID });
+  logger.info('Refund initiated', { orderId, amount: refundAmount, conversationId: result.ConversationID });
 
   return { ConversationID: result.ConversationID };
 }

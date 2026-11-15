@@ -997,6 +997,7 @@ model Order {
   receipts   Receipt[]
 
   @@index([restaurantId])
+  @@index([restaurantId, customerPhone])
   @@index([status])
   @@index([orderNumber])
   @@index([sessionId])
@@ -1039,6 +1040,8 @@ model Payment {
   mpesaPhone             String?       @map("mpesa_phone")
   mpesaCheckoutRequestId String?       @map("mpesa_checkout_request_id")
   mpesaReceiptNumber     String?       @map("mpesa_receipt_number")
+  refundConversationId   String?       @map("refund_conversation_id")
+  refundedAt             DateTime?     @map("refunded_at")
   idempotencyKey         String?       @map("idempotency_key")
   deviceId               String?       @map("device_id")
   clientTransactionId    String?       @map("client_transaction_id")
@@ -1285,6 +1288,7 @@ model Customer {
   preferredChannel  String?        @map("preferred_channel")
   firstVisit        DateTime       @default(now()) @map("first_visit")
   lastVisit         DateTime       @default(now()) @map("last_visit")
+  lastVisitCountedAt DateTime?     @map("last_visit_counted_at")
   totalVisits       Int            @default(1) @map("total_visits")
   totalSpend        Decimal        @default(0) @map("total_spend") @db.Decimal(12, 2)
   averageSpend      Decimal        @default(0) @map("average_spend") @db.Decimal(12, 2)

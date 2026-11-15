@@ -1,6 +1,8 @@
 import { prisma } from '@/config/database';
 import { NotFoundError, ConflictError, AppError } from '@/utils/errors';
 import logger from '@/utils/logger';
+import { normalizeKenyanPhone } from '@/utils/phone';
+import { findCustomerByPhone } from './customer.service';
 
 /**
  * Smart loyalty engine.
@@ -205,7 +207,20 @@ export async function processPaidOrder(
 
   let pointsEarned = 0;
   const pointsPerKes = Number(program.pointsPerKes);
-  if (pointsPerKes > 0 && order.totalAmount >= 1) {
+
+  // Award points once per order, even if a payment callback is retried.
+  const alreadyEarned = existingAccount
+    ? await prisma.loyaltyTransaction.findFirst({
+        where: {
+          accountId: existingAccount.id,
+          type: 'EARN',
+          referenceType: 'ORDER',
+          referenceId: order.orderId,
+        },
+      })
+    : null;
+
+  if (pointsPerKes > 0 && order.totalAmount >= 1 && !alreadyEarned) {
     pointsEarned = Math.floor(order.totalAmount / pointsPerKes);
     if (pointsEarned > 0) {
       await applyPoints(restaurantId, customer.customerId, pointsEarned, EARN as any, `Spend of KES ${Math.floor(order.totalAmount)}`, {
@@ -229,13 +244,22 @@ export async function processPaidOrder(
 
     // abuse prevention: per-customer usage limit per rule
     if (existingAccount) {
+      const alreadyIssuedForOrder = await prisma.loyaltyReward.findFirst({
+        where: {
+          accountId: existingAccount.id,
+          ruleId: rule.id,
+          note: { contains: order.orderNumber },
+        },
+      });
+      if (alreadyIssuedForOrder) continue;
+
       const used = await prisma.loyaltyReward.count({
         where: { accountId: existingAccount.id, ruleId: rule.id },
       });
       if (used >= rule.usageLimit) continue;
     }
 
-    await issueReward(restaurantId, customer.customerId, rule);
+    await issueReward(restaurantId, customer.customerId, rule, order);
     rewardsIssued++;
   }
 
@@ -273,7 +297,7 @@ function evaluateRule(rule: any, order: OrderContext, customer: CustomerContext)
   }
 }
 
-async function issueReward(restaurantId: string, customerId: string, rule: any): Promise<void> {
+async function issueReward(restaurantId: string, customerId: string, rule: any, order: OrderContext): Promise<void> {
   const account = await getOrCreateAccount(restaurantId, customerId);
 
   if (rule.rewardType === 'POINTS') {
@@ -293,7 +317,7 @@ async function issueReward(restaurantId: string, customerId: string, rule: any):
       rewardValue: rule.rewardValue,
       itemId: rule.rewardItemId || null,
       quantity: rule.rewardQuantity || 1,
-      note: rule.name,
+      note: `${rule.name} · order ${order.orderNumber}`,
     },
   });
 }
@@ -347,6 +371,7 @@ export async function cancelReward(restaurantId: string, rewardId: string): Prom
  */
 export async function processPayment(restaurantId: string, phone: string, orderId: string): Promise<{ pointsEarned: number; rewardsIssued: number }> {
   try {
+    const normalizedPhone = normalizeKenyanPhone(phone) || phone;
     const [order, customer] = await Promise.all([
       prisma.order.findUnique({
         where: { id: orderId },
@@ -354,9 +379,7 @@ export async function processPayment(restaurantId: string, phone: string, orderI
           items: { select: { menuItemId: true, itemName: true, quantity: true, menuItem: { select: { category: { select: { name: true } } } } } },
         },
       }),
-      prisma.customer.findUnique({
-        where: { restaurantId_phone: { restaurantId, phone } },
-      }),
+      findCustomerByPhone(restaurantId, normalizedPhone),
     ]);
 
     if (!order || !customer) return { pointsEarned: 0, rewardsIssued: 0 };

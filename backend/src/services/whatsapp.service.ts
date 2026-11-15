@@ -2,6 +2,8 @@ import { prisma } from '@/config/database';
 import { NotFoundError, ConflictError } from '@/utils/errors';
 import * as whatsapp from '@/integrations/whatsapp';
 import logger from '@/utils/logger';
+import { normalizeKenyanPhone } from '@/utils/phone';
+import { findCustomerByPhone, getCustomerSegmentSnapshot } from './customer.service';
 
 /**
  * WhatsApp engagement layer.
@@ -25,13 +27,6 @@ export const DEFAULT_TEMPLATES: Record<string, string> = {
   reservation_confirm: 'Reservation confirmed at {{restaurantName}}! 🪑 Party of {{partySize}} on {{reservedAt}}. See you soon!',
 };
 
-function normalizePhone(phone: string): string {
-  let p = phone.trim().replace(/\s+/g, '');
-  if (p.startsWith('+')) p = p.slice(1);
-  else if (p.startsWith('0')) p = `254${p.slice(1)}`;
-  return p;
-}
-
 export function canContact(customer: { consentMarketing: boolean; isOptedOut: boolean; preferredChannel?: string | null }): boolean {
   if (!customer.consentMarketing) return false;
   if (customer.isOptedOut) return false;
@@ -54,11 +49,12 @@ async function isEnabled(restaurantId: string): Promise<boolean> {
 
 async function sendToCustomer(restaurantId: string, phone: string, message: string): Promise<boolean> {
   if (!message || message.trim().length === 0) return false;
+  const recipient = normalizeKenyanPhone(phone) || phone.trim();
   try {
-    await whatsapp.sendTextMessage(normalizePhone(phone), message.slice(0, 4096));
+    await whatsapp.sendTextMessage(recipient, message.slice(0, 4096));
     return true;
   } catch (error: any) {
-    logger.error('WhatsApp send failed', { error: error.message, restaurantId, phone });
+    logger.error('WhatsApp send failed', { error: error.message, restaurantId, phone: recipient });
     return false;
   }
 }
@@ -123,9 +119,7 @@ export async function sendTransactional(restaurantId: string, templateName: stri
   try {
     if (!(await isEnabled(restaurantId))) return false;
 
-    const customer = await prisma.customer.findUnique({
-      where: { restaurantId_phone: { restaurantId, phone: normalizePhone(phone) } },
-    });
+    const customer = await findCustomerByPhone(restaurantId, phone);
     if (!customer || !canContact(customer)) return false;
 
     const content = await getTemplateContent(restaurantId, templateName);
@@ -195,18 +189,16 @@ async function buildAudience(restaurantId: string, segment?: string): Promise<Ar
   });
 
   if (segment && segment !== 'ALL') {
-    // segments are derived — reuse the CRM classifier with customer stats
-    const { classifyCustomer } = await import('@/services/customer.service');
-    audience = audience.filter((c) => {
-      const segs = classifyCustomer({
-        totalSpend: Number(c.totalSpend),
-        totalVisits: c.totalVisits,
-        firstVisit: c.firstVisit,
-        lastVisit: c.lastVisit,
-        lunchShare: 0, dinnerShare: 0, weekendShare: 0, topCategoryShare: 0,
-      });
-      return segs.includes(segment);
-    });
+    // Segments are derived from customer stats + order behaviour. Reuse the
+    // CRM snapshot so time-of-day/category segments match the Customers page.
+    const snapshot = await getCustomerSegmentSnapshot(restaurantId);
+    const target = segment.trim().toLowerCase();
+    const matchingIds = new Set(
+      snapshot.customers
+        .filter((customer) => customer.segments.some((s) => s.toLowerCase() === target))
+        .map((customer) => customer.id)
+    );
+    audience = audience.filter((customer) => matchingIds.has(customer.id));
   }
 
   return audience;
