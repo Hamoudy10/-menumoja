@@ -16,6 +16,26 @@ import {
 
 const prisma = new PrismaClient();
 
+function toPlainText(text: string): string {
+  if (!text) return text;
+  return text
+    .replace(/\r\n/g, '\n')
+    .replace(/\*\*(.+?)\*\*/g, '$1')
+    .replace(/__(.+?)__/g, '$1')
+    .replace(/`([^`]+)`/g, '$1')
+    .replace(/^\s{0,3}#{1,6}\s*/gm, '')
+    .replace(/^\s*[*-]\s+/gm, (m) => (m.trim().startsWith('*') ? '• ' : '• '))
+    .replace(/\*/g, (ch, idx, str) => {
+      // keep asterisks used as multiplication (between word chars)
+      const prev = str[idx - 1];
+      const next = str[idx + 1];
+      if (prev && next && /\w/.test(prev) && /\w/.test(next)) return ch;
+      return '';
+    })
+    .replace(/\n{3,}/g, '\n\n')
+    .trim();
+}
+
 interface MenuRecord {
   id: string;
   name: string;
@@ -74,7 +94,7 @@ async function runGuardedCustomerChat(
       cached: true,
     });
     return {
-      reply: cachedReply,
+      reply: toPlainText(cachedReply),
       suggestedItems: [],
       quickReplies: ['View Menu', 'Place Order', 'Contact Restaurant'],
     };
@@ -82,7 +102,7 @@ async function runGuardedCustomerChat(
 
   // 3. LLM call
   const startedAt = Date.now();
-  const llmResult = await openai.customerChat(restaurantId, conversation, language, menuContext, faqContext);
+  const llmResult = await openai.customerChat(restaurantId, conversation, language, menuContext, faqContext, restaurantName);
   const latencyMs = Date.now() - startedAt;
   const promptTokens = llmResult.usage?.promptTokens || 0;
   const completionTokens = llmResult.usage?.completionTokens || 0;
@@ -108,7 +128,7 @@ async function runGuardedCustomerChat(
   // 5. Cache the grounded reply
   await setCachedReply(cacheKey, llmResult.reply);
 
-  return { reply: llmResult.reply, suggestedItems: llmResult.suggestedItems, quickReplies: llmResult.quickReplies };
+  return { reply: toPlainText(llmResult.reply), suggestedItems: llmResult.suggestedItems, quickReplies: llmResult.quickReplies };
 }
 
 interface MenuItemRecord {
@@ -142,6 +162,7 @@ export async function processCustomerMessage(
   reply: string;
   suggestedItems: string[];
   quickReplies: string[];
+  assistantName?: string;
 }> {
   try {
     if (!message || !message.trim()) {
@@ -218,6 +239,10 @@ export async function processCustomerMessage(
       result = buildSmartReply(sanitizedMessage, normalizedMenu, faqs, restaurant, language);
     }
 
+    const assistantName = restaurant?.name ? `${restaurant.name} AI` : undefined;
+
+    result.reply = toPlainText(result.reply);
+
     updatedMessages.push({ role: 'assistant', content: result.reply });
 
     await prisma.aiConversation.update({
@@ -225,7 +250,7 @@ export async function processCustomerMessage(
       data: { messages: updatedMessages, updatedAt: new Date() },
     });
 
-    return result;
+    return { ...result, assistantName };
   } catch (error) {
     if (error instanceof AppError) throw error;
     logger.error('processCustomerMessage failed', { error: { message: (error as any)?.message, name: (error as any)?.name, stack: (error as any)?.stack }, restaurantId, sessionId });

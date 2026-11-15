@@ -319,7 +319,7 @@ export async function handleCallback(
         if (customer) {
           await recordCampaignConversion(order.restaurantId, customer.id, order.id, Number(validCallback.amount || order.amount));
         }
-        await sendTransactional(order.restaurantId, 'payment_receipt', customerPhone, {
+        void sendTransactional(order.restaurantId, 'payment_receipt', customerPhone, {
           amount: Number(validCallback.amount || order.amount),
           orderNumber: order.orderNumber,
           method: 'M-Pesa',

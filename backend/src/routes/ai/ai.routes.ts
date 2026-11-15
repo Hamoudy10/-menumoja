@@ -89,6 +89,7 @@ router.post('/chat/customer',
         reply: searchResult.reply,
         suggestedItems: searchResult.suggestedItems,
         quickReplies: searchResult.quickReplies,
+        assistantName: searchResult.assistantName,
       },
     });
   })

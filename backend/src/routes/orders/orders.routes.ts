@@ -293,7 +293,9 @@ router.post('/public/create',
     }
 
     if (seatedTableId) {
-      await onTableSeated(restaurantId, seatedTableId);
+      void onTableSeated(restaurantId, seatedTableId).catch((e) =>
+        logger.error('Table seat tracking failed (order create)', { error: e, restaurantId })
+      );
     }
 
     const orderNumber = generateOrderNumber(restaurantId);
@@ -369,26 +371,30 @@ router.post('/public/create',
       await recordIdempotency(idempotencyKey, `pub:${sessionId}`, order.id);
     }
 
-    // Customer identity (best-effort, never breaks ordering)
+    // Customer identity + notification (best-effort, never breaks ordering)
     if (customerPhone) {
-      try {
-        await upsertCustomer(restaurantId, {
-          phone: customerPhone,
-          name: customerName || undefined,
-          source: 'QR',
-        }, { countVisit: true });
-        await sendTransactional(restaurantId, 'order_confirm', customerPhone, {
-          orderNumber,
-          prepMinutes: estimatedPrepMinutes,
-        });
-      } catch (customerError) {
-        logger.error('Customer/notify processing failed (order create)', { error: customerError, restaurantId });
-      }
+      void (async () => {
+        try {
+          await upsertCustomer(restaurantId, {
+            phone: customerPhone,
+            name: customerName || undefined,
+            source: 'QR',
+          }, { countVisit: true });
+          await sendTransactional(restaurantId, 'order_confirm', customerPhone, {
+            orderNumber,
+            prepMinutes: estimatedPrepMinutes,
+          });
+        } catch (customerError) {
+          logger.error('Customer/notify processing failed (order create)', { error: customerError, restaurantId });
+        }
+      })();
     }
 
     logger.info('Order created', { orderId: order.id, orderNumber, restaurantId });
 
-    await recordOrderAnalytics(restaurantId, order.items, Number(order.totalAmount));
+    void recordOrderAnalytics(restaurantId, order.items, Number(order.totalAmount)).catch((e) =>
+      logger.warn('Failed to record order analytics (order kept)', { error: e, restaurantId })
+    );
 
     if (paymentMethod === 'mpesa') {
       try {
@@ -631,18 +637,22 @@ router.post('/',
     // Customer identity at order time (not at payment time) so walk-ins show
     // up in the CRM immediately and visits are counted once per day.
     if (customerPhone) {
-      try {
-        await upsertCustomer(restaurantId, {
-          phone: customerPhone,
-          name: customerName || undefined,
-          source: 'POS',
-        }, { countVisit: true });
-      } catch (customerError) {
-        logger.error('Customer upsert failed (POS order create)', { error: customerError, restaurantId });
-      }
+      void (async () => {
+        try {
+          await upsertCustomer(restaurantId, {
+            phone: customerPhone,
+            name: customerName || undefined,
+            source: 'POS',
+          }, { countVisit: true });
+        } catch (customerError) {
+          logger.error('Customer upsert failed (POS order create)', { error: customerError, restaurantId });
+        }
+      })();
     }
 
-    await recordOrderAnalytics(restaurantId, order.items, Number(order.totalAmount));
+    await recordOrderAnalytics(restaurantId, order.items, Number(order.totalAmount)).catch((e) =>
+      logger.warn('Failed to record order analytics (POS order kept)', { error: e, restaurantId })
+    );
 
     logger.info('POS order created', { orderId: order.id, orderNumber: order.orderNumber, restaurantId });
 
@@ -1255,11 +1265,9 @@ router.put('/:id/status',
 
     // Order-ready WhatsApp notification (consent-gated, best-effort)
     if (newStatus === 'READY' && order.customerPhone) {
-      try {
-        await sendTransactional(restaurantId, 'order_ready', order.customerPhone, { orderNumber: updated.orderNumber });
-      } catch (notifyError) {
-        logger.error('Order-ready notification failed', { error: notifyError, restaurantId });
-      }
+      void sendTransactional(restaurantId, 'order_ready', order.customerPhone, { orderNumber: updated.orderNumber }).catch((notifyError) =>
+        logger.error('Order-ready notification failed', { error: notifyError, restaurantId })
+      );
     }
 
     logger.info('Order status updated', { orderId: id, from: order.status, to: newStatus, userId: req.user?.userId });

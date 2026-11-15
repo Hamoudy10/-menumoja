@@ -463,9 +463,10 @@ async function withRetry<T>(fn: () => Promise<T>, fallback?: T): Promise<T> {
   throw new AppError(502, 'AI_SERVICE_ERROR', 'AI service unavailable after retries', 'Huduma ya AI haipatikani baada ya majaribio');
 }
 
-function buildCustomerChatSystemPrompt(language: string, menuContext: string, faqContext: string): string {
+function buildCustomerChatSystemPrompt(language: string, menuContext: string, faqContext: string, restaurantName?: string): string {
   const lang = language === 'sw' ? 'Swahili' : 'English';
-  return `You are a friendly chef assistant for the restaurant on MenuMoja. Respond in ${lang}.
+  const aiName = restaurantName ? `${restaurantName} AI` : 'the restaurant AI';
+  return `You are ${aiName}, a friendly restaurant assistant. Respond in ${lang}.
 
 Restaurant context (use this for anything about the restaurant, its menu, or its FAQs):
 Menu Context:
@@ -482,7 +483,10 @@ Guidelines:
 - For general questions (small talk, jokes, fun facts, weather, math, travel, recipes, food culture, trivia, advice): answer naturally and helpfully from your general knowledge, then if relevant, gently tie it back to the restaurant (e.g. suggest a dish)
 - Keep responses under 200 words
 - Use a light, warm tone with occasional emojis
-- If the user wants to order, guide them through the process
+
+FORMATTING (important - your reply is shown as plain text, NOT markdown):
+- Write plain conversational sentences. Do NOT use markdown of any kind: no asterisks, no **bold**, no # headings, no bullet symbols (* - •), no backticks, no tables.
+- If listing items, separate them with commas or line breaks only.
 - If you don't know something, say so politely rather than guessing`;
 }
 
@@ -551,7 +555,8 @@ export async function customerChat(
   messages: Array<{ role: string; content: string }>,
   language: string,
   menuContext: string,
-  faqContext: string
+  faqContext: string,
+  restaurantName?: string
 ): Promise<{
   reply: string;
   suggestedItems: string[];
@@ -560,7 +565,7 @@ export async function customerChat(
 }> {
   return withRetry(async () => {
     const client = getClient();
-    const systemPrompt = buildCustomerChatSystemPrompt(language, menuContext, faqContext);
+    const systemPrompt = buildCustomerChatSystemPrompt(language, menuContext, faqContext, restaurantName);
     const trimmedMessages = trimConversationHistory([
       { role: 'system', content: systemPrompt } as any,
       ...messages.slice(-30),
@@ -977,10 +982,11 @@ export async function streamCustomerChat(
   language: string,
   menuContext: string,
   faqContext: string,
-  onChunk: (chunk: string) => void
+  onChunk: (chunk: string) => void,
+  restaurantName?: string
 ): Promise<void> {
   const client = getClient();
-  const systemPrompt = buildCustomerChatSystemPrompt(language, menuContext, faqContext);
+  const systemPrompt = buildCustomerChatSystemPrompt(language, menuContext, faqContext, restaurantName);
   const trimmedMessages = trimConversationHistory([
     { role: 'system', content: systemPrompt } as any,
     ...messages.slice(-30),

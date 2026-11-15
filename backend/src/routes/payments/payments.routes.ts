@@ -533,7 +533,7 @@ router.post('/cash/record',
         if (customer) {
           await recordCampaignConversion(restaurantId, customer.id, orderId, Number(payment.amount));
         }
-        await sendTransactional(restaurantId, 'payment_receipt', order.customerPhone, {
+        void sendTransactional(restaurantId, 'payment_receipt', order.customerPhone, {
           amount: Number(payment.amount),
           orderNumber: order.orderNumber,
           method: 'Cash',
@@ -1222,7 +1222,7 @@ router.post('/card/record',
         if (customer) {
           await recordCampaignConversion(restaurantId, customer.id, orderId, Number(payment.amount));
         }
-        await sendTransactional(restaurantId, 'payment_receipt', order.customerPhone, {
+        void sendTransactional(restaurantId, 'payment_receipt', order.customerPhone, {
           amount: Number(payment.amount),
           orderNumber: order.orderNumber,
           method: 'Card',

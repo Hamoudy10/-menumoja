@@ -23,6 +23,7 @@ interface ChatItem {
 interface AIChatProps {
   restaurantId?: string
   menuItems?: ChatItem[]
+  restaurantName?: string
 }
 
 const defaultQuickReplies = [
@@ -36,8 +37,10 @@ function makeSessionId(): string {
   return `s-${Date.now()}-${Math.random().toString(36).slice(2, 10)}`
 }
 
-export function AIChat({ restaurantId, menuItems = [] }: AIChatProps) {
+export function AIChat({ restaurantId, menuItems = [], restaurantName }: AIChatProps) {
   const { addToCart, language } = useStore()
+  const [assistantName, setAssistantName] = useState(restaurantName || 'Chef Assistant')
+  useEffect(() => { if (restaurantName) setAssistantName(restaurantName) }, [restaurantName])
   const greeting = language === 'sw'
     ? 'Karibu! Ninaweza kukusaidiaje leo? 😊'
     : language === 'ar'
@@ -102,6 +105,7 @@ export function AIChat({ restaurantId, menuItems = [] }: AIChatProps) {
         text.trim(),
         language === 'sw' ? 'sw' : 'en'
       )
+      if (res.assistantName) setAssistantName(res.assistantName)
       const aiMsg: ChatMessage = {
         id: nextId(),
         role: 'ai',
@@ -193,7 +197,7 @@ export function AIChat({ restaurantId, menuItems = [] }: AIChatProps) {
               <div className="flex items-center gap-2">
                 <ChefHat className="h-5 w-5" />
                 <div>
-                  <span className="font-heading text-sm font-bold block">Chef Assistant</span>
+                  <span className="font-heading text-sm font-bold block">{assistantName}</span>
                   <span className="text-[10px] opacity-80">Ask about our menu — instant answers</span>
                 </div>
               </div>

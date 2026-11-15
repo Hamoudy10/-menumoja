@@ -451,6 +451,7 @@ export default function MenuView() {
         <AIChat
           restaurantId={restaurantInfo.id}
           menuItems={menuCategories.flatMap((cat) => cat.items)}
+          restaurantName={restaurantInfo?.name ? `${restaurantInfo.name} AI` : undefined}
         />
       )}
     </div>

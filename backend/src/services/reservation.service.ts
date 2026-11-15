@@ -88,7 +88,7 @@ export async function createReservation(
 
   // consent-gated WhatsApp confirmation
   try {
-    await sendTransactional(restaurantId, 'reservation_confirm', customerPhone, {
+    void sendTransactional(restaurantId, 'reservation_confirm', customerPhone, {
       customerName: data.customerName.trim(),
       reservedAt: reservedAt.toLocaleString('en-KE', { hour12: true }),
       partySize: data.partySize,
