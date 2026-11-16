@@ -82,15 +82,12 @@ router.get('/overview', asyncHandler(async (req: AuthenticatedRequest, res: Resp
 
   const currentOrders = await prisma.order.findMany({ where: { restaurantId, createdAt: { gte: range.start, lte: range.end } } })
   const prevOrders = await prisma.order.findMany({ where: { restaurantId, createdAt: { gte: prevRange.start, lte: prevRange.end } } })
-  const currentPayments = await prisma.payment.findMany({ where: { restaurantId, createdAt: { gte: range.start, lte: range.end } } })
-  const prevPayments = await prisma.payment.findMany({ where: { restaurantId, createdAt: { gte: prevRange.start, lte: prevRange.end } } })
   const currentScans = await prisma.qrScan.findMany({ where: { restaurantId, scannedAt: { gte: range.start, lte: range.end } } })
   const prevScans = await prisma.qrScan.findMany({ where: { restaurantId, scannedAt: { gte: prevRange.start, lte: prevRange.end } } })
   const menuItems = await prisma.menuItem.findMany({ where: { restaurantId }, orderBy: { totalOrders: 'desc' }, take: 1 })
-  const currentAnalytics = await prisma.analyticsDaily.findMany({ where: { restaurantId, date: { gte: range.start, lte: range.end } } })
 
-  const totalRevenue = currentPayments.reduce((s, p) => s + Number(p.amount), 0);
-  const prevRevenue = prevPayments.reduce((s, p) => s + Number(p.amount), 0);
+  const totalRevenue = currentOrders.reduce((s, o) => s + Number(o.totalAmount), 0);
+  const prevRevenue = prevOrders.reduce((s, o) => s + Number(o.totalAmount), 0);
   const totalOrders = currentOrders.length;
   const prevOrdersCount = prevOrders.length;
   const avgOrderValue = totalOrders > 0 ? totalRevenue / totalOrders : 0;
@@ -110,9 +107,9 @@ router.get('/overview', asyncHandler(async (req: AuthenticatedRequest, res: Resp
     totalScans,
     topItem: topItem ? { id: topItem.id, name: topItem.name } : null,
     busiestHour,
-    revenueMpesa: currentPayments.filter(p => p.paymentMethod === 'MPESA').reduce((s, p) => s + Number(p.amount), 0),
-    revenueCash: currentPayments.filter(p => p.paymentMethod === 'CASH').reduce((s, p) => s + Number(p.amount), 0),
-    revenueCard: currentPayments.filter(p => p.paymentMethod === 'CARD').reduce((s, p) => s + Number(p.amount), 0),
+    revenueMpesa: currentOrders.filter(o => o.paymentMethod === 'MPESA').reduce((s, o) => s + Number(o.totalAmount), 0),
+    revenueCash: currentOrders.filter(o => o.paymentMethod === 'CASH').reduce((s, o) => s + Number(o.totalAmount), 0),
+    revenueCard: currentOrders.filter(o => o.paymentMethod === 'CARD' || o.paymentMethod === 'SPLIT').reduce((s, o) => s + Number(o.totalAmount), 0),
   };
 
   const comparisons = {
@@ -130,24 +127,23 @@ router.get('/revenue', asyncHandler(async (req: AuthenticatedRequest, res: Respo
   const range = getDateRange(query.period, query.startDate, query.endDate);
   const groupBy = query.groupBy || 'day';
 
-  const payments = await prisma.payment.findMany({
+  const orders = await prisma.order.findMany({
     where: { restaurantId, createdAt: { gte: range.start, lte: range.end } },
     orderBy: { createdAt: 'asc' },
   });
 
-  const grouped: Record<string, { date: string; mpesa: number; cash: number; total: number }> = {};
+  const grouped: Record<string, { date: string; mpesa: number; cash: number; card: number; total: number }> = {};
 
-  for (const payment of payments) {
-    const key = formatDate(payment.createdAt, groupBy);
+  for (const order of orders) {
+    const key = formatDate(order.createdAt, groupBy);
     if (!grouped[key]) {
-      grouped[key] = { date: key, mpesa: 0, cash: 0, total: 0 };
+      grouped[key] = { date: key, mpesa: 0, cash: 0, card: 0, total: 0 };
     }
-    if (payment.paymentMethod === 'MPESA') {
-      grouped[key].mpesa += Number(payment.amount);
-    } else {
-      grouped[key].cash += Number(payment.amount);
-    }
-    grouped[key].total += Number(payment.amount);
+    const amount = Number(order.totalAmount);
+    if (order.paymentMethod === 'MPESA') grouped[key].mpesa += amount;
+    else if (order.paymentMethod === 'CASH') grouped[key].cash += amount;
+    else if (order.paymentMethod === 'CARD' || order.paymentMethod === 'SPLIT') grouped[key].card += amount;
+    grouped[key].total += amount;
   }
 
   const data = Object.values(grouped);

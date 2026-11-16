@@ -12,8 +12,13 @@ import {
 import { Badge } from '@/components/ui/Badge'
 import * as analyticsApi from '@/api/analytics'
 
-type Period = 'today' | 'week' | 'month'
-const periods: Period[] = ['today', 'week', 'month']
+type Period = 'today' | 'week' | 'month' | 'year'
+const periods: { key: Period; label: string }[] = [
+  { key: 'today', label: 'Today' },
+  { key: 'week', label: 'This Week' },
+  { key: 'month', label: 'This Month' },
+  { key: 'year', label: 'This Year' },
+]
 
 const MUTED = 'text-text-secondary dark:text-white/40'
 const COLORS = ['#FF6B35', '#3B82F6', '#2ECC71', '#8B5CF6', '#F59E0B']
@@ -45,19 +50,23 @@ export default function AnalyticsPage() {
       if (overviewRes.status === 'fulfilled') setOverview(overviewRes.value)
       if (revenueRes.status === 'fulfilled') {
         const data = revenueRes.value
-        setRevenueData(Array.isArray(data) ? data : data.data || [])
+        const raw = Array.isArray(data) ? data : data.data || []
+        setRevenueData(raw.map((d: any) => ({ ...d, revenue: d.revenue ?? d.total ?? d.amount ?? 0, time: d.time ?? d.date ?? d.name })))
       }
       if (orderRes.status === 'fulfilled') {
         const data = orderRes.value
-        setOrderData(Array.isArray(data) ? data : data.data || [])
+        const raw = Array.isArray(data) ? data : data.data || []
+        setOrderData(raw.map((d: any) => ({ ...d, orders: d.orders ?? d.count ?? 0, time: d.time ?? d.date ?? d.name })))
       }
       if (itemsRes.status === 'fulfilled') {
         const data = itemsRes.value
-        setTopItems(Array.isArray(data) ? data : data.items || data.data || [])
+        const raw = Array.isArray(data) ? data : (data.top || data.items || data.data || [])
+        setTopItems(raw)
       }
       if (scansRes.status === 'fulfilled') {
         const data = scansRes.value
-        setScanData(Array.isArray(data) ? data : data.data || [])
+        const raw = Array.isArray(data) ? data : data.data || []
+        setScanData(raw.map((d: any) => ({ ...d, scans: d.scans ?? d.count ?? 0, time: d.time ?? d.date ?? d.name })))
       }
 
       const paymentData = overviewRes.status === 'fulfilled' ? overviewRes.value : null
@@ -119,9 +128,9 @@ export default function AnalyticsPage() {
           </button>
           <div className="flex gap-1 rounded-xl bg-black/5 dark:bg-white/10 p-1">
             {periods.map((p) => (
-              <button key={p} onClick={() => setPeriod(p)}
-                className={`rounded-lg px-4 py-2 text-sm font-accent font-medium transition-colors ${period === p ? 'bg-secondary text-white' : 'text-text-secondary dark:text-white/60 hover:text-text-primary'}`}>
-                {p.charAt(0).toUpperCase() + p.slice(1)}
+              <button key={p.key} onClick={() => setPeriod(p.key)}
+                className={`rounded-lg px-4 py-2 text-sm font-accent font-medium transition-colors ${period === p.key ? 'bg-secondary text-white' : 'text-text-secondary dark:text-white/60 hover:text-text-primary'}`}>
+                {p.label}
               </button>
             ))}
           </div>
