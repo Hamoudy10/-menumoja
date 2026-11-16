@@ -71,7 +71,7 @@ export default function AdminOverview() {
             {mrrChart.length === 0 ? (
               <p className="text-sm text-text-secondary text-center pt-24">No revenue history yet</p>
             ) : (
-              <ResponsiveContainer width="100%" height="100%" minWidth={0}>
+              <ResponsiveContainer width="100%" height="100%" minWidth={0} minHeight={160}>
                 <LineChart data={mrrChart} margin={{ top: 5, right: 5, left: -10, bottom: 0 }}>
                   <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.05)" />
                   <XAxis dataKey="month" tick={{ fontSize: 10 }} stroke="rgba(255,255,255,0.2)" />
@@ -90,7 +90,7 @@ export default function AdminOverview() {
             {planRevenue.length === 0 ? (
               <p className="text-sm text-text-secondary text-center pt-24">No plan data yet</p>
             ) : (
-              <ResponsiveContainer width="100%" height="100%" minWidth={0}>
+              <ResponsiveContainer width="100%" height="100%" minWidth={0} minHeight={160}>
                 <BarChart data={planRevenue} margin={{ top: 5, right: 5, left: -10, bottom: 0 }}>
                   <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.05)" />
                   <XAxis dataKey="planName" tick={{ fontSize: 10 }} stroke="rgba(255,255,255,0.2)" />

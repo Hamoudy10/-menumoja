@@ -165,7 +165,7 @@ export default function AnalyticsPage() {
               <h3 className="font-heading text-lg font-bold text-text-primary dark:text-white mb-4">Revenue</h3>
               <div className="h-64">
                 {revenueData.length > 0 ? (
-                  <ResponsiveContainer width="100%" height="100%" minWidth={0}>
+                  <ResponsiveContainer key={`chart-${revenueData.length}-${orderData.length}-${scanData.length}`} width="100%" height="100%" minWidth={0} minHeight={160}>
                     <AreaChart data={revenueData} margin={{ top: 5, right: 5, left: -10, bottom: 0 }}>
                       <defs><linearGradient id="revGrad" x1="0" y1="0" x2="0" y2="1"><stop offset="5%" stopColor="#FF6B35" stopOpacity={0.3} /><stop offset="95%" stopColor="#FF6B35" stopOpacity={0} /></linearGradient></defs>
                       <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.05)" />
@@ -183,7 +183,7 @@ export default function AnalyticsPage() {
               <h3 className="font-heading text-lg font-bold text-text-primary dark:text-white mb-4">Orders Over Time</h3>
               <div className="h-64">
                 {orderData.length > 0 ? (
-                  <ResponsiveContainer width="100%" height="100%" minWidth={0}>
+                  <ResponsiveContainer key={`chart-${revenueData.length}-${orderData.length}-${scanData.length}`} width="100%" height="100%" minWidth={0} minHeight={160}>
                     <BarChart data={orderData} margin={{ top: 5, right: 5, left: -10, bottom: 0 }}>
                       <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.05)" />
                       <XAxis dataKey={orderData[0]?.time || orderData[0]?.date || 'name'} tick={{ fontSize: 11 }} stroke="rgba(255,255,255,0.2)" />
@@ -221,7 +221,7 @@ export default function AnalyticsPage() {
               {paymentSplit.length > 0 ? (
                 <>
                   <div className="flex items-center justify-center" style={{ height: 180 }}>
-                    <ResponsiveContainer width="100%" height="100%" minWidth={0}>
+                    <ResponsiveContainer key={`chart-${revenueData.length}-${orderData.length}-${scanData.length}`} width="100%" height="100%" minWidth={0} minHeight={160}>
                       <PieChart>
                         <Pie data={paymentSplit} cx="50%" cy="50%" innerRadius={45} outerRadius={70} paddingAngle={4} dataKey="value" animationDuration={1000}>
                           {paymentSplit.map((entry, i) => (<Cell key={i} fill={entry.color} />))}
@@ -246,7 +246,7 @@ export default function AnalyticsPage() {
               <h3 className="font-heading text-lg font-bold text-text-primary dark:text-white mb-4">QR Scans</h3>
               {scanData.length > 0 ? (
                 <div className="h-52">
-                  <ResponsiveContainer width="100%" height="100%" minWidth={0}>
+                  <ResponsiveContainer key={`chart-${revenueData.length}-${orderData.length}-${scanData.length}`} width="100%" height="100%" minWidth={0} minHeight={160}>
                     <BarChart data={scanData} margin={{ top: 5, right: 5, left: -10, bottom: 0 }}>
                       <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.05)" />
                       <XAxis dataKey={scanData[0]?.time || scanData[0]?.date || 'name'} tick={{ fontSize: 10 }} stroke="rgba(255,255,255,0.2)" />
@@ -273,8 +273,8 @@ export default function AnalyticsPage() {
               </div>
             </div>
             <div className="h-48">
-              {scanData.length > 0 && scanData[0]?.device ? (
-                <ResponsiveContainer width="100%" height="100%" minWidth={0}>
+              {scanData.length > 0 ? (
+                <ResponsiveContainer key={`chart-${revenueData.length}-${orderData.length}-${scanData.length}`} width="100%" height="100%" minWidth={0} minHeight={160}>
                   <BarChart data={scanData} margin={{ top: 5, right: 5, left: -10, bottom: 0 }}>
                     <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.05)" />
                     <XAxis dataKey="date" tick={{ fontSize: 10 }} stroke="rgba(255,255,255,0.2)" />

@@ -281,21 +281,28 @@ router.get('/scans', asyncHandler(async (req: AuthenticatedRequest, res: Respons
     orderBy: { scannedAt: 'asc' },
   });
 
-  const grouped: Record<string, { date: string; count: number; uniqueDevices: number; deviceSet: Set<string> }> = {};
+  const grouped: Record<string, { date: string; count: number; uniqueDevices: number; deviceSet: Set<string>; mobile: number; desktop: number; tablet: number }> = {};
 
   for (const scan of scans) {
     const key = formatDate(scan.scannedAt, groupBy);
     if (!grouped[key]) {
-      grouped[key] = { date: key, count: 0, uniqueDevices: 0, deviceSet: new Set() };
+      grouped[key] = { date: key, count: 0, uniqueDevices: 0, deviceSet: new Set(), mobile: 0, desktop: 0, tablet: 0 };
     }
     grouped[key].count++;
     if (scan.sessionId) grouped[key].deviceSet.add(scan.sessionId);
+    const dt = (scan.deviceType || '').toLowerCase();
+    if (dt === 'mobile') grouped[key].mobile++;
+    else if (dt === 'tablet') grouped[key].tablet++;
+    else grouped[key].desktop++;
   }
 
   const data = Object.values(grouped).map((g) => ({
     date: g.date,
     count: g.count,
     uniqueDevices: g.deviceSet.size,
+    mobile: g.mobile,
+    desktop: g.desktop,
+    tablet: g.tablet,
   }));
 
   res.json({ success: true, data });

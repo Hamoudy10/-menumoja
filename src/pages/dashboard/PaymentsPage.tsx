@@ -209,7 +209,7 @@ export default function PaymentsPage() {
           <div className="rounded-2xl bg-white dark:bg-primary-light border border-white/10 p-4">
             <h3 className="font-heading text-lg font-bold text-text-primary dark:text-white mb-4">Payment Split</h3>
             <div className="flex items-center justify-center h-48">
-              <ResponsiveContainer width="100%" height="100%" minWidth={0}>
+              <ResponsiveContainer width="100%" height="100%" minWidth={0} minHeight={160}>
                 <PieChart>
                   <Pie
                     data={pieData}
@@ -243,7 +243,7 @@ export default function PaymentsPage() {
           <div className="rounded-2xl bg-white dark:bg-primary-light border border-white/10 p-4">
             <h3 className="font-heading text-lg font-bold text-text-primary dark:text-white mb-4">Hourly Breakdown</h3>
             <div className="h-40">
-              <ResponsiveContainer width="100%" height="100%" minWidth={0}>
+              <ResponsiveContainer width="100%" height="100%" minWidth={0} minHeight={160}>
                 <BarChart data={hourlyData} margin={{ top: 5, right: 5, left: -10, bottom: 0 }}>
                   <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.05)" />
                   <XAxis dataKey="time" tick={{ fontSize: 10, fontFamily: 'Space Grotesk' }} stroke="rgba(255,255,255,0.2)" />
