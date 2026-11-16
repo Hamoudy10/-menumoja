@@ -29,5 +29,11 @@ export const addToWaitlist = (data: any) =>
 export const seatWaitlist = (id: string, tableId: string) =>
   api.post(`/reservations/waitlist/${id}/seat`, { tableId }).then(unwrap)
 
-export const cancelWaitlist = (id: string) =>
-  api.post(`/reservations/waitlist/${id}/cancel`).then(unwrap)
+export const fetchPublicTables = (slug: string) =>
+  api.get(`/reservations/public/tables/${slug}`).then(unwrap)
+
+export const createPublicReservation = (data: any) =>
+  api.post('/reservations/public', data).then(unwrap)
+
+export const cancelPublicReservation = (id: string, phone: string) =>
+  api.post(`/reservations/public/${id}/cancel`, { phone }).then(unwrap)

@@ -27,7 +27,7 @@ export default function ReservationsPage() {
   const [tables, setTables] = useState<any[]>([])
 
   const [showResModal, setShowResModal] = useState(false)
-  const [resForm, setResForm] = useState({ customerName: '', customerPhone: '', partySize: '2', reservedAt: '', notes: '' })
+  const [resForm, setResForm] = useState({ customerName: '', customerPhone: '', partySize: '2', reservedAt: '', notes: '', tableId: '' })
   const [savingRes, setSavingRes] = useState(false)
 
   const [showWaitModal, setShowWaitModal] = useState(false)
@@ -63,10 +63,11 @@ export default function ReservationsPage() {
         partySize: Number(resForm.partySize),
         reservedAt: new Date(resForm.reservedAt).toISOString(),
         notes: resForm.notes.trim() || undefined,
+        tableId: resForm.tableId || undefined,
       })
       showSuccessToast('Reservation created')
       setShowResModal(false)
-      setResForm({ customerName: '', customerPhone: '', partySize: '2', reservedAt: '', notes: '' })
+      setResForm({ customerName: '', customerPhone: '', partySize: '2', reservedAt: '', notes: '', tableId: '' })
       load()
     } catch (err: any) { showErrorToast(err?.response?.data?.message || 'Failed to create reservation') }
     finally { setSavingRes(false) }
@@ -210,6 +211,12 @@ export default function ReservationsPage() {
               <Input label="Party size" type="number" min={1} value={resForm.partySize} onChange={(e) => setResForm({ ...resForm, partySize: e.target.value })} />
               <Input label="Time *" type="datetime-local" value={resForm.reservedAt} onChange={(e) => setResForm({ ...resForm, reservedAt: e.target.value })} />
             </div>
+            <select value={resForm.tableId} onChange={(e) => setResForm({ ...resForm, tableId: e.target.value })} className="w-full rounded-xl border border-black/10 dark:border-white/10 bg-white dark:bg-primary-light px-3 py-2 text-sm">
+              <option value="">Auto-assign table</option>
+              {tables.filter((t) => t.status === 'FREE').map((t) => (
+                <option key={t.id} value={t.id}>{t.label || `Table ${t.tableNumber}`}{t.capacity ? ` (cap ${t.capacity})` : ''}</option>
+              ))}
+            </select>
             <Input label="Notes" value={resForm.notes} onChange={(e) => setResForm({ ...resForm, notes: e.target.value })} />
             <div className="flex gap-2 pt-1">
               <Button fullWidth loading={savingRes} onClick={createReservation}>Create Reservation</Button>

@@ -21,7 +21,7 @@ const WAIT_PER_PARTY_MINUTES = 15;
 
 export async function createReservation(
   restaurantId: string,
-  data: { customerName: string; customerPhone: string; partySize: number; reservedAt: string; notes?: string; source?: string }
+  data: { customerName: string; customerPhone: string; partySize: number; reservedAt: string; notes?: string; source?: string; tableId?: string }
 ): Promise<any> {
   if (!data.customerName?.trim() || !data.customerPhone?.trim()) {
     throw AppError.validation('Customer name and phone are required', 'Jina na nambari ya simu ya mteja zinahitajika');
@@ -51,24 +51,42 @@ export async function createReservation(
     logger.warn('Customer upsert failed during reservation', { error: (error as Error).message, restaurantId });
   }
 
-  // Suggest a free table large enough for the party
-  const candidate = await prisma.restaurantTable.findFirst({
-    where: {
-      restaurantId,
-      status: { in: ['FREE', 'RESERVED'] },
-      OR: [{ capacity: null }, { capacity: { gte: data.partySize } }],
-    },
-    orderBy: [{ status: 'asc' }, { capacity: 'asc' }],
-    select: { id: true, label: true, status: true },
-  });
-
+  // Table assignment: honor an explicit customer/staff choice when it is free
+  // and large enough; otherwise auto-suggest a fitting free table.
   let tableId: string | null = null;
-  if (candidate && candidate.status === 'FREE') {
-    tableId = candidate.id;
-    await prisma.restaurantTable.update({
-      where: { id: candidate.id },
-      data: { status: 'RESERVED' },
+  if (data.tableId) {
+    const chosen = await prisma.restaurantTable.findFirst({
+      where: { id: data.tableId, restaurantId },
+      select: { id: true, status: true, capacity: true },
     });
+    if (!chosen) {
+      throw AppError.validation('Selected table not found', 'Meza iliyochaguliwa haikupatikana');
+    }
+    if (chosen.status !== 'FREE') {
+      throw AppError.validation('Selected table is not available', 'Meza iliyochaguliwa haipatikani');
+    }
+    if (chosen.capacity && chosen.capacity < data.partySize) {
+      throw AppError.validation('Selected table is too small for the party', 'Meza iliyochaguliwa ni ndogo mno');
+    }
+    tableId = chosen.id;
+    await prisma.restaurantTable.update({ where: { id: chosen.id }, data: { status: 'RESERVED' } });
+  } else {
+    const candidate = await prisma.restaurantTable.findFirst({
+      where: {
+        restaurantId,
+        status: { in: ['FREE', 'RESERVED'] },
+        OR: [{ capacity: null }, { capacity: { gte: data.partySize } }],
+      },
+      orderBy: [{ status: 'asc' }, { capacity: 'asc' }],
+      select: { id: true, label: true, status: true },
+    });
+    if (candidate && candidate.status === 'FREE') {
+      tableId = candidate.id;
+      await prisma.restaurantTable.update({
+        where: { id: candidate.id },
+        data: { status: 'RESERVED' },
+      });
+    }
   }
 
   const reservation = await prisma.reservation.create({
