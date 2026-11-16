@@ -161,7 +161,8 @@ export function computeMenuFingerprint(menuItems: Array<{ name: string; price: n
 }
 
 export function cacheKeyForChat(restaurantId: string, language: string, message: string, fingerprint: string): string {
-  return `${CACHE_PREFIX}${restaurantId}:${fingerprint}:${language}:${message.trim().toLowerCase().slice(0, 300)}`;
+  const dayBucket = new Date(Date.now() + 3 * 60 * 60 * 1000).toISOString().slice(0, 10);
+  return `${CACHE_PREFIX}${restaurantId}:${dayBucket}:${fingerprint}:${language}:${message.trim().toLowerCase().slice(0, 300)}`;
 }
 
 export async function getCachedReply(key: string): Promise<string | null> {

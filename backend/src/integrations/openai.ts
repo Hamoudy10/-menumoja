@@ -18,6 +18,22 @@ export const MODEL_NAME = AI_MODEL;
  * Menu Moja AI Manager answer: grounded on the provided data payload.
  * Returns the reply plus real token usage for cost tracking.
  */
+export async function verifyManagerAnswer(question: string, dataText: string, reply: string): Promise<boolean> {
+  return withRetry(async () => {
+    const client = getClient();
+    const response = await client.chat.completions.create({
+      model: AI_MODEL,
+      messages: [
+        { role: 'system', content: 'You are a strict fact-checker. Given a QUESTION, DATA, and a REPLY, determine whether every factual claim, number, name, and figure in REPLY is directly supported by DATA. Reply with exactly "YES" if fully supported, or "NO: <list of unsupported claims>" if not. Do not add anything else.' },
+        { role: 'user', content: `QUESTION: ${question}\n\nDATA:\n${dataText}\n\nREPLY:\n${reply}` },
+      ],
+      max_tokens: 200,
+      temperature: 0,
+    });
+    const text = response.choices[0]?.message?.content?.trim() || '';
+    return /^YES\b/i.test(text);
+  });
+}
 export async function generateManagerAnswer(
   question: string,
   dataText: string,

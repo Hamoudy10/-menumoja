@@ -52,6 +52,12 @@ export const EXPECTED_TOOL_KEYS = [
 ];
 
 export const COMMAND_EVAL_CASES: CommandEvalCase[] = [
+  { text: 'What is my restaurant name?', expectedTool: 'get_settings', language: 'en', note: 'identity question - must surface restaurant name' },
+  { text: 'Jina la mgahawa wangu ni nani?', expectedTool: 'get_settings', language: 'sw' },
+  { text: 'How much did we sell yesterday?', expectedTool: 'get_sales_summary', language: 'en' },
+  { text: 'Tuliuza ngapi jana?', expectedTool: 'get_sales_summary', language: 'sw' },
+  { text: 'How many tables do we have?', expectedTool: 'get_table_status', language: 'en' },
+  { text: 'Tuna meza ngapi?', expectedTool: 'get_table_status', language: 'sw' },
   // ── Sales / revenue ──
   { text: 'How much did we sell today?', expectedTool: 'get_sales_summary', language: 'en' },
   { text: 'Tumepata pesa ngapi leo?', expectedTool: 'get_sales_summary', language: 'sw' },

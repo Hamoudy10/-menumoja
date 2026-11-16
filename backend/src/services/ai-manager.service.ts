@@ -79,6 +79,18 @@ export async function answerQuestion(restaurantId: string, question: string): Pr
       logger.warn('Manager reply failed number grounding - returning structured data', { restaurantId });
       return { reply: dataText, toolUsed: toolKey, source: 'tool' };
     }
+    // LLM-as-judge: deeper semantic verification (gated by budget)
+    if (await isWithinDailyBudget(restaurantId)) {
+      try {
+        const ok = await openai.verifyManagerAnswer(message, dataText, reply);
+        if (!ok) {
+          logger.warn('Manager reply failed LLM-judge verification - returning structured data', { restaurantId });
+          return { reply: dataText, toolUsed: toolKey, source: 'tool' };
+        }
+      } catch (judgeError) {
+        logger.warn('LLM-judge check failed - keeping reply', { error: (judgeError as Error).message });
+      }
+    }
     return { reply, toolUsed: toolKey, source: 'llm' };
   } catch (error) {
     logger.warn('Manager LLM failed — returning structured data', { error: (error as Error).message, restaurantId });
