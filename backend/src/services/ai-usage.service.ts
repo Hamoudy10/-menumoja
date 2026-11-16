@@ -203,6 +203,31 @@ export function verifyGrounding(reply: string, menuPrices: number[]): boolean {
   return true;
 }
 
+export function verifyNumbersGrounded(reply: string, dataText: string): boolean {
+  const numbersFrom = (text: string): Set<number> => {
+    const set = new Set<number>();
+    const matches = text.match(/\b\d+(?:\.\d{1,2})?\b/g) || [];
+    for (const m of matches) {
+      const n = parseFloat(m);
+      if (isFinite(n)) set.add(Math.round(n * 100) / 100);
+    }
+    return set;
+  };
+
+  const dataNumbers = numbersFrom(dataText);
+  const replyNumbers = numbersFrom(reply);
+
+  for (const n of replyNumbers) {
+    // Skip small formatting numbers (counts like "top 3", "1st") and 0/1
+    if (n < 10) continue;
+    // Allow ±1 tolerance for rounding
+    if (!dataNumbers.has(n) && !dataNumbers.has(n - 1) && !dataNumbers.has(n + 1)) {
+      logger.warn('AI grounding (numbers) failed - ungrounded figure', { claimed: n });
+      return false;
+    }
+  }
+  return true;
+}
 export function providerName(): string {
   return config.aiProvider || 'deepseek';
 }

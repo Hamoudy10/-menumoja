@@ -10,26 +10,10 @@ import { classifyCustomer } from './customer.service';
  * (never a database dump). All retrievals are tenant-scoped.
  */
 
+import { kenyaDateRange } from '../utils/date';
+
 function rangeFor(period: 'today' | 'week' | 'month' | 'year'): { start: Date; end: Date } {
-  const now = new Date();
-  const end = now;
-  let start: Date;
-  switch (period) {
-    case 'today':
-      start = new Date(now.getFullYear(), now.getMonth(), now.getDate());
-      break;
-    case 'week':
-      start = new Date(now);
-      start.setDate(start.getDate() - start.getDay());
-      start.setHours(0, 0, 0, 0);
-      break;
-    case 'year':
-      start = new Date(now.getFullYear(), 0, 1);
-      break;
-    default:
-      start = new Date(now.getFullYear(), now.getMonth(), 1);
-  }
-  return { start, end };
+  return kenyaDateRange(period);
 }
 
 export async function getSalesSummary(restaurantId: string, period: 'today' | 'week' | 'month' = 'month'): Promise<any> {
@@ -320,9 +304,22 @@ export async function runTool(restaurantId: string, toolKey: string): Promise<{ 
   return { label: tool.label, data };
 }
 
-export function formatToolData(label: string, data: any): string {
+export function formatToolData(label: string, data: any, restaurantName?: string): string {
   try {
-    return `${label}:\n${JSON.stringify(data, null, 2)}`;
+    const now = new Date().toISOString().slice(0, 19).replace('T', ' ');
+    const recordCount = Array.isArray(data)
+      ? data.length
+      : (data && typeof data === 'object' && Array.isArray(data.customers))
+        ? data.customers.length
+        : (data && typeof data === 'object' && Array.isArray(data.tables))
+          ? data.tables.length
+          : null;
+    const header = [
+      restaurantName ? `Restaurant: ${restaurantName}` : null,
+      `As of: ${now} UTC`,
+      recordCount !== null ? `Records: ${recordCount}` : null,
+    ].filter(Boolean).join(' | ');
+    return `${header ? header + '\n' : ''}${label}:\n${JSON.stringify(data, null, 2)}`;
   } catch {
     return `${label}: (data unavailable)`;
   }

@@ -23,35 +23,10 @@ const periodQuerySchema = z.object({
   format: z.enum(['pdf', 'excel']).optional(),
 });
 
+import { kenyaDateRange } from '../../utils/date';
+
 function getDateRange(period?: string, startDate?: string, endDate?: string): { start: Date; end: Date } {
-  if (startDate && endDate) {
-    return { start: new Date(startDate), end: new Date(endDate) };
-  }
-
-  const now = new Date();
-  let start: Date;
-  let end: Date = now;
-
-  switch (period) {
-    case 'today':
-      start = new Date(now.getFullYear(), now.getMonth(), now.getDate());
-      break;
-    case 'week':
-      start = new Date(now);
-      start.setDate(start.getDate() - start.getDay());
-      start.setHours(0, 0, 0, 0);
-      break;
-    case 'month':
-      start = new Date(now.getFullYear(), now.getMonth(), 1);
-      break;
-    case 'year':
-      start = new Date(now.getFullYear(), 0, 1);
-      break;
-    default:
-      start = new Date(now.getFullYear(), now.getMonth(), 1);
-  }
-
-  return { start, end };
+  return kenyaDateRange(period, startDate, endDate);
 }
 
 function getPreviousRange(current: { start: Date; end: Date }): { start: Date; end: Date } {

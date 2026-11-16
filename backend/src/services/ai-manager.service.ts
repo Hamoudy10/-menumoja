@@ -1,7 +1,7 @@
 import { prisma } from '@/config/database';
 import * as openai from '@/integrations/openai';
 import { detectIntent, runTool, formatToolData } from './manager.service';
-import { recordAiUsage, isWithinDailyBudget, providerName, providerForModel } from './ai-usage.service';
+import { recordAiUsage, isWithinDailyBudget, providerName, providerForModel, verifyNumbersGrounded } from './ai-usage.service';
 import { detectActionIntent, proposeAction, ProposedAction } from './ai-action.service';
 import logger from '@/utils/logger';
 
@@ -75,6 +75,10 @@ export async function answerQuestion(restaurantId: string, question: string): Pr
 
   try {
     const reply = await answerFromLlm(restaurantId, message, dataText, restaurantName);
+    if (!verifyNumbersGrounded(reply, dataText)) {
+      logger.warn('Manager reply failed number grounding - returning structured data', { restaurantId });
+      return { reply: dataText, toolUsed: toolKey, source: 'tool' };
+    }
     return { reply, toolUsed: toolKey, source: 'llm' };
   } catch (error) {
     logger.warn('Manager LLM failed — returning structured data', { error: (error as Error).message, restaurantId });

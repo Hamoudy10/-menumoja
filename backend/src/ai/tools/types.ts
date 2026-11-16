@@ -29,6 +29,7 @@ export interface UIContext {
 
 export interface ToolContext {
   restaurantId: string;
+  restaurantName?: string;
   userId: string;
   role: string;
   uiContext?: UIContext;

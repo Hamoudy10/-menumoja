@@ -355,7 +355,8 @@ async function buildReadAnswer(
 
   if (results.length === 1) {
     const result = results[0];
-    const dataText = formatToolData(result.label, result.data);
+    const restaurant = await prisma.restaurant.findUnique({ where: { id: ctx.restaurantId }, select: { name: true } });
+    const dataText = formatToolData(result.label, result.data, restaurant?.name);
 
     if (result.tool === 'search_knowledge') {
       const knowledgeResults = Array.isArray(result.data?.results) ? result.data.results : [];
@@ -624,7 +625,8 @@ export async function handleCommand(ctx: ToolContext, input: CommandInput): Prom
 
     if (step.tool.kind === 'read') {
       const result = await step.tool.run(ctx, step.args);
-      const dataText = formatToolData(step.tool.label, result.data);
+      const restaurant = await prisma.restaurant.findUnique({ where: { id: ctx.restaurantId }, select: { name: true } });
+      const dataText = formatToolData(step.tool.label, result.data, restaurant?.name);
       const deterministic = step.tool.summarize ? step.tool.summarize(result.data) : null;
       let reply = result.message || deterministic || dataText;
 
