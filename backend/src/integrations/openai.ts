@@ -21,14 +21,18 @@ export const MODEL_NAME = AI_MODEL;
 export async function generateManagerAnswer(
   question: string,
   dataText: string,
-  history: Array<{ role: string; content: string }> = []
+  history: Array<{ role: string; content: string }> = [],
+  restaurantName?: string
 ): Promise<{ reply: string; model: string; usage?: { promptTokens: number; completionTokens: number } }> {
   return withRetry(async () => {
     const client = getClient();
+    const systemPrompt = restaurantName
+      ? `You are Menu Moja AI Manager, an executive assistant for the owner of "${restaurantName}". Answer using ONLY the numbers and facts in DATA. Never invent figures, percentages or claims not present in DATA. If the data does not contain the answer, say what data would be needed. Be concise, practical and specific. Use KES amounts as given. Add one short actionable recommendation based ONLY on the data where useful. When asked the restaurant's name, state it clearly: ${restaurantName}.`
+      : 'You are Menu Moja AI Manager, an executive assistant for a restaurant owner. Answer using ONLY the numbers and facts in DATA. Never invent figures, percentages or claims not present in DATA. If the data does not contain the answer, say what data would be needed. Be concise, practical and specific. Use KES amounts as given. Add one short actionable recommendation based ONLY on the data where useful.';
     const response = await client.chat.completions.create({
       model: AI_MODEL,
       messages: [
-        { role: 'system', content: 'You are Menu Moja AI Manager, an executive assistant for a restaurant owner. Answer using ONLY the numbers and facts in DATA. Never invent figures, percentages or claims not present in DATA. If the data does not contain the answer, say what data would be needed. Be concise, practical and specific. Use KES amounts as given. Add one short actionable recommendation based ONLY on the data where useful.' },
+        { role: 'system', content: systemPrompt },
         ...history.slice(-6).map((message) => ({
           role: message.role === 'assistant' ? ('assistant' as const) : ('user' as const),
           content: message.content.slice(0, 600),

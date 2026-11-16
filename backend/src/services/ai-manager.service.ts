@@ -17,9 +17,9 @@ import logger from '@/utils/logger';
  *   and a data source, so owners can trust and verify it.
  */
 
-async function answerFromLlm(restaurantId: string, question: string, dataText: string): Promise<string> {
+async function answerFromLlm(restaurantId: string, question: string, dataText: string, restaurantName?: string): Promise<string> {
   const startedAt = Date.now();
-  const result = await openai.generateManagerAnswer(question, dataText);
+  const result = await openai.generateManagerAnswer(question, dataText, [], restaurantName);
 
   await recordAiUsage({
     restaurantId,
@@ -39,6 +39,9 @@ export async function answerQuestion(restaurantId: string, question: string): Pr
   if (!message) {
     return { reply: 'Ask me about your sales, profitability, stock, customers, staff, campaigns or forecasts.', toolUsed: null, source: 'tool' };
   }
+
+  const restaurant = await prisma.restaurant.findUnique({ where: { id: restaurantId }, select: { name: true } });
+  const restaurantName = restaurant?.name;
 
   // Write-operations are proposed, never executed implicitly (Level 3).
   if (detectActionIntent(message)) {
@@ -71,7 +74,7 @@ export async function answerQuestion(restaurantId: string, question: string): Pr
   }
 
   try {
-    const reply = await answerFromLlm(restaurantId, message, dataText);
+    const reply = await answerFromLlm(restaurantId, message, dataText, restaurantName);
     return { reply, toolUsed: toolKey, source: 'llm' };
   } catch (error) {
     logger.warn('Manager LLM failed — returning structured data', { error: (error as Error).message, restaurantId });
@@ -82,23 +85,22 @@ export async function answerQuestion(restaurantId: string, question: string): Pr
 // ── Daily briefing ──
 
 export async function generateDailyBriefing(restaurantId: string, date = new Date()): Promise<any> {
-  const day = new Date(date);
-  const start = new Date(day.getFullYear(), day.getMonth(), day.getDate());
-  start.setDate(start.getDate() - 1); // "yesterday"
-  const end = new Date(start);
-  end.setHours(23, 59, 59, 999);
+  // Kenya calendar day boundaries (EAT, UTC+3, no DST)
+  const KENYA_OFFSET_MS = 3 * 60 * 60 * 1000;
+  const local = new Date(date.getTime() + KENYA_OFFSET_MS);
+  const start = new Date(Date.UTC(local.getUTCFullYear(), local.getUTCMonth(), local.getUTCDate() - 1) - KENYA_OFFSET_MS);
+  const end = new Date(start.getTime() + 24 * 60 * 60 * 1000 - 1);
 
-  const comparable = new Date(start);
-  comparable.setDate(comparable.getDate() - 7);
+  const comparable = new Date(start.getTime() - 7 * 24 * 60 * 60 * 1000);
 
   const [today, weekAgo, topItems, itemsWithRecipes] = await Promise.all([
     prisma.order.aggregate({
-      where: { restaurantId, paymentStatus: 'PAID', status: { not: 'CANCELLED' }, createdAt: { gte: start, lte: end } },
+      where: { restaurantId, status: { not: 'CANCELLED' }, createdAt: { gte: start, lte: end } },
       _sum: { totalAmount: true },
       _count: { id: true },
     }),
     prisma.order.aggregate({
-      where: { restaurantId, paymentStatus: 'PAID', status: { not: 'CANCELLED' }, createdAt: { gte: comparable, lt: start } },
+      where: { restaurantId, status: { not: 'CANCELLED' }, createdAt: { gte: comparable, lt: start } },
       _sum: { totalAmount: true },
       _count: { id: true },
     }),
@@ -106,7 +108,7 @@ export async function generateDailyBriefing(restaurantId: string, date = new Dat
       by: ['menuItemId'],
       where: {
         menuItemId: { not: null },
-        order: { restaurantId, paymentStatus: 'PAID', status: { not: 'CANCELLED' }, createdAt: { gte: start, lte: end } },
+        order: { restaurantId, status: { not: 'CANCELLED' }, createdAt: { gte: start, lte: end } },
       },
       _sum: { quantity: true },
       orderBy: { _sum: { quantity: 'desc' } },
