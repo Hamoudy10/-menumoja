@@ -22,33 +22,26 @@ const features: Feature[] = [
     rowSpan: 'lg:row-span-2',
   },
   {
-    icon: MessageCircle,
+    icon: Bot,
     title: 'AI Menu Assistant',
     description:
-      'Your AI sommelier recommends dishes, answers customer questions, and upsells intelligently in English, Swahili, or Arabic.',
-    gradient: 'from-accent to-secondary',
-  },
-  {
-    icon: Wallet,
-    title: 'M-Pesa Ordering',
-    description:
-      'Seamless M-Pesa integration lets customers order and pay directly from their phones. Instant confirmations, zero hassle.',
-    gradient: 'from-success to-secondary',
-  },
-  {
-    icon: Bot,
-    title: 'AI Ordering Assistant',
-    description:
-      'Smart AI assistant that helps customers discover menu items, answer questions, and place orders naturally.',
+      'Your AI assistant recommends dishes, answers customer questions in English, Swahili or Arabic, and upsells intelligently.',
     gradient: 'from-secondary to-accent',
     colSpan: 'lg:col-span-2',
     rowSpan: 'lg:row-span-2',
   },
   {
-    icon: Camera,
-    title: 'Camera Surveillance',
+    icon: Wallet,
+    title: 'M-Pesa & Cash Payments',
     description:
-      'AI-powered CCTV with motion detection, theft alerts, and real-time monitoring from your dashboard.',
+      'Seamless M-Pesa, cash and card payments with instant confirmations and KRA eTIMS receipts.',
+    gradient: 'from-success to-secondary',
+  },
+  {
+    icon: Camera,
+    title: 'Camera Surveillance (Premium)',
+    description:
+      'Optional AI-powered CCTV with motion detection and theft alerts — available on the Premium plan.',
     gradient: 'from-accent to-secondary',
   },
   {

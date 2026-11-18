@@ -1,4 +1,4 @@
-import { Navbar, Hero, SocialProof, Features, HowItWorks, Pricing, Testimonials, Footer } from '@/components/landing'
+import { Navbar, Hero, SocialProof, Features, HowItWorks, Pricing, Footer } from '@/components/landing'
 import { ChefAIAssistant } from '@/components/landing/ChefAIAssistant'
 
 export default function LandingPage() {
@@ -10,7 +10,6 @@ export default function LandingPage() {
       <Features />
       <HowItWorks />
       <Pricing />
-      <Testimonials />
       <Footer />
       <ChefAIAssistant />
     </div>

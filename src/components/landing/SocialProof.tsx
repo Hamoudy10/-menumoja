@@ -81,18 +81,12 @@ export function SocialProof() {
           className="text-center mb-12 sm:mb-16"
         >
           <h2 className="text-2xl sm:text-3xl lg:text-4xl font-bold font-heading text-white mb-3">
-            Trusted by <span className="text-gradient">Mombasa</span>&apos;s Best Restaurants
+            Built for <span className="text-gradient">Kenyan restaurants</span>
           </h2>
           <p className="text-white/50 text-sm sm:text-base max-w-2xl mx-auto font-body">
-            Join hundreds of restaurants already growing with MenuMoja
+            M-Pesa payments, KRA eTIMS receipts, Swahili support, and QR ordering — in one platform.
           </p>
         </motion.div>
-
-        <div className="grid grid-cols-2 lg:grid-cols-4 gap-6 sm:gap-8 lg:gap-12 mb-16 sm:mb-20">
-          {counters.map((counter) => (
-            <AnimatedCounter key={counter.label} {...counter} />
-          ))}
-        </div>
 
         <motion.div
           initial={{ opacity: 0, y: 20 }}

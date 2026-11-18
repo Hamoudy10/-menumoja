@@ -49,7 +49,7 @@ export function Hero() {
               className="inline-flex items-center gap-2 px-4 py-2 rounded-full glass text-white/80 text-xs sm:text-sm mb-6 sm:mb-8"
             >
               <span className="w-2 h-2 bg-success rounded-full animate-pulse" />
-              <span>Trusted by 247+ restaurants in Mombasa 🇰🇪</span>
+              <span>Built for restaurants in Kenya 🇰🇪</span>
             </motion.div>
 
             <h1 className="text-4xl sm:text-5xl lg:text-6xl xl:text-7xl font-bold text-white mb-6 leading-[1.1] max-w-4xl">
